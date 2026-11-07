@@ -37,6 +37,21 @@ cargo test smoke -- --ignored --nocapture   # quét Steam thật trên máy, bac
 Đóng gói (`.exe`/`.msi`, AppImage cho Bazzite) cần `cargo install tauri-cli --version "^2" --locked` rồi `cargo tauri build`.
 Trên Bazzite build trong distrobox/toolbox có `webkit2gtk4.1-devel`, hoặc build AppImage trên máy Linux khác.
 
+## Phát hành
+
+Đẩy tag dạng `vX.Y.Z` là GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)) chạy test, build bộ cài Windows (NSIS `.exe`) và AppImage cho Linux/Bazzite, rồi tạo GitHub Release. Số phiên bản lấy từ tag.
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release.
+
+## Trang web
+
+Thư mục `site/` là trang tĩnh (trang chủ, hướng dẫn, Privacy, Terms) để deploy lên Vercel với Root Directory là `site`. Số sao, số lượt tải và nút tải bản mới nhất lấy trực tiếp từ GitHub API.
+
 ## Chưa làm
 
 - Launch wrapper `checkpoint run -- %command%` (tự restore trước khi chơi, backup sau khi tắt)

@@ -6,32 +6,185 @@
 <title>Checkpoint · Save game sync</title>
 <meta name="description" content="Checkpoint backs up and restores Steam save games between your own PCs using your own Google Drive.">
 <link rel="icon" href="icon.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Be+Vietnam+Pro:wght@400;500&family=JetBrains+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="wrap">
   <header>
     <a class="logo" href="/"><img src="icon.png" alt="">Checkpoint</a>
-    <nav><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></nav>
+    <nav>
+      <a href="#huong-dan">Hướng dẫn</a>
+      <a href="#google">Kết nối Google</a>
+      <a href="https://github.com/fr0stf0x/checkpoint" id="ghLink">GitHub</a>
+    </nav>
   </header>
 
-  <h1>Đồng bộ save game Steam giữa các máy của bạn</h1>
-  <p class="lead">Checkpoint là app desktop cá nhân (Windows và Linux) giúp backup và restore save game Steam vào chính Google Drive của bạn, kể cả khi Steam chạy offline mode.</p>
-  <p class="lead" lang="en">Checkpoint is a personal desktop app for Windows and Linux that backs up and restores Steam save games to your own Google Drive, so you can continue the same progress on another PC.</p>
+  <section class="hero">
+    <h1>Đồng bộ save game Steam giữa các máy của bạn</h1>
+    <p class="lead">App desktop cho Windows và Linux (Bazzite, SteamOS…). Backup và restore save game vào chính Google Drive của bạn, kể cả khi Steam chạy offline mode.</p>
+    <p class="lead" lang="en">A personal desktop app that backs up and restores Steam save games to your own Google Drive, so you can continue the same progress on another PC.</p>
+    <div class="dl">
+      <a class="btn primary" id="dlMain" href="https://github.com/fr0stf0x/checkpoint/releases/latest">Tải bản mới nhất</a>
+      <a class="btn" id="dlAlt" href="https://github.com/fr0stf0x/checkpoint/releases">Tất cả phiên bản</a>
+    </div>
+    <div class="stats" id="stats">
+      <a class="stat" href="https://github.com/fr0stf0x/checkpoint/stargazers"><span class="num" id="stStars">–</span><span class="lbl">sao trên GitHub</span></a>
+      <a class="stat" href="https://github.com/fr0stf0x/checkpoint/releases"><span class="num" id="stDl">–</span><span class="lbl">lượt tải</span></a>
+      <a class="stat" href="https://github.com/fr0stf0x/checkpoint/releases/latest"><span class="num" id="stVer">–</span><span class="lbl" id="stVerDate">phiên bản mới nhất</span></a>
+    </div>
+  </section>
 
   <div class="grid">
-    <div class="card"><h2>Chạy trên máy bạn</h2><p>Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn.</p></div>
-    <div class="card"><h2>Quyền tối thiểu</h2><p>Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.</p></div>
-    <div class="card"><h2>Không ghi đè nhầm</h2><p>So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản trên cloud, và chụp snapshot trước mỗi lần restore.</p></div>
+    <div class="card"><h3>Chạy trên máy bạn</h3><p>Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn.</p></div>
+    <div class="card"><h3>Quyền tối thiểu</h3><p>Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.</p></div>
+    <div class="card"><h3>Không ghi đè nhầm</h3><p>So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản cloud, chụp snapshot trước mỗi lần restore, giữ 10 bản gần nhất.</p></div>
+    <div class="card"><h3>Windows ↔ Bazzite</h3><p>Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game).</p></div>
   </div>
+
+  <section id="huong-dan" class="guide">
+    <h2>Hướng dẫn sử dụng</h2>
+
+    <ol class="steps">
+      <li>
+        <h3>Cài app</h3>
+        <ul>
+          <li><b>Windows:</b> tải <code>Checkpoint_x.y.z_x64-setup.exe</code> và chạy. Windows SmartScreen có thể cảnh báo vì app chưa ký số: bấm <i>More info → Run anyway</i>.</li>
+          <li><b>Bazzite / Linux:</b> tải file <code>.AppImage</code>, chuột phải → <i>Properties → Permissions</i> → cho phép chạy (hoặc <code>chmod +x Checkpoint_*.AppImage</code>), rồi mở ở Desktop Mode.</li>
+          <li>Mở app lần đầu: bấm <b>Tải manifest</b> để app biết vị trí save của các game.</li>
+        </ul>
+      </li>
+      <li>
+        <h3>Tạo Google Client ID (làm 1 lần, dùng cho mọi máy)</h3>
+        <p>Xem phần <a href="#google">Kết nối Google Drive</a> bên dưới. Mất khoảng 5–10 phút.</p>
+      </li>
+      <li>
+        <h3>Kết nối trong app</h3>
+        <ul>
+          <li>Vào <b>Cài đặt → Nơi lưu backup</b>. Nếu chưa có rclone, bấm <b>Cài rclone</b>: app tải bản chính thức từ downloads.rclone.org và kiểm tra SHA256, không cần quyền admin.</li>
+          <li>Dán <b>Client ID</b> và <b>Client secret</b>, bấm <b>Kết nối Google Drive</b>, đăng nhập trong trình duyệt vừa mở.</li>
+          <li>Làm lại bước này trên từng máy, với <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>.</li>
+        </ul>
+      </li>
+      <li>
+        <h3>Dùng hằng ngày</h3>
+        <ul>
+          <li>Chơi xong trên máy A: bấm <b>Backup</b> (hoặc <b>Backup toàn bộ</b>).</li>
+          <li>Trước khi chơi trên máy B: bấm <b>Restore</b> (hoặc <b>Restore toàn bộ</b>).</li>
+          <li>Tắt game trước khi backup hoặc restore. App không cho thao tác khi game đang chạy.</li>
+        </ul>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Trạng thái</th><th>Nghĩa là</th><th>Nên làm</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill ok">Đã đồng bộ</span></td><td>Save trên máy giống hệt bản mới nhất trên cloud.</td><td>Không cần làm gì.</td></tr>
+            <tr><td><span class="pill warn">Local mới hơn</span></td><td>Bạn vừa chơi trên máy này.</td><td>Backup.</td></tr>
+            <tr><td><span class="pill info">Cloud mới hơn</span></td><td>Máy khác đã backup tiến trình mới.</td><td>Restore.</td></tr>
+            <tr><td><span class="pill bad">Xung đột</span></td><td>Cả máy này lẫn cloud đều đổi từ lần đồng bộ trước.</td><td>Mở Restore, so ngày, chọn giữ một bản. Bản kia vẫn còn trong lịch sử.</td></tr>
+            <tr><td><span class="pill warn">Khác nhau</span></td><td>Máy này chưa đồng bộ game này lần nào.</td><td>So ngày trong hộp thoại rồi quyết định.</td></tr>
+            <tr><td><span class="pill">Chưa rõ vị trí save</span></td><td>Game không có trong manifest.</td><td>Chưa hỗ trợ tự khai báo (sắp có).</td></tr>
+          </tbody>
+        </table></div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="google" class="guide">
+    <h2>Kết nối Google Drive</h2>
+    <p>Checkpoint dùng <a href="https://rclone.org">rclone</a> để nói chuyện với Google Drive. Client ID dùng chung của rclone đang bị Google giới hạn rất chậm và sắp ngừng, nên bạn cần tạo <b>Client ID riêng</b> trong Google Cloud. Miễn phí, và chỉ bạn dùng.</p>
+
+    <ol class="steps">
+      <li>
+        <h3>Tạo project</h3>
+        <ul>
+          <li>Mở <a href="https://console.cloud.google.com/projectcreate">console.cloud.google.com/projectcreate</a>, đăng nhập đúng tài khoản Google sẽ chứa backup.</li>
+          <li>Đặt tên, ví dụ <code>checkpoint-rclone</code>. Organization để <i>No organization</i>. Bấm <b>Create</b>, rồi chọn project vừa tạo ở ô chọn project trên cùng.</li>
+        </ul>
+      </li>
+      <li>
+        <h3>Bật Google Drive API</h3>
+        <ul><li>Mở <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</a>, bấm <b>Enable</b>.</li></ul>
+      </li>
+      <li>
+        <h3>Cấu hình màn hình xin quyền</h3>
+        <ul>
+          <li>Mở <a href="https://console.cloud.google.com/auth/overview">Google Auth Platform</a>, bấm <b>Get started</b>.</li>
+          <li><b>App name:</b> <code>Checkpoint</code>. <b>User support email</b> và <b>Contact email</b>: email của bạn. <b>Audience:</b> chọn <b>External</b>. Đồng ý điều khoản, bấm <b>Create</b>.</li>
+          <li>Vào <b>Branding</b>, phần <i>App domain</i>, điền:
+            <div class="kv">
+              <span>Application home page</span><code class="copy" data-copy-origin="/">https://checkpoint.vercel.app/</code>
+              <span>Privacy policy link</span><code class="copy" data-copy-origin="/privacy">https://checkpoint.vercel.app/privacy</code>
+              <span>Terms of service link</span><code class="copy" data-copy-origin="/terms">https://checkpoint.vercel.app/terms</code>
+              <span>Authorized domains</span><code class="copy" data-copy-host="1">checkpoint.vercel.app</code>
+            </div>
+            <span class="note">Bấm vào ô để copy. Bỏ trống ô logo để không phải chờ Google duyệt logo.</span>
+          </li>
+          <li>Vào <b>Audience</b>, bấm <b>Publish app</b> → <b>Confirm</b>. Trạng thái phải là <b>In production</b>.
+            <div class="callout warn"><b>Đừng để ở “Testing”.</b> Ở chế độ Testing, đăng nhập chỉ có hiệu lực 7 ngày, sau đó app không backup được nữa cho tới khi kết nối lại.</div>
+            <span class="note">Không cần gửi xác minh: quyền <code>drive.file</code> không phải quyền nhạy cảm.</span>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <h3>Tạo OAuth client</h3>
+        <ul>
+          <li>Mở <a href="https://console.cloud.google.com/auth/clients">Clients</a> → <b>Create client</b>.</li>
+          <li><b>Application type:</b> <b>Desktop app</b>. Tên tùy ý. Bấm <b>Create</b>.</li>
+          <li>Copy <b>Client ID</b> (dạng <code>….apps.googleusercontent.com</code>) và <b>Client secret</b> (dạng <code>GOCSPX-…</code>). Bấm <b>Download JSON</b> để giữ lại, vì Google chỉ hiện secret một lần.</li>
+        </ul>
+      </li>
+      <li>
+        <h3>Dán vào Checkpoint và đăng nhập</h3>
+        <ul>
+          <li>Trong app: <b>Cài đặt → Nơi lưu backup</b>, dán Client ID và Client secret, bấm <b>Kết nối Google Drive</b>.</li>
+          <li>Trình duyệt mở trang đăng nhập Google. Chọn tài khoản, rồi:
+            <div class="callout">Google hiện <b>“Google hasn’t verified this app”</b>: bấm <b>Advanced</b> → <b>Go to Checkpoint (unsafe)</b>. Đây là app của chính bạn nên an toàn.</div>
+          </li>
+          <li>Bấm <b>Continue</b> để cho phép quyền xem và quản lý file do app tạo trong Drive.</li>
+          <li>
+            <div class="callout">Nếu sau đó trình duyệt báo <b>“127.0.0.1 refused to connect”</b> thì <b>bỏ qua</b>. Đó là máy chủ tạm của rclone trên máy bạn: nó nhận mã đăng nhập rồi tắt ngay, nên lần tải lại trang tiếp theo sẽ báo lỗi. Quay lại app là thấy đã kết nối.</div>
+          </li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3>Gặp lỗi?</h3>
+    <dl class="faq">
+      <dt>Báo “Error 403: access_denied”</dt>
+      <dd>App vẫn ở chế độ Testing và tài khoản đang đăng nhập không nằm trong Test users. Bấm <b>Publish app</b> như bước 3.</dd>
+      <dt>Báo “redirect_uri_mismatch”</dt>
+      <dd>Client tạo sai loại. Tạo lại client loại <b>Desktop app</b>, không phải Web application.</dd>
+      <dt>Sau 7 ngày không backup được</dt>
+      <dd>App đang ở Testing. Publish app, rồi bấm <b>Kết nối lại Google Drive</b> trong app.</dd>
+      <dt>Máy khác không thấy bản backup</dt>
+      <dd>Hai máy phải dùng <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>. Với quyền <code>drive.file</code>, Client ID khác sẽ không thấy file do client kia tạo.</dd>
+      <dt>Muốn xóa hết dữ liệu</dt>
+      <dd>Xóa thư mục <code>Checkpoint</code> trong Google Drive, và thu hồi quyền ở <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</dd>
+    </dl>
+  </section>
+
+  <section class="guide">
+    <h2>Lưu ý</h2>
+    <ul>
+      <li><b>Save gắn SteamID:</b> một số game (Elden Ring, Sekiro, Dark Souls…) chỉ đọc được save trên đúng account Steam đã tạo ra nó. App đánh dấu những game này.</li>
+      <li><b>Trên Bazzite:</b> chạy game ít nhất 1 lần qua Proton trước khi restore bản từ Windows, để Proton tạo thư mục prefix.</li>
+      <li><b>Snapshot:</b> trước mỗi lần restore, bản trên máy được lưu ở <code>%LOCALAPPDATA%\Checkpoint\snapshots</code> (Linux: <code>~/.local/share/Checkpoint/snapshots</code>).</li>
+      <li><b>File cài đặt đồ họa</b> mặc định không được backup, để máy khác GPU không bị đè độ phân giải. Bật trong Cài đặt nếu muốn.</li>
+    </ul>
+  </section>
 
   <section class="card">
     <h2>Google user data</h2>
     <p lang="en">Checkpoint requests the Google Drive scope <code>https://www.googleapis.com/auth/drive.file</code> only to create, read and update the backup files it creates in a folder named <code>Checkpoint</code> in the user's own Google Drive. Data is transferred directly between the user's computer and Google. It is not sent to any server operated by the developer and is not shared with anyone. See the <a href="/privacy">Privacy Policy</a>.</p>
   </section>
 
-  <footer><span>Checkpoint · dự án cá nhân, không liên kết với Valve hay Google.</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+  <footer>
+    <span>Checkpoint · dự án cá nhân mã nguồn mở, không liên kết với Valve hay Google.</span>
+    <a href="https://github.com/fr0stf0x/checkpoint">GitHub</a>
+    <a href="https://github.com/fr0stf0x/checkpoint/issues">Báo lỗi</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+  </footer>
 </div>
+<script src="main.js"></script>
 </body>
 </html>
