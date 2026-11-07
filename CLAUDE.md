@@ -98,5 +98,9 @@ UI đã chốt trong mockup: trình hướng dẫn 3 bước (Chọn A → B và
 - Phải tắt `checkpoint.exe` đang chạy trước khi `cargo build`, vì file exe bị khóa.
 - Test thật trên máy: `cargo test smoke -- --ignored --nocapture` (quét Steam, backup vào thư mục tạm), `cargo test drive_real -- --ignored --nocapture` (backup thật lên nơi lưu đang cấu hình), `cargo test install_real -- --ignored --nocapture` (tải rclone thật). Không restore đè lên save thật khi test.
 - Phát hành: đánh tag `vX.Y.Z` và push tag. Hỏi chủ dự án trước khi push hoặc đánh tag.
+- **Changelog (bắt buộc mỗi lần release, viết bằng tiếng Anh):**
+  - Trong lúc làm, ghi thay đổi vào mục `## [Unreleased]` của `CHANGELOG.md` (định dạng Keep a Changelog: Added / Changed / Fixed / Removed), viết cho người dùng đọc, không liệt kê chi tiết code.
+  - Trước khi đánh tag: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm mục `## [Unreleased]` trống mới ở trên, cập nhật các link so sánh ở cuối file, commit, rồi mới tag.
+  - Workflow release lấy đúng mục `## [X.Y.Z]` và đặt **trên** phần hướng dẫn cài đặt trong ghi chú GitHub Release. Không có mục cho phiên bản đó thì workflow dừng, không phát hành.
 - Commit message: không thêm dòng `Co-Authored-By: Claude`. Trên Windows PowerShell 5.1, message có dấu `"` sẽ bị cắt khi truyền cho git → ghi message ra file rồi `git commit -F <file>`.
 - Không bao giờ in hay commit token rclone, client secret, hay nội dung `rclone.conf`.

@@ -92,6 +92,27 @@ jobs:
           rm -f src-tauri/Cargo.toml.bak
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
+      # The release notes start with this version's section of CHANGELOG.md
+      - name: Extract this version's changelog
+        id: notes
+        shell: bash
+        run: |
+          NOTES=$(awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found && /^\[[^]]+\]: / { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d')
+          if [ -z "$NOTES" ]; then
+            echo "CHANGELOG.md has no section for [$VERSION]. Add it before tagging." >&2
+            exit 1
+          fi
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$NOTES"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and publish the GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -102,9 +123,15 @@ jobs:
           tagName: ${{ env.TAG }}
           releaseName: Checkpoint ${{ env.TAG }}
           releaseBody: |
+            ## What's new
+
+            ${{ steps.notes.outputs.body }}
+
+            ## Install
+
             **Windows:** download `Checkpoint_${{ env.VERSION }}_x64-setup.exe` and run it.
             **Bazzite / Linux:** download the `.AppImage`, right-click → Properties → allow executing (or `chmod +x`), then open it.
 
-            Setup guide, including connecting Google Drive: see the project website.
+            Setup guide, including connecting Google Drive: see the project website. Full history: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
           releaseDraft: false
           prerelease: ${{ contains(env.TAG, '-') }}
