@@ -3,7 +3,16 @@
   const REPO = 'fr0stf0x/checkpoint';
   const API = 'https://api.github.com/repos/' + REPO;
   const $ = (id) => document.getElementById(id);
-  const fmtNum = (n) => n.toLocaleString('vi-VN');
+  const EN = document.documentElement.lang === 'en';
+  const LOCALE = EN ? 'en-US' : 'vi-VN';
+  const T = EN ? {
+    copy: 'Click to copy', none: 'none yet', noneLbl: 'releases', released: 'released ',
+    win: 'Download for Windows', lin: 'Download for Linux / Bazzite', winAlt: 'Windows version', linAlt: 'Linux / Bazzite version',
+  } : {
+    copy: 'Bấm để copy', none: 'chưa có', noneLbl: 'bản phát hành', released: 'phát hành ',
+    win: 'Tải cho Windows', lin: 'Tải cho Linux / Bazzite', winAlt: 'Bản Windows', linAlt: 'Bản Linux / Bazzite',
+  };
+  const fmtNum = (n) => n.toLocaleString(LOCALE);
 
   // Điền link thật của trang đang chạy (vd. https://ten-du-an.vercel.app) vào phần hướng dẫn Google
   document.querySelectorAll('[data-copy-origin]').forEach((el) => {
@@ -13,7 +22,7 @@
     el.textContent = location.hostname;
   });
   document.querySelectorAll('code.copy').forEach((el) => {
-    el.title = 'Bấm để copy';
+    el.title = T.copy;
     el.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(el.textContent);
@@ -66,20 +75,20 @@
     $('stDl').textContent = fmtNum(total);
 
     const latest = data.releases.find((r) => !r.pre) || data.releases[0];
-    if (!latest) { $('stVer').textContent = 'chưa có'; $('stVerDate').textContent = 'bản phát hành'; return; }
+    if (!latest) { $('stVer').textContent = T.none; $('stVerDate').textContent = T.noneLbl; return; }
     $('stVer').textContent = latest.tag;
-    $('stVerDate').textContent = 'phát hành ' + new Date(latest.date).toLocaleDateString('vi-VN');
+    $('stVerDate').textContent = T.released + new Date(latest.date).toLocaleDateString(LOCALE);
 
     const win = latest.assets.find((a) => /setup\.exe$/i.test(a.name)) || latest.assets.find((a) => /\.(exe|msi)$/i.test(a.name));
     const lin = latest.assets.find((a) => /\.AppImage$/i.test(a.name));
     const main = $('dlMain'), alt = $('dlAlt');
     const os = visitorOs();
     if (os === 'linux' && lin) {
-      main.href = lin.url; main.textContent = `Tải cho Linux / Bazzite (${latest.tag})`;
-      if (win) { alt.href = win.url; alt.textContent = 'Bản Windows'; }
+      main.href = lin.url; main.textContent = `${T.lin} (${latest.tag})`;
+      if (win) { alt.href = win.url; alt.textContent = T.winAlt; }
     } else if (win) {
-      main.href = win.url; main.textContent = `Tải cho Windows (${latest.tag})`;
-      if (lin) { alt.href = lin.url; alt.textContent = 'Bản Linux / Bazzite'; }
+      main.href = win.url; main.textContent = `${T.win} (${latest.tag})`;
+      if (lin) { alt.href = lin.url; alt.textContent = T.linAlt; }
     }
   }
 
