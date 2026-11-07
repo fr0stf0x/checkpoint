@@ -86,6 +86,7 @@ tbody tr:hover td{background:var(--surface-2)}
 .row input[type=text]{flex:1;min-width:220px}
 .group{border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--surface)}
 .group h3{font-size:15px}
+.errmsg{white-space:pre-wrap;word-break:break-word;font-family:var(--f-mono);font-size:12.5px}
 .steps{display:flex;flex-direction:column;gap:10px}
 .wsteps{display:flex;gap:6px;flex-wrap:wrap}
 .wsteps span{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}

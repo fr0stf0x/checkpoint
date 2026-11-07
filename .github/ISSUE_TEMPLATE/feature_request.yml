@@ -1,0 +1,39 @@
+name: Đề xuất tính năng / Feature request
+description: Ý tưởng làm Checkpoint tốt hơn / An idea to make Checkpoint better
+title: "[Đề xuất] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Bạn đang gặp vấn đề gì? / What problem are you trying to solve?
+      description: Ví dụ "Mỗi lần chơi xong tôi hay quên bấm Backup". / For example "I keep forgetting to back up after playing".
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Bạn muốn app làm gì? / What would you like the app to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Cách khác đã thử / Alternatives you've considered
+
+  - type: input
+    id: games
+    attributes:
+      label: Game liên quan (nếu có) / Games involved (if any)
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Bạn dùng trên / You use it on
+      multiple: true
+      options:
+        - Windows
+        - Bazzite / SteamOS
+        - Linux khác / Other Linux

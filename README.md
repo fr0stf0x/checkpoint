@@ -18,6 +18,12 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Move a game's save from one Steam account to another (for example when you have to switch accounts): copies the account's save folder to the new account, fixes `steam_autocloud.vdf`, optionally replaces the SteamID inside save files, then lets you test in game and **keep** or **undo** in one click. The original account's files are never touched. Restore can also write a backup into a different account.
 - Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID.
 
+## Reporting bugs
+
+- The app writes a log to `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`), rotated at 2 MB. Home folder paths are replaced with `~`; tokens, client secrets and Steam account names are never logged.
+- When something fails, the app shows an error dialog with **Create issue on GitHub**. It opens a new issue in your browser with version, OS, the error and the end of the log prefilled (SteamIDs masked). No GitHub credentials are stored in the app: you sign in to GitHub in the browser and press Submit.
+- The **Report bug / Feedback** button in the sidebar opens the bug report or feature request form, and can copy the log or open the log folder.
+
 ## How it works
 
 - Reads `libraryfolders.vdf` and `appmanifest_*.acf` for installed games, and `loginusers.vdf` for accounts.

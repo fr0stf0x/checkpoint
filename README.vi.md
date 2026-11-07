@@ -18,6 +18,12 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Chuyển save của một game từ tài khoản Steam này sang tài khoản khác (ví dụ khi phải đổi tài khoản): copy thư mục save sang tài khoản mới, sửa `steam_autocloud.vdf`, tùy chọn thay SteamID bên trong file save, rồi để bạn thử trong game và **Giữ** hoặc **Hoàn tác** bằng 1 click. File của tài khoản cũ không bao giờ bị đụng tới. Restore cũng ghi được bản backup vào tài khoản khác.
 - Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn.
 
+## Báo lỗi
+
+- App ghi log vào `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`), quá 2 MB thì xoay vòng. Đường dẫn thư mục người dùng được thay bằng `~`; không bao giờ ghi token, client secret hay tên tài khoản Steam.
+- Khi có lỗi, app hiện popup có nút **Tạo issue trên GitHub**. Nút này mở trang tạo issue trong trình duyệt với phiên bản, hệ điều hành, thông báo lỗi và phần cuối của log điền sẵn (SteamID được che). App không chứa thông tin đăng nhập GitHub nào: bạn đăng nhập GitHub trên trình duyệt rồi bấm Submit.
+- Nút **Báo lỗi / Góp ý** ở thanh bên mở form báo lỗi hoặc đề xuất tính năng, và có nút copy log hoặc mở thư mục log.
+
 ## Cách hoạt động
 
 - Đọc `libraryfolders.vdf` và `appmanifest_*.acf` để biết game đã cài, `loginusers.vdf` để biết tài khoản.

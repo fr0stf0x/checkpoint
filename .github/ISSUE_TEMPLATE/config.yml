@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Hướng dẫn sử dụng và kết nối Google Drive / Setup guide
+    url: https://github.com/fr0stf0x/checkpoint#readme
+    about: Xem hướng dẫn trước khi báo lỗi kết nối Google. / Read the guide before reporting Google sign-in problems.

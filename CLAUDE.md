@@ -57,6 +57,7 @@ Giao diện app thật (`ui/`) đi theo prototype này: sidebar Game / Tài kho�
 | Save trong Registry | Chưa làm |
 | Giữ 1 tiến trình `rclone rcd` chạy nền thay vì gọi rclone mỗi lệnh (~3 giây/lệnh hiện tại) | Chưa làm |
 | Giao diện tiếng Anh cho app (hiện app chỉ có tiếng Việt, site có cả 2) | Chưa làm |
+| Log ở máy client (`logger.rs`), popup lỗi có nút "Tạo issue", nút "Báo lỗi / Góp ý", issue template bug/feature | Xong. Issue tạo bằng URL điền sẵn (`report.rs`), không nhúng credentials GitHub; field `id` trong template phải khớp tham số URL (`version`, `os`, `what-happened`, `logs`) |
 
 ## Use case: chơi tiếp bằng tài khoản khác (A → B)
 
@@ -88,4 +89,5 @@ UI đã chốt trong mockup: trình hướng dẫn 3 bước (Chọn A → B và
 - Phải tắt `checkpoint.exe` đang chạy trước khi `cargo build`, vì file exe bị khóa.
 - Test thật trên máy: `cargo test smoke -- --ignored --nocapture` (quét Steam, backup vào thư mục tạm), `cargo test drive_real -- --ignored --nocapture` (backup thật lên nơi lưu đang cấu hình), `cargo test install_real -- --ignored --nocapture` (tải rclone thật). Không restore đè lên save thật khi test.
 - Phát hành: đánh tag `vX.Y.Z` và push tag. Hỏi chủ dự án trước khi push hoặc đánh tag.
+- Commit message: không thêm dòng `Co-Authored-By: Claude`. Trên Windows PowerShell 5.1, message có dấu `"` sẽ bị cắt khi truyền cho git → ghi message ra file rồi `git commit -F <file>`.
 - Không bao giờ in hay commit token rclone, client secret, hay nội dung `rclone.conf`.

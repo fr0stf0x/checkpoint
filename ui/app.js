@@ -68,7 +68,7 @@
   async function loadGames() {
     S.loading = true; render();
     try { S.list = await call('list_games'); }
-    catch (e) { S.list = null; toast(String(e), true); }
+    catch (e) { S.list = null; fail('Không quét được game', e); }
     try { S.pending = await call('migrate_pending'); } catch (e) { S.pending = []; }
     S.loading = false;
     $('#cGames').textContent = S.list ? S.list.games.length : '';
@@ -187,7 +187,7 @@
   async function renderHistory() {
     pane.innerHTML = `<div class="panehead"><h2>Lịch sử backup</h2></div><div class="loading"><span class="spin"></span>Đang đọc từ cloud…</div>`;
     let items = [];
-    try { items = backendReady() ? await call('history') : []; } catch (e) { toast(String(e), true); }
+    try { items = backendReady() ? await call('history') : []; } catch (e) { fail('Không đọc được lịch sử từ cloud', e); }
     if (S.view !== 'history') return;
     pane.innerHTML = `<div class="panehead"><h2>Lịch sử backup</h2></div>
       <div class="list">${items.map((v) => `<div><span class="mono">${fmt(v.created_utc)}</span><span>${esc(v.game_name)} <span class="note">· ${v.files} file · ${human(v.bytes)}</span></span><span class="note">${esc(v.device_name)} (${v.os})</span></div>`).join('') || '<div class="empty" style="display:block">Chưa có bản backup nào.</div>'}</div>
@@ -405,7 +405,7 @@
         toast(`${m.game_name}: đã hoàn tác, trả lại như trước khi chuyển.`);
       }
       if (inWizard) { W.done[id] = kind; renderWizard(); } else close();
-    } catch (e) { if (!inWizard) close(); toast(String(e), true); }
+    } catch (e) { fail(kind === 'keep' ? 'Không giữ được kết quả chuyển save' : 'Không hoàn tác được', e); }
     loadGames();
   }
 
@@ -472,7 +472,7 @@
       S.busy = false;
       const msg = String(e);
       if (msg.startsWith('NEEDS_CONFIRM')) { close(); return kind === 'backup' ? confirmBackup(g) : openRestore(g); }
-      close(); toast(msg, true); render();
+      fail(`${kind === 'backup' ? 'Backup' : 'Restore'} ${g.name} không thành công`, msg); render();
     }
   }
 
@@ -499,7 +499,7 @@
   async function openRestore(g) {
     busyModal(`Restore · ${g.name}`);
     let versions = [];
-    try { versions = await call('list_versions', { appid: g.appid }); } catch (e) { close(); return toast(String(e), true); }
+    try { versions = await call('list_versions', { appid: g.appid }); } catch (e) { return fail('Không đọc được danh sách bản backup', e); }
     if (!versions.length) { close(); return toast('Chưa có bản backup nào của game này.', true); }
     renderRestore(g, versions, versions[0].id);
   }
@@ -601,7 +601,7 @@
     }
     S.busy = false; close();
     toast(`Xong ${ok}/${todo.length} game.`);
-    errs.forEach((e) => toast(e, true));
+    if (errs.length) fail(`${kind === 'backup' ? 'Backup' : 'Restore'} toàn bộ: ${errs.length} game lỗi`, errs.join('\n'));
     await loadGames();
   }
 
@@ -642,7 +642,7 @@
       else if (a === 'manifest') {
         busyModal('Tải manifest vị trí save');
         try { const c = await call('update_manifest'); close(); toast(`Đã tải manifest: ${c.toLocaleString('vi')} game.`); await loadInfo(); await loadGames(); }
-        catch (err) { close(); toast(String(err), true); }
+        catch (err) { fail('Không tải được manifest', err); }
       }
       else if (a === 'pick') { const p = await call('pick_folder'); if (p) $('#fPath').value = p; }
       else if (a === 'rinstall') {
@@ -650,7 +650,7 @@
         $('#busyText').textContent = 'Đang tải rclone (khoảng 25 MB) và kiểm tra SHA256…';
         S.busy = true;
         try { const v = await call('rclone_install'); close(); toast(`Đã cài ${v}`); loadRclone(); }
-        catch (err) { close(); toast(String(err), true); }
+        catch (err) { fail('Không cài được rclone', err); }
         S.busy = false;
       }
       else if (a === 'rconnect') {
@@ -663,15 +663,68 @@
           const r = await call('rclone_connect', { clientId, clientSecret });
           S.busy = false; close(); toast(`Đã kết nối: ${r}`);
           await loadInfo(); S.list = null; render(); loadGames();
-        } catch (err) { S.busy = false; close(); toast(String(err), true); loadRclone(); }
+        } catch (err) { S.busy = false; fail('Không kết nối được Google Drive', err); loadRclone(); }
       }
       else if (a === 'saveCfg') {
         const cfg = readSettings();
         await call('save_config', { config: cfg });
         await loadInfo(); toast('Đã lưu cài đặt.'); S.list = null; S.accounts = null; render(); loadGames();
       }
-    } catch (err) { toast(String(err), true); }
+      else if (a === 'report') openReport();
+      else if (a === 'reportBug') reportIssue('bug', '[Lỗi] ', null);
+      else if (a === 'reportFeature') reportIssue('feature', '[Đề xuất] ', null);
+      else if (a === 'issueFromError') reportIssue('bug', `[Lỗi] ${S.lastError ? S.lastError.title : ''}`, S.lastError ? S.lastError.msg : null);
+      else if (a === 'openLogs') await call('open_log_folder');
+      else if (a === 'copyLog') copyLog();
+    } catch (err) { fail('Có lỗi xảy ra', err); }
   });
+
+  // ---------- báo lỗi ----------
+  function logUi(level, message) {
+    if (!invoke) return;
+    invoke('log_frontend', { level, message: String(message) }).catch(() => {});
+  }
+  window.addEventListener('error', (e) => logUi('error', `JS: ${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`));
+  window.addEventListener('unhandledrejection', (e) => logUi('error', `Promise: ${e.reason && e.reason.stack ? e.reason.stack : e.reason}`));
+
+  /** Popup lỗi có nút Tạo issue. Backend đã ghi lỗi của lệnh vào log; ở đây ghi thêm ngữ cảnh trên giao diện. */
+  function fail(title, e) {
+    const msg = String(e && e.message ? e.message : e);
+    logUi('error', `${title}: ${msg}`);
+    S.lastError = { title, msg };
+    S.busy = false;
+    modal(`<h3>${esc(title)}</h3>
+      <div class="alert bad"><span class="errmsg">${esc(msg)}</span></div>
+      <p class="note">Nếu lỗi lặp lại, bấm <b>Tạo issue trên GitHub</b>: trang GitHub mở trong trình duyệt với phiên bản, hệ điều hành, thông báo lỗi và log điền sẵn (đường dẫn thư mục người dùng và SteamID đã được che). Chỉ cần đăng nhập GitHub, xem lại rồi bấm Submit.</p>
+      <div class="mfoot"><button class="btn" data-act="openLogs">Mở thư mục log</button><button class="btn" data-act="copyLog">Copy log</button><span class="spacer"></span>
+        <button class="btn" data-close="1">Đóng</button><button class="btn primary" data-act="issueFromError">Tạo issue trên GitHub</button></div>`);
+  }
+
+  function openReport() {
+    const v = S.info ? S.info.version : '';
+    modal(`<h3>Báo lỗi / Góp ý</h3>
+      <p>Mở trang GitHub của Checkpoint trong trình duyệt. Cần tài khoản GitHub (miễn phí) để gửi.</p>
+      <div class="cards">
+        <div class="card"><b>Báo lỗi</b><span class="note">App chạy sai, báo lỗi, hay save không như mong đợi. Phiên bản, hệ điều hành và log được điền sẵn (đã che đường dẫn thư mục người dùng và SteamID).</span><div><button class="btn primary" data-act="reportBug">Báo lỗi</button></div></div>
+        <div class="card"><b>Đề xuất tính năng</b><span class="note">Ý tưởng để app tiện hơn. Không gửi kèm log.</span><div><button class="btn" data-act="reportFeature">Đề xuất</button></div></div>
+      </div>
+      <p class="note">Log nằm ở <span class="mono">${esc(S.info ? S.info.log_dir : '')}</span>. Checkpoint ${esc(v)}.</p>
+      <div class="mfoot"><button class="btn" data-act="openLogs">Mở thư mục log</button><button class="btn" data-act="copyLog">Copy log</button><span class="spacer"></span><button class="btn" data-close="1">Đóng</button></div>`);
+  }
+
+  async function reportIssue(kind, title, error) {
+    try {
+      const r = await call('report_issue', { kind, title, error });
+      toast('Đã mở GitHub trong trình duyệt. Xem lại nội dung rồi bấm Submit.');
+      if (r.log_truncated) toast('Log dài nên chỉ điền phần cuối. Cần thêm thì bấm Mở thư mục log và kéo file checkpoint.log vào issue.');
+    } catch (e) { toast(String(e), true); }
+  }
+
+  async function copyLog() {
+    const text = await call('get_log', { lines: 2000 });
+    try { await navigator.clipboard.writeText(text); toast('Đã copy log (đã che đường dẫn thư mục người dùng và SteamID).'); }
+    catch (e) { toast('Không copy được. Bấm Mở thư mục log và gửi file checkpoint.log.', true); }
+  }
   function confirmOrBackup(g) {
     if (g.status === 'local' || g.status === 'new') doOp('backup', g, {});
     else confirmBackup(g);
