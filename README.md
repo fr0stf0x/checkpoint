@@ -105,7 +105,4 @@ Checkpoint is free and open source. If it saved your progress, you can [buy me a
 
 ## Roadmap
 
-- Launch wrapper `checkpoint run -- %command%` (restore before playing, back up after quitting)
-- "Currently playing on PC X" lock
-- Custom game entries
-- Restore a local snapshot from the UI
+See [TODO.md](TODO.md). Highlights: a launch wrapper (`checkpoint run -- %command%`), a "playing on PC X" lock, custom game entries, game and account artwork, and a redesigned website.

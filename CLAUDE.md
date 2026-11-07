@@ -38,6 +38,8 @@ Giao diện app thật (`ui/`) đi theo prototype này: sidebar Game / Tài kho�
 
 ## Đề xuất và trạng thái
 
+Việc chưa làm được theo dõi ở **`TODO.md`** (tiếng Anh, checkbox). Khi xong một mục: tick trong TODO.md và ghi vào `CHANGELOG.md` mục `[Unreleased]`. Bảng dưới là lịch sử các đề xuất từ lúc brainstorm.
+
 | Đề xuất | Trạng thái |
 |---|---|
 | So sánh bằng hash, phân biệt 3 trạng thái + xung đột | Xong |

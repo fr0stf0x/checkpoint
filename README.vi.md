@@ -105,7 +105,4 @@ Checkpoint miễn phí và mã nguồn mở. Nếu app giữ được tiến tr�
 
 ## Sắp làm
 
-- Launch wrapper `checkpoint run -- %command%` (tự restore trước khi chơi, backup sau khi tắt)
-- Khóa "đang chơi ở máy X"
-- Tự khai báo game
-- Restore snapshot local từ giao diện
+Xem [TODO.md](TODO.md). Nổi bật: launch wrapper (`checkpoint run -- %command%`), khóa "đang chơi ở máy X", tự khai báo game, ảnh game và ảnh đại diện tài khoản, làm lại trang web.
