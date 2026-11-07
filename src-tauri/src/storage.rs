@@ -32,10 +32,19 @@ pub fn open(backend: &Backend) -> Result<Box<dyn Storage>> {
     }
 }
 
-/// Tìm rclone: đường dẫn trong cấu hình → PATH → thư mục cài của winget (bản mới nhất).
+/// Nơi app tự cài rclone (không cần quyền admin).
+pub fn managed_rclone_path() -> PathBuf {
+    crate::config::data_dir().join("bin").join(if cfg!(windows) { "rclone.exe" } else { "rclone" })
+}
+
+/// Tìm rclone: đường dẫn trong cấu hình → bản app tự cài → PATH → thư mục cài của winget (bản mới nhất).
 pub fn resolve_rclone(configured: Option<&str>) -> String {
     if let Some(b) = configured.map(str::trim).filter(|b| !b.is_empty()) {
         return b.to_string();
+    }
+    let managed = managed_rclone_path();
+    if managed.exists() {
+        return managed.to_string_lossy().to_string();
     }
     let in_path = rclone_command("rclone").arg("version").output().map(|o| o.status.success()).unwrap_or(false);
     if in_path {

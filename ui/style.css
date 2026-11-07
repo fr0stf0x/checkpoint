@@ -86,6 +86,15 @@ tbody tr:hover td{background:var(--surface-2)}
 .row input[type=text]{flex:1;min-width:220px}
 .group{border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px;background:var(--surface)}
 .group h3{font-size:15px}
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:6px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.step.done{border-left-color:var(--ok)}
+.step.todo{border-left-color:var(--warn)}
+.step .note.mono{word-break:break-all}
+details.adv{margin-top:6px}
+details.adv summary{cursor:pointer;color:var(--muted);font-size:13px}
+details.adv[open]{display:flex;flex-direction:column;gap:10px}
+input[type=password]{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 9px}
 .check{display:flex;gap:8px;align-items:flex-start}
 .check input{margin-top:3px;accent-color:var(--accent)}
 .empty{padding:40px;text-align:center;color:var(--muted)}

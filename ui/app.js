@@ -200,12 +200,14 @@
             <option value="rclone" ${b.kind === 'rclone' ? 'selected' : ''}>Google Drive qua rclone (Windows + Bazzite)</option>
             <option value="folder" ${b.kind === 'folder' ? 'selected' : ''}>Thư mục (Google Drive for Desktop, ổ mạng…)</option>
           </select></div>
-        <div id="bkRclone" ${b.kind === 'rclone' ? '' : 'hidden'} class="field">
-          <label class="l" for="rRemote">Remote</label>
-          <div class="row"><input type="text" id="rRemote" value="${esc(b.kind === 'rclone' ? b.remote : 'gdrive:Checkpoint')}"></div>
-          <label class="l" for="rBin">File rclone</label>
-          <div class="row"><input type="text" id="rBin" value="${esc(b.kind === 'rclone' ? (b.bin || '') : '')}" placeholder="rclone (lấy từ PATH)"><button class="btn" data-act="rcheck">Kiểm tra</button></div>
-          <div class="row"><button class="btn primary" data-act="rconnect">Kết nối Google Drive</button><span class="note">Mở trình duyệt để đăng nhập Google, tạo remote tên <span class="mono">gdrive</span>. Cả 3 máy dùng chung 1 tài khoản Google là thấy cùng dữ liệu.</span></div>
+        <div id="bkRclone" ${b.kind === 'folder' ? 'hidden' : ''} class="field">
+          <div id="rcPanel" class="steps"><div class="loading"><span class="spin"></span>Đang kiểm tra rclone…</div></div>
+          <details class="adv"><summary>Nâng cao</summary>
+            <div class="field"><label class="l" for="rRemote">Remote</label>
+              <input type="text" id="rRemote" value="${esc(b.kind === 'rclone' ? b.remote : 'gdrive:Checkpoint')}"></div>
+            <div class="field"><label class="l" for="rBin">File rclone</label>
+              <input type="text" id="rBin" value="${esc(b.kind === 'rclone' ? (b.bin || '') : '')}" placeholder="Để trống để app tự tìm"></div>
+          </details>
         </div>
         <div id="bkFolder" ${b.kind === 'folder' ? '' : 'hidden'} class="field">
           <label class="l" for="fPath">Thư mục</label>
@@ -223,9 +225,37 @@
       <div class="row"><button class="btn primary" data-act="saveCfg">Lưu cài đặt</button><span class="note">Cấu hình lưu ở <span class="mono">${esc(S.info.config_dir)}</span></span></div>
     </div>`;
     $('#bk').addEventListener('change', (e) => {
-      $('#bkRclone').hidden = e.target.value !== 'rclone';
+      $('#bkRclone').hidden = e.target.value === 'folder';
       $('#bkFolder').hidden = e.target.value !== 'folder';
     });
+    loadRclone();
+  }
+
+  const OS_NAME = { windows: 'Windows', linux: 'Linux', macos: 'macOS' };
+
+  async function loadRclone() {
+    let st;
+    try { st = await call('rclone_status'); } catch (e) { st = null; }
+    const panel = $('#rcPanel');
+    if (!panel || S.view !== 'settings') return;
+    if (!st) { panel.innerHTML = '<p class="note">Không kiểm tra được rclone.</p>'; return; }
+    const r = st.remote;
+    const step1 = st.found
+      ? `<div class="step done"><b>1. rclone</b><span>Đã có ${esc(st.version)}${st.managed ? ' (app tự cài)' : ''}</span><span class="note mono">${esc(st.bin)}</span></div>`
+      : `<div class="step todo"><b>1. rclone</b><span>Chưa có rclone trên máy này.</span>
+           <div class="row"><button class="btn primary" data-act="rinstall" ${st.platform ? '' : 'disabled'}>Cài rclone</button>
+           <span class="note">Tải bản chính thức ${esc(st.platform || '')} từ downloads.rclone.org, kiểm tra SHA256, cài vào thư mục của app. Không cần quyền admin.</span></div></div>`;
+    let remoteLine;
+    if (!r) remoteLine = 'Chưa kết nối.';
+    else if (r.custom_client) remoteLine = `Đã kết nối remote <span class="mono">${esc(r.name)}</span> bằng client ID riêng${r.scope ? `, quyền <span class="mono">${esc(r.scope)}</span>` : ''}.`;
+    else remoteLine = `Remote <span class="mono">${esc(r.name)}</span> đang dùng client ID chung của rclone: rất chậm và sắp bị Google ngừng. Nhập client ID riêng để kết nối lại.`;
+    const ok = r && r.custom_client;
+    const step2 = `<div class="step ${ok ? 'done' : 'todo'}"><b>2. Google Drive</b><span>${remoteLine}</span>
+        <div class="field"><label class="l" for="cid">Client ID</label><input type="text" id="cid" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false" ${st.found ? '' : 'disabled'}></div>
+        <div class="field"><label class="l" for="csec">Client secret</label><input type="password" id="csec" placeholder="GOCSPX-…" autocomplete="off" ${st.found ? '' : 'disabled'}></div>
+        <div class="row"><button class="btn ${ok ? '' : 'primary'}" data-act="rconnect" ${st.found ? '' : 'disabled'}>${r ? 'Kết nối lại Google Drive' : 'Kết nối Google Drive'}</button>
+        <span class="note">Mở trình duyệt để đăng nhập Google. Client secret chỉ lưu trong file cấu hình của rclone trên máy này. Dùng cùng client ID và tài khoản Google trên cả 3 máy.</span></div></div>`;
+    panel.innerHTML = `<p class="note">Máy này: ${esc(OS_NAME[st.os] || st.os)} ${esc(st.arch)}</p>${step1}${step2}`;
   }
 
   function readSettings() {
@@ -405,12 +435,25 @@
         catch (err) { close(); toast(String(err), true); }
       }
       else if (a === 'pick') { const p = await call('pick_folder'); if (p) $('#fPath').value = p; }
-      else if (a === 'rcheck') { const v = await call('rclone_check', { bin: $('#rBin').value.trim() || null }); toast(v || 'rclone chạy được'); }
-      else if (a === 'rconnect') {
-        busyModal('Kết nối Google Drive');
-        $('#busyText').textContent = 'Đăng nhập Google trong trình duyệt vừa mở, rồi quay lại đây…';
-        try { const r = await call('rclone_connect', { name: 'gdrive', bin: (S.info.config.backend.bin) || null }); close(); toast(`Đã kết nối: ${r}`); await loadInfo(); render(); }
+      else if (a === 'rinstall') {
+        busyModal('Cài rclone');
+        $('#busyText').textContent = 'Đang tải rclone (khoảng 25 MB) và kiểm tra SHA256…';
+        S.busy = true;
+        try { const v = await call('rclone_install'); close(); toast(`Đã cài ${v}`); loadRclone(); }
         catch (err) { close(); toast(String(err), true); }
+        S.busy = false;
+      }
+      else if (a === 'rconnect') {
+        const clientId = $('#cid').value.trim(), clientSecret = $('#csec').value.trim();
+        if (!clientId || !clientSecret) { toast('Nhập cả Client ID và Client secret.', true); return; }
+        busyModal('Kết nối Google Drive');
+        $('#busyText').textContent = 'Đăng nhập Google trong trình duyệt vừa mở, cho phép quyền, rồi quay lại đây. Nếu sau đó trình duyệt báo "127.0.0.1 refused to connect" thì bỏ qua, rclone đã nhận mã và tắt máy chủ tạm.';
+        S.busy = true;
+        try {
+          const r = await call('rclone_connect', { clientId, clientSecret });
+          S.busy = false; close(); toast(`Đã kết nối: ${r}`);
+          await loadInfo(); S.list = null; render(); loadGames();
+        } catch (err) { S.busy = false; close(); toast(String(err), true); loadRclone(); }
       }
       else if (a === 'saveCfg') {
         const cfg = readSettings();

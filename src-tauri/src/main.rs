@@ -3,6 +3,7 @@
 mod config;
 mod manifest;
 mod paths;
+mod rclone;
 mod steam;
 mod storage;
 mod sync;
@@ -121,45 +122,45 @@ async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     .await
 }
 
-fn rclone_bin(bin: Option<String>) -> String {
-    storage::resolve_rclone(bin.as_deref())
+const REMOTE_NAME: &str = "gdrive";
+
+/// rclone mà người dùng chỉ định trong cấu hình (nếu có).
+fn configured_bin(cfg: &Config) -> Option<String> {
+    match &cfg.backend {
+        Backend::Rclone { bin: Some(b), .. } if !b.trim().is_empty() => Some(b.clone()),
+        _ => None,
+    }
 }
 
 #[tauri::command]
-async fn rclone_check(bin: Option<String>) -> Result<String, String> {
-    blocking(move || {
-        let out = storage::rclone_command(&rclone_bin(bin))
-            .arg("version")
-            .output()
-            .map_err(|_| anyhow::anyhow!("Không tìm thấy rclone. Cài rclone hoặc chỉ đường dẫn tới file rclone."))?;
-        Ok(String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or("").to_string())
+async fn rclone_status() -> Result<rclone::RcloneStatus, String> {
+    blocking(|| {
+        let cfg = Config::load();
+        Ok(rclone::status(configured_bin(&cfg).as_deref(), REMOTE_NAME))
     })
     .await
 }
 
-/// Tạo remote Google Drive cho rclone. Lệnh này mở trình duyệt để đăng nhập Google.
+/// Tải rclone chính thức về thư mục của app.
 #[tauri::command]
-async fn rclone_connect(name: String, bin: Option<String>) -> Result<String, String> {
+async fn rclone_install() -> Result<String, String> {
+    blocking(|| {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        rclone::install()
+    })
+    .await
+}
+
+/// Tạo remote Google Drive bằng client_id riêng rồi trỏ app vào gdrive:Checkpoint.
+/// Lệnh này mở trình duyệt để đăng nhập Google.
+#[tauri::command]
+async fn rclone_connect(client_id: String, client_secret: String) -> Result<String, String> {
     blocking(move || {
-        let name: String = name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
-        if name.is_empty() {
-            anyhow::bail!("Tên remote không hợp lệ");
-        }
-        let bin = rclone_bin(bin);
-        let out = storage::rclone_command(&bin)
-            .args(["config", "create", &name, "drive", "scope=drive.file"])
-            .output()
-            .map_err(|_| anyhow::anyhow!("Không chạy được rclone"))?;
-        if !out.status.success() {
-            anyhow::bail!("rclone lỗi: {}", String::from_utf8_lossy(&out.stderr).trim());
-        }
         let mut cfg = Config::load();
-        let remote = format!("{name}:Checkpoint");
-        let keep_bin = match &cfg.backend {
-            Backend::Rclone { bin: Some(b), .. } if !b.trim().is_empty() => Some(b.clone()),
-            _ => None,
-        };
-        cfg.backend = Backend::Rclone { remote: remote.clone(), bin: keep_bin };
+        let bin = configured_bin(&cfg);
+        rclone::connect(bin.as_deref(), REMOTE_NAME, &client_id, &client_secret)?;
+        let remote = format!("{REMOTE_NAME}:Checkpoint");
+        cfg.backend = Backend::Rclone { remote: remote.clone(), bin };
         cfg.save()?;
         Ok(remote)
     })
@@ -180,7 +181,8 @@ fn main() {
             list_versions,
             history,
             pick_folder,
-            rclone_check,
+            rclone_status,
+            rclone_install,
             rclone_connect
         ])
         .run(tauri::generate_context!())
