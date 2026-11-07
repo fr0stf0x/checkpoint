@@ -53,10 +53,25 @@ Giao diện app thật (`ui/`) đi theo prototype này: sidebar Game / Tài kho�
 | **Khóa "đang chơi ở máy X"** (`lock.json` trên Drive) để tránh xung đột | Chưa làm |
 | Game ngoài Steam / giả lập / tự khai báo đường dẫn (custom entry) | Chưa làm |
 | Backup định kỳ chạy ngầm + icon khay hệ thống | Chưa làm |
-| Ghép account giữa các máy (account A ở PC = account B ở Bazzite) | Chưa làm |
+| **Chuyển save sang tài khoản Steam khác** (A → B), xem mục bên dưới | Chưa làm, đã có mockup (Phần 4 của prototype) |
 | Save trong Registry | Chưa làm |
 | Giữ 1 tiến trình `rclone rcd` chạy nền thay vì gọi rclone mỗi lệnh (~3 giây/lệnh hiện tại) | Chưa làm |
 | Giao diện tiếng Anh cho app (hiện app chỉ có tiếng Việt, site có cả 2) | Chưa làm |
+
+## Use case: chơi tiếp bằng tài khoản khác (A → B)
+
+Yêu cầu của chủ dự án: chơi game (ví dụ Phantom Blade Zero) bằng tài khoản A, hôm sau không dùng A được nữa, muốn chơi tiếp bằng tài khoản B.
+
+Phân loại save (quyết định app làm được gì):
+- Không gắn account → không cần làm gì.
+- SteamID/AccountID chỉ nằm trong tên thư mục (hoặc `userdata/<accountid>`) → copy sang thư mục của B, sửa `steam_autocloud.vdf` (`"accountid"`) sang B. Làm được.
+- ID nằm trong file ở dạng đọc được (chữ hoặc u64 little-endian) → thay ID cùng độ dài, đánh dấu thử nghiệm (có thể vỡ checksum).
+- File mã hóa/nén → không biết game có kiểm tra ID không, phải copy rồi thử trong game, có hoàn tác.
+- Save ở server → không làm được.
+
+Phantom Blade Zero (appid 4115450): save ở `<base>/ProjectPBZ/Saved/SaveGames/Steam/<SteamID64>/` gồm `PBZSaveGame.sav`, thư mục `1RealTime`, `2Hourly`, `3Daily`, và `steam_autocloud.vdf`. File `.sav` có header `PBZS`, entropy ~8 bit/byte (mã hóa hoặc nén), không có SteamID ở dạng đọc được → thuộc nhóm "phải thử".
+
+UI đã chốt trong mockup: trình hướng dẫn 3 bước (Chọn A → B và game → Chuẩn bị: checklist + bảng đổi đường dẫn → Thử trong game: "Chạy được, giữ" / "Không được, hoàn tác"). Lối vào: nút trên thẻ tài khoản, menu "⋯" của game có save gắn SteamID, và hộp thoại Restore tự phát hiện bản cloud của account khác. Sau khi chuyển thành công, lưu cặp A → B lên Drive để các máy khác restore tự ghi vào B. Luôn copy, không bao giờ sửa hay xóa bản của A; chụp snapshot save hiện có của B trước khi ghi.
 
 ## Quy ước làm việc
 
