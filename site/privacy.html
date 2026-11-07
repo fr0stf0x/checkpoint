@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy Policy · Checkpoint</title>
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Be+Vietnam+Pro:wght@400;500&family=JetBrains+Mono&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="logo" href="/"><img src="icon.png" alt="">Checkpoint</a>
+    <nav><a href="/">Home</a><a href="/terms">Terms of Service</a></nav>
+  </header>
+
+  <h1>Privacy Policy</h1>
+  <p class="meta">Last updated: 7 November 2026</p>
+
+  <section>
+    <h2>What Checkpoint is</h2>
+    <p>Checkpoint is a desktop application that runs on the user's own computer. It backs up Steam save game files to the user's own Google Drive and restores them on the user's other computers. There is no Checkpoint server and no Checkpoint account.</p>
+  </section>
+
+  <section>
+    <h2>Data the app accesses</h2>
+    <ul>
+      <li><b>Local files:</b> the Steam installation folder (library list, installed game list, local account list in <code>loginusers.vdf</code>) and the save game files of installed games.</li>
+      <li><b>Google Drive:</b> with the scope <code>https://www.googleapis.com/auth/drive.file</code>, the app creates and reads only the files it created itself, inside a folder named <code>Checkpoint</code>. It cannot see or change other files in the user's Drive.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How the data is used</h2>
+    <ul>
+      <li>Save files are compressed and uploaded to the user's Google Drive, and downloaded back when the user chooses to restore.</li>
+      <li>Each backup includes a small metadata file: game name and Steam App ID, device name chosen by the user, operating system, time of backup, file count, size and a content hash. Folder names in save paths may contain a Steam account ID.</li>
+      <li>This data is used only to show backup status and to perform backup and restore for the user.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Storage and sharing</h2>
+    <ul>
+      <li>Google OAuth tokens are stored only on the user's computer, in the configuration file of the rclone tool that the app uses to talk to Google Drive.</li>
+      <li>Backups are stored only in the user's own Google Drive.</li>
+      <li>No data is sent to the developer or to any third party other than Google. There is no analytics, advertising or tracking.</li>
+      <li>Use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Deleting your data</h2>
+    <ul>
+      <li>Delete the <code>Checkpoint</code> folder in Google Drive to remove all backups.</li>
+      <li>Revoke the app's access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+      <li>Uninstall the app and remove its local folders (<code>%APPDATA%\Checkpoint</code>, <code>%LOCALAPPDATA%\Checkpoint</code> on Windows; <code>~/.config/Checkpoint</code>, <code>~/.cache/Checkpoint</code>, <code>~/.local/share/Checkpoint</code> on Linux).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <p>Questions about this policy: use the support email shown on the Google sign-in consent screen for Checkpoint.</p>
+  </section>
+
+  <footer><a href="/">Home</a><a href="/terms">Terms of Service</a></footer>
+</div>
+</body>
+</html>

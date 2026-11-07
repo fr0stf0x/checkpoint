@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Checkpoint · Save game sync</title>
+<meta name="description" content="Checkpoint backs up and restores Steam save games between your own PCs using your own Google Drive.">
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Be+Vietnam+Pro:wght@400;500&family=JetBrains+Mono&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="logo" href="/"><img src="icon.png" alt="">Checkpoint</a>
+    <nav><a href="/privacy">Privacy Policy</a><a href="/terms">Terms of Service</a></nav>
+  </header>
+
+  <h1>Đồng bộ save game Steam giữa các máy của bạn</h1>
+  <p class="lead">Checkpoint là app desktop cá nhân (Windows và Linux) giúp backup và restore save game Steam vào chính Google Drive của bạn, kể cả khi Steam chạy offline mode.</p>
+  <p class="lead" lang="en">Checkpoint is a personal desktop app for Windows and Linux that backs up and restores Steam save games to your own Google Drive, so you can continue the same progress on another PC.</p>
+
+  <div class="grid">
+    <div class="card"><h2>Chạy trên máy bạn</h2><p>Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn.</p></div>
+    <div class="card"><h2>Quyền tối thiểu</h2><p>Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.</p></div>
+    <div class="card"><h2>Không ghi đè nhầm</h2><p>So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản trên cloud, và chụp snapshot trước mỗi lần restore.</p></div>
+  </div>
+
+  <section class="card">
+    <h2>Google user data</h2>
+    <p lang="en">Checkpoint requests the Google Drive scope <code>https://www.googleapis.com/auth/drive.file</code> only to create, read and update the backup files it creates in a folder named <code>Checkpoint</code> in the user's own Google Drive. Data is transferred directly between the user's computer and Google. It is not sent to any server operated by the developer and is not shared with anyone. See the <a href="/privacy">Privacy Policy</a>.</p>
+  </section>
+
+  <footer><span>Checkpoint · dự án cá nhân, không liên kết với Valve hay Google.</span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></footer>
+</div>
+</body>
+</html>

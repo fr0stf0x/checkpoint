@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checkpoint</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <nav class="side" id="nav">
+      <div class="logo"><i></i>Checkpoint</div>
+      <button data-view="games" class="on">Game <span class="count" id="cGames"></span></button>
+      <button data-view="accounts">Tài khoản Steam <span class="count" id="cAcc"></span></button>
+      <button data-view="history">Lịch sử</button>
+      <button data-view="settings">Cài đặt</button>
+      <div class="sep"></div>
+      <div class="meta" id="sideMeta"></div>
+    </nav>
+    <main class="pane" id="pane"></main>
+  </div>
+  <div id="layer"></div>
+  <div id="toasts"></div>
+  <script src="app.js"></script>
+</body>
+</html>

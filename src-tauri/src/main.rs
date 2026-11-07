@@ -1,0 +1,188 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod config;
+mod manifest;
+mod paths;
+mod steam;
+mod storage;
+mod sync;
+mod vdf;
+
+use config::{Backend, Config};
+use serde::Serialize;
+use std::sync::Mutex;
+
+/// Chỉ cho chạy 1 thao tác backup/restore tại một thời điểm.
+static OP: Mutex<()> = Mutex::new(());
+
+async fn blocking<T, F>(f: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> anyhow::Result<T> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[derive(Serialize)]
+struct Info {
+    config: Config,
+    os: String,
+    steam_root: Option<String>,
+    manifest_games: usize,
+    manifest_updated: Option<i64>,
+    config_dir: String,
+}
+
+#[tauri::command]
+async fn get_info() -> Result<Info, String> {
+    blocking(|| {
+        let cfg = Config::load();
+        let m = sync::manifest();
+        Ok(Info {
+            steam_root: steam::find_root(cfg.steam_root_override.as_deref()).map(|p| p.to_string_lossy().to_string()),
+            os: if cfg!(windows) { "windows".into() } else { "linux".into() },
+            manifest_games: m.as_ref().map(|m| m.games.len()).unwrap_or(0),
+            manifest_updated: m.as_ref().map(|m| m.updated_utc),
+            config_dir: config::config_dir().to_string_lossy().to_string(),
+            config: cfg,
+        })
+    })
+    .await
+}
+
+#[tauri::command]
+async fn save_config(config: Config) -> Result<(), String> {
+    blocking(move || config.save()).await
+}
+
+#[tauri::command]
+async fn update_manifest() -> Result<usize, String> {
+    blocking(|| Ok(sync::set_manifest(manifest::download_and_build()?))).await
+}
+
+#[tauri::command]
+async fn list_games() -> Result<sync::ListResult, String> {
+    blocking(|| sync::list(&Config::load())).await
+}
+
+#[tauri::command]
+async fn list_accounts() -> Result<Vec<steam::Account>, String> {
+    blocking(|| {
+        let cfg = Config::load();
+        let root = steam::find_root(cfg.steam_root_override.as_deref())
+            .ok_or_else(|| anyhow::anyhow!("Không tìm thấy thư mục Steam"))?;
+        Ok(steam::accounts(&root))
+    })
+    .await
+}
+
+#[tauri::command]
+async fn backup_game(appid: u32, force: bool) -> Result<sync::OpResult, String> {
+    blocking(move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        sync::backup(&Config::load(), appid, force)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn restore_game(appid: u32, version_id: Option<String>, force: bool) -> Result<sync::OpResult, String> {
+    blocking(move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        sync::restore(&Config::load(), appid, version_id, force)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_versions(appid: u32) -> Result<Vec<sync::VersionMeta>, String> {
+    blocking(move || sync::versions(&Config::load(), appid)).await
+}
+
+#[tauri::command]
+async fn history() -> Result<Vec<sync::VersionMeta>, String> {
+    blocking(|| sync::history(&Config::load())).await
+}
+
+#[tauri::command]
+async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    blocking(move || {
+        Ok(app
+            .dialog()
+            .file()
+            .blocking_pick_folder()
+            .and_then(|p| p.into_path().ok())
+            .map(|p| p.to_string_lossy().to_string()))
+    })
+    .await
+}
+
+fn rclone_bin(bin: Option<String>) -> String {
+    storage::resolve_rclone(bin.as_deref())
+}
+
+#[tauri::command]
+async fn rclone_check(bin: Option<String>) -> Result<String, String> {
+    blocking(move || {
+        let out = storage::rclone_command(&rclone_bin(bin))
+            .arg("version")
+            .output()
+            .map_err(|_| anyhow::anyhow!("Không tìm thấy rclone. Cài rclone hoặc chỉ đường dẫn tới file rclone."))?;
+        Ok(String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or("").to_string())
+    })
+    .await
+}
+
+/// Tạo remote Google Drive cho rclone. Lệnh này mở trình duyệt để đăng nhập Google.
+#[tauri::command]
+async fn rclone_connect(name: String, bin: Option<String>) -> Result<String, String> {
+    blocking(move || {
+        let name: String = name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').collect();
+        if name.is_empty() {
+            anyhow::bail!("Tên remote không hợp lệ");
+        }
+        let bin = rclone_bin(bin);
+        let out = storage::rclone_command(&bin)
+            .args(["config", "create", &name, "drive", "scope=drive.file"])
+            .output()
+            .map_err(|_| anyhow::anyhow!("Không chạy được rclone"))?;
+        if !out.status.success() {
+            anyhow::bail!("rclone lỗi: {}", String::from_utf8_lossy(&out.stderr).trim());
+        }
+        let mut cfg = Config::load();
+        let remote = format!("{name}:Checkpoint");
+        let keep_bin = match &cfg.backend {
+            Backend::Rclone { bin: Some(b), .. } if !b.trim().is_empty() => Some(b.clone()),
+            _ => None,
+        };
+        cfg.backend = Backend::Rclone { remote: remote.clone(), bin: keep_bin };
+        cfg.save()?;
+        Ok(remote)
+    })
+    .await
+}
+
+fn main() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            get_info,
+            save_config,
+            update_manifest,
+            list_games,
+            list_accounts,
+            backup_game,
+            restore_game,
+            list_versions,
+            history,
+            pick_folder,
+            rclone_check,
+            rclone_connect
+        ])
+        .run(tauri::generate_context!())
+        .expect("Không khởi động được Checkpoint");
+}

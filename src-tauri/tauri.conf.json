@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Checkpoint",
+  "version": "0.1.0",
+  "identifier": "dev.checkpoint.savesync",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Checkpoint",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 820,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "linux": {
+      "appimage": { "bundleMediaFramework": false }
+    }
+  }
+}
