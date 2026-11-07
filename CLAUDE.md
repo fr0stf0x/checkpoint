@@ -1,108 +1,82 @@
-# Checkpoint – ghi chú dự án cho Claude
+# Checkpoint – project notes for Claude
 
-Đọc file này trước khi làm việc. README.md mô tả app làm gì và build thế nào; file này ghi **vì sao**, **yêu cầu gốc**, và **còn gì chưa làm**.
+Read this before working on the project. README.md explains what the app does and how to build it; this file records **why** things are the way they are, the design decisions, and the working conventions. Planned work lives in `TODO.md`, released changes in `CHANGELOG.md`.
 
-## Bối cảnh
+**If `CLAUDE.local.md` exists, read it too.** It holds the maintainer's personal preferences and local machine notes (it is gitignored, so it only exists on their machines):
 
-Chủ dự án có 3 PC chơi Steam: 2 máy Windows 11, 1 máy Bazzite (Fedora Atomic, immutable). Steam chỉ chạy được offline mode nên không dùng được Steam Cloud. App này thay Steam Cloud: backup/restore save game qua Google Drive của chính chủ dự án (gói Google AI Pro, dung lượng dư).
+@CLAUDE.local.md
 
-## Yêu cầu gốc (từ chủ dự án)
+## Purpose
 
-1. Chạy được trên Windows và Bazzite.
-2. Liệt kê game đang có trong máy.
-3. Liệt kê các account Steam.
-4. Kết nối tới 1 thư mục tổng trên Google Drive.
-5. Mỗi game có nút backup và restore.
-6. Có nút backup và restore toàn bộ.
-7. Khi restore, so ngày bản cloud với bản local; local mới hơn thì cảnh báo.
+The maintainer plays Steam games on three PCs (two Windows 11, one Bazzite). Steam only runs in offline mode there, so Steam Cloud is unavailable. Checkpoint replaces it: it backs up and restores save games through the user's own Google Drive and works on Windows and Linux.
 
-Sau đó bổ sung:
-- App tự nhận biết hệ điều hành, tự kiểm tra có rclone chưa, có nút cài rclone, có ô nhập Google client ID + secret để tự chạy lệnh `rclone config`.
-- GitHub Actions tự build khi đánh tag.
-- Trang web (`site/`, deploy Vercel) có thông tin GitHub, số lượt tải, số sao, hướng dẫn sử dụng (đặc biệt phần kết nối Google), có bản tiếng Việt và tiếng Anh.
+Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list installed games and Steam accounts; connect one Google Drive folder; backup/restore per game and for all games; warn on restore when the local save is newer. Later additions: in-app rclone install and Google client ID setup, release builds on tags, a bilingual website, moving saves between Steam accounts, logging and bug reports, English/Vietnamese UI.
 
-Tất cả các mục trên đã làm xong (v0.1.0).
+## Feasibility and design decisions
 
-## Kết luận khả thi (đã research)
+- **Not possible:** using Steam Cloud itself while offline; guaranteeing a save works on another Steam account (many games embed the SteamID); finding saves for 100% of games; syncing while a game is running; merging two saves.
+- **Limited:** saves in the Windows Registry (Windows ↔ Proton `user.reg`) are not supported; native-Linux builds of a game may use other paths and formats than the Windows build, so on Bazzite prefer running games through Proton; the UI is hard to use in Bazzite's Gaming Mode with a controller.
+- **Status by content hash, not file dates.** Clocks drift and unzipping changes dates. Each game's status compares the SHA-256 of its save files with the hashes recorded at the last sync on this PC (`state.json`), which distinguishes local newer / cloud newer / conflict / never synced. Warnings go both ways: restoring over newer local progress and backing up over newer cloud progress.
+- **Portable logical paths.** Backups store files as `<flavor>/<token>/<rest>` (e.g. `win/winAppData/...`), so a Windows backup restores into the Proton prefix on Linux and back.
+- **Google Drive through rclone** (Drive for Desktop has no Linux client). rclone's shared client ID is heavily rate limited (~37 s per call) and being retired, so users create their own OAuth client (Desktop app, scope `drive.file`) and must **publish it to "In production"**; in Testing mode tokens expire after 7 days. With `drive.file`, different client IDs cannot see each other's files, so every PC must use the same client ID and Google account.
+- After Google sign-in, the browser showing "127.0.0.1 refused to connect" is **expected**: rclone received the code and closed its temporary server.
 
-- **Không làm được:** dùng chính Steam Cloud khi offline; đảm bảo restore save sang account Steam khác (nhiều game nhúng SteamID); tự tìm save cho 100% game; sync khi game đang chạy; gộp 2 save khác nhau.
-- **Hạn chế:** save trong Registry (Windows ↔ Proton `user.reg`) chưa hỗ trợ; game bản Linux native khác đường dẫn và có thể khác định dạng save so với bản Windows, nên trên Bazzite ưu tiên chạy qua Proton; giao diện trong Gaming Mode của Bazzite khó dùng bằng tay cầm.
-- **Quyết định thiết kế:** không so bằng ngày sửa file (lệch đồng hồ, giải nén làm đổi ngày) mà so bằng hash nội dung + hash lúc đồng bộ lần cuối (`state.json`), nhờ vậy phân biệt được local mới hơn / cloud mới hơn / xung đột. Cảnh báo cả hai chiều: restore khi local mới hơn, và backup khi cloud mới hơn.
-- **Google Drive:** dùng rclone làm lớp vận chuyển (Drive for Desktop không có bản Linux). Client ID dùng chung của rclone bị Google giới hạn nặng (~37 giây mỗi lệnh) và đang bị khai tử → bắt buộc client ID riêng, scope `drive.file`, OAuth app phải **Publish (In production)**, nếu để Testing thì token hết hạn sau 7 ngày. Với `drive.file`, client ID khác nhau không thấy file của nhau → mọi máy phải dùng cùng client ID và cùng tài khoản Google.
-- Sau khi đăng nhập Google, trình duyệt báo "127.0.0.1 refused to connect" là **bình thường** (rclone đã nhận mã và tắt máy chủ tạm), không phải bug.
+## Code map
 
-## Prototype
-
-Bản thiết kế tương tác ban đầu (mockup + bảng khả thi + đề xuất + kiến trúc): https://claude.ai/artifact/VQfARuNDZkth8BvZt6oVLy
-Giao diện app thật (`ui/`) đi theo prototype này: sidebar Game / Tài khoản / Lịch sử / Cài đặt, bảng game với pill trạng thái, hộp thoại Restore so 2 bên Local vs Cloud, màn hình "kế hoạch" trước khi chạy Backup/Restore toàn bộ.
-
-## Đề xuất và trạng thái
-
-Việc chưa làm được theo dõi ở **`TODO.md`** (tiếng Anh, checkbox). Khi xong một mục: tick trong TODO.md và ghi vào `CHANGELOG.md` mục `[Unreleased]`. Bảng dưới là lịch sử các đề xuất từ lúc brainstorm.
-
-| Đề xuất | Trạng thái |
+| Path | Role |
 |---|---|
-| So sánh bằng hash, phân biệt 3 trạng thái + xung đột | Xong |
-| Cảnh báo cả chiều backup (cloud mới hơn) | Xong |
-| Lịch sử phiên bản (giữ 10 bản/game), restore bản cũ | Xong |
-| Snapshot local trước mỗi lần restore (giữ 5) | Xong (chưa có nút restore snapshot trong UI) |
-| Chặn thao tác khi game đang chạy | Xong |
-| Đánh dấu game có save gắn SteamID | Xong |
-| Tách "save" và "cài đặt đồ họa" (mặc định không backup config) | Xong |
-| Chỉ upload khi có thay đổi (hash giống thì bỏ qua) | Xong |
-| Map đường dẫn Windows ↔ Proton prefix | Xong (chưa chạy thử trên Bazzite) |
-| **Launch wrapper** `checkpoint run -- %command%` đặt trong Launch Options của Steam: tự restore trước khi chơi, tự backup sau khi tắt (đề xuất đáng làm nhất) | Chưa làm |
-| **Khóa "đang chơi ở máy X"** (`lock.json` trên Drive) để tránh xung đột | Chưa làm |
-| Game ngoài Steam / giả lập / tự khai báo đường dẫn (custom entry) | Chưa làm |
-| Backup định kỳ chạy ngầm + icon khay hệ thống | Chưa làm |
-| **Chuyển save sang tài khoản Steam khác** (A → B), xem mục bên dưới | Xong (`migrate.rs`), chưa thử với game thật |
-| Save trong Registry | Chưa làm |
-| Giữ 1 tiến trình `rclone rcd` chạy nền thay vì gọi rclone mỗi lệnh (~3 giây/lệnh hiện tại) | Chưa làm |
-| App đa ngôn ngữ (Anh/Việt, rust-i18n, tự theo hệ thống) + site dùng i18next | Xong |
-| Log ở máy client (`logger.rs`), popup lỗi có nút "Tạo issue", nút "Báo lỗi / Góp ý", issue template bug/feature | Xong. Issue tạo bằng URL điền sẵn (`report.rs`), không nhúng credentials GitHub; field `id` trong template phải khớp tham số URL (`version`, `os`, `what-happened`, `logs`) |
+| `src-tauri/src/main.rs` | Tauri commands, `blocking()` wrapper (runs work off the UI thread, logs errors in English), UI strings (`get_strings`) |
+| `steam.rs`, `vdf.rs` | Steam install, libraries, installed games, accounts (`loginusers.vdf`) |
+| `manifest.rs` | Downloads the ludusavi manifest and caches the Steam subset as JSON |
+| `paths.rs` | Manifest rules → real files; logical path ↔ real path (incl. Proton prefix); path safety checks |
+| `sync.rs` | List with status, backup, restore (with optional account remap), cloud `index.json`, snapshots |
+| `migrate.rs` | Moving a save from Steam account A to B: preview, apply, undo, keep |
+| `storage.rs`, `rclone.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect |
+| `config.rs` | `config.json` (device, backend, language…) and `state.json` (last sync hashes) |
+| `logger.rs`, `report.rs`, `i18n.rs` | File log, prefilled GitHub issue URL, `tr!` macro (translated errors with English for logs) |
+| `src-tauri/locales/{en,vi}.yml` | All user-facing text for the backend (`err.*`, `msg.*`) and the UI (`ui.*`) |
+| `ui/` | Plain HTML/JS frontend (no Node, no bundler) |
+| `site/` | Website (Vercel): i18next single page, `/privacy`, `/terms` |
+| `.github/workflows/release.yml` | Tag `vX.Y.Z` → tests, Windows NSIS + Linux AppImage, GitHub Release |
 
-## Use case: chơi tiếp bằng tài khoản khác (A → B)
+## Moving saves between Steam accounts (A → B)
 
-Yêu cầu của chủ dự án: chơi game (ví dụ Phantom Blade Zero) bằng tài khoản A, hôm sau không dùng A được nữa, muốn chơi tiếp bằng tài khoản B.
+Classification decides what the app can do:
+- Not account-bound → nothing to do.
+- SteamID/AccountID only in a folder name (or `userdata/<accountid>`) → copy into B's folder and rewrite `steam_autocloud.vdf` (`"accountid"`). Works.
+- ID inside the file in readable form (text, UTF-16 or little-endian u64) → same-length replacement, marked experimental (checksums may break).
+- Encrypted/compressed file → unknown whether the game checks the account; copy, test in game, undo if needed.
+- Server-side saves → impossible.
 
-Phân loại save (quyết định app làm được gì):
-- Không gắn account → không cần làm gì.
-- SteamID/AccountID chỉ nằm trong tên thư mục (hoặc `userdata/<accountid>`) → copy sang thư mục của B, sửa `steam_autocloud.vdf` (`"accountid"`) sang B. Làm được.
-- ID nằm trong file ở dạng đọc được (chữ hoặc u64 little-endian) → thay ID cùng độ dài, đánh dấu thử nghiệm (có thể vỡ checksum).
-- File mã hóa/nén → không biết game có kiểm tra ID không, phải copy rồi thử trong game, có hoàn tác.
-- Save ở server → không làm được.
+Implementation rules (`migrate.rs`): always **copy**, never modify or delete A's files. The move record (`<data>/migrations/<id>.json`) is written **before** copying so a half-done move can be undone; B's overwritten files are captured in `<id>.zip` and newly created folders are recorded, so undo also removes files the game created during the test. One pending move per game. "Keep" stores `account_aliases[A] = B` in the cloud `index.json`; the Restore dialog then defaults to writing A's backups into B (`remap_from`/`remap_to`).
 
-Phantom Blade Zero (appid 4115450): save ở `<base>/ProjectPBZ/Saved/SaveGames/Steam/<SteamID64>/` gồm `PBZSaveGame.sav`, thư mục `1RealTime`, `2Hourly`, `3Daily`, và `steam_autocloud.vdf`. File `.sav` có header `PBZS`, entropy ~8 bit/byte (mã hóa hoặc nén), không có SteamID ở dạng đọc được → thuộc nhóm "phải thử".
+Example: Phantom Blade Zero (appid 4115450) keeps saves in `<base>/ProjectPBZ/Saved/SaveGames/Steam/<SteamID64>/` (`PBZSaveGame.sav`, `1RealTime/`, `2Hourly/`, `3Daily/`, `steam_autocloud.vdf`). The `.sav` header is `PBZS` with ~8 bits/byte entropy and no readable SteamID → "test in game" class.
 
-UI đã chốt trong mockup: trình hướng dẫn 3 bước (Chọn A → B và game → Chuẩn bị: checklist + bảng đổi đường dẫn → Thử trong game: "Chạy được, giữ" / "Không được, hoàn tác"). Lối vào: nút trên thẻ tài khoản, menu "⋯" của game có save gắn SteamID, và hộp thoại Restore tự phát hiện bản cloud của account khác. Sau khi chuyển thành công, lưu cặp A → B lên Drive để các máy khác restore tự ghi vào B. Luôn copy, không bao giờ sửa hay xóa bản của A; chụp snapshot save hiện có của B trước khi ghi.
+## Conventions
 
-Đã cài đặt (`src-tauri/src/migrate.rs`):
-- `migrate_preview` phân loại none/folder/in_file/opaque, kiểm tra B đã có thư mục save chưa, số file sẽ ghi đè, game có đang chạy.
-- `migrate_apply` ghi bản ghi `<data>/migrations/<id>.json` **trước** khi copy (lỗi giữa chừng vẫn hoàn tác được), chụp file sẽ bị ghi đè vào `<id>.zip`, nhớ thư mục mới tạo. Trạng thái `pending` tới khi người dùng chọn.
-- `migrate_undo` xóa thư mục mới tạo (kể cả file game tự tạo khi chơi thử), trả file bị ghi đè. `migrate_keep` ghi `account_aliases[A] = B` vào `index.json` trên cloud.
-- Restore có `remap_from`/`remap_to`: ghi bản của A vào chỗ của B, sửa `steam_autocloud.vdf`. Hộp thoại Restore mặc định chọn theo `account_aliases`.
-- Mỗi game chỉ có 1 lần chuyển đang chờ. Banner ở màn hình Game nhắc tới khi chọn Giữ/Hoàn tác.
+- **Code, comments, commit messages, logs, changelog and this file are in English.** No hard-coded user-facing strings.
+- **User-facing text** lives in `src-tauri/locales/en.yml` and `vi.yml` (rust-i18n):
+  - backend errors: `tr!("err.*")` (macro in `i18n.rs`; translates and remembers the English text so `blocking()` logs errors in English);
+  - success messages: `t!("msg.*")`;
+  - UI: the `ui.*` subtree, served by `get_strings`, used through `t()` / `h()` in `ui/app.js` (`h` escapes inserted values for HTML). Plurals use `_one` / `_other` keys picked by `%{n}`.
+  - Add every key to **both** files; the tests `locale_files_have_same_keys` and `ui_code_keys_exist` catch missing keys.
+  - Vietnamese UI text addresses the user as "bạn".
+- Keep `README.md` (English) and `README.vi.md` in sync. The website uses i18next with `site/locales/en.json` and `vi.json`.
+- After changing `ui/`, rebuild the Rust app: Tauri embeds the frontend in the binary.
+- Never print or commit rclone tokens, client secrets or the contents of `rclone.conf`. Logs replace the home folder with `~`; exported logs mask SteamIDs.
+- Do not add `Co-Authored-By: Claude` (or any AI attribution) to commits or PRs.
 
-## Quy ước làm việc
+## Testing
 
-- Trao đổi với chủ dự án bằng tiếng Việt, xưng "tao/mày" theo cách chủ dự án dùng.
-- **Code, comment, commit message và log: tiếng Anh.** Không hard-code chuỗi hiển thị cho người dùng.
-- **Chuỗi người dùng thấy** nằm trong `src-tauri/locales/en.yml` và `vi.yml` (rust-i18n):
-  - lỗi backend: `tr!("err.*")` (macro trong `i18n.rs`, vừa dịch vừa nhớ bản tiếng Anh để `blocking()` ghi log tiếng Anh);
-  - thông báo thành công: `t!("msg.*")`;
-  - giao diện: nhánh `ui.*`, lấy qua lệnh `get_strings`, dùng `t()`/`h()` trong `app.js` (`h` escape giá trị khi chèn HTML). Số nhiều: khóa `_one`/`_other` theo `%{n}`.
-  - Thêm khóa thì thêm ở **cả hai** file; test `locale_files_have_same_keys` và `ui_code_keys_exist` bắt thiếu khóa.
-  - Văn phong tiếng Việt trong app xưng "bạn".
-- README.md (tiếng Anh) và README.vi.md giữ đồng bộ. Site dùng i18next, bản dịch ở `site/locales/en.json`, `vi.json`.
-- Frontend là HTML/JS thuần trong `ui/` (không Node, không bundler). Sau khi sửa `ui/` phải build lại Rust vì Tauri nhúng frontend vào binary.
-- Thử giao diện không cần app: `CHECKPOINT_DUMP=<dir> cargo test dump_ui_strings -- --ignored` xuất bản dịch ra JSON, rồi dùng một `mock.js` giả `window.__TAURI__` (có lệnh `get_strings`).
-- Trên máy Windows của chủ dự án, PowerShell mở sẵn có thể chưa có PATH mới: thêm `$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User") + ";$env:USERPROFILE\.cargo\bin"` trước khi gọi `cargo`/`git`.
-- Phải tắt `checkpoint.exe` đang chạy trước khi `cargo build`, vì file exe bị khóa.
-- Test thật trên máy: `cargo test smoke -- --ignored --nocapture` (quét Steam, backup vào thư mục tạm), `cargo test drive_real -- --ignored --nocapture` (backup thật lên nơi lưu đang cấu hình), `cargo test install_real -- --ignored --nocapture` (tải rclone thật). Không restore đè lên save thật khi test.
-- Phát hành: đánh tag `vX.Y.Z` và push tag. Hỏi chủ dự án trước khi push hoặc đánh tag.
-- **Changelog (bắt buộc mỗi lần release, viết bằng tiếng Anh):**
-  - Trong lúc làm, ghi thay đổi vào mục `## [Unreleased]` của `CHANGELOG.md` (định dạng Keep a Changelog: Added / Changed / Fixed / Removed), viết cho người dùng đọc, không liệt kê chi tiết code.
-  - Trước khi đánh tag: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm mục `## [Unreleased]` trống mới ở trên, cập nhật các link so sánh ở cuối file, commit, rồi mới tag.
-  - Workflow release lấy đúng mục `## [X.Y.Z]` và đặt **trên** phần hướng dẫn cài đặt trong ghi chú GitHub Release. Không có mục cho phiên bản đó thì workflow dừng, không phát hành.
-- Commit message: không thêm dòng `Co-Authored-By: Claude`. Trên Windows PowerShell 5.1, message có dấu `"` sẽ bị cắt khi truyền cho git → ghi message ra file rồi `git commit -F <file>`.
-- Không bao giờ in hay commit token rclone, client secret, hay nội dung `rclone.conf`.
+- `cargo test` in `src-tauri` (unit tests; CI runs them in parallel, so tests that change the global locale take `LOCALE_LOCK`).
+- On a real machine (ignored by default): `cargo test smoke -- --ignored --nocapture` (scan Steam, back up into a temp folder), `cargo test drive_real -- --ignored --nocapture` (real backup to the configured storage), `cargo test install_real -- --ignored --nocapture` (download rclone), `cargo test preview_real -- --ignored --nocapture` (read-only account-move preview). Never restore over real saves while testing.
+- UI without the app: `CHECKPOINT_DUMP=<dir> cargo test dump_ui_strings -- --ignored` writes the UI strings to JSON; serve a copy of `ui/` with a `mock.js` that fakes `window.__TAURI__.core.invoke` (including `get_strings`).
+
+## Releases and changelog
+
+- Release = push a `vX.Y.Z` tag; the workflow builds and publishes. Ask the maintainer before pushing or tagging unless they said so.
+- **Every release needs a changelog entry, in English:**
+  - While working, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog: Added / Changed / Fixed / Removed). Write for users, not a list of code changes.
+  - Before tagging: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a new empty `## [Unreleased]` above it, update the compare links at the bottom, commit, then tag.
+  - The workflow puts that version's section under "What's new", **above** the install instructions in the GitHub Release notes, and fails if the section is missing.
+- When a `TODO.md` item ships, tick it and add it to the changelog.

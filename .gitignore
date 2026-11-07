@@ -1,2 +1,5 @@
 /src-tauri/target/
 /src-tauri/gen/
+
+# Personal notes for Claude Code (maintainer preferences, local machine details)
+CLAUDE.local.md
