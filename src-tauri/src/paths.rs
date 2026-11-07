@@ -1,12 +1,13 @@
-//! Biến các luật đường dẫn của manifest (`<winAppData>/Game/*.sav`) thành file thật trên máy,
-//! và ngược lại: biến "đường dẫn logic" trong bản backup thành đường dẫn thật trên máy restore.
+//! Turns manifest path rules (`<winAppData>/Game/*.sav`) into real files on this machine,
+//! and back: turns the "logical paths" stored in a backup into real paths on the restoring machine.
 //!
-//! Đường dẫn logic có dạng `<flavor>/<token>/<phần còn lại>`, ví dụ
-//! `win/winAppData/EldenRing/76561198.../ER0000.sl2`. Nhờ vậy một bản backup từ Windows
-//! restore được vào Proton prefix trên Bazzite và ngược lại.
+//! A logical path looks like `<flavor>/<token>/<rest>`, e.g.
+//! `win/winAppData/EldenRing/76561198.../ER0000.sl2`. This is what lets a Windows backup
+//! restore into the Proton prefix on Bazzite and the other way round.
 
 use crate::manifest::FileRule;
 use anyhow::{anyhow, bail, Result};
+use crate::tr;
 use glob::MatchOptions;
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
@@ -14,11 +15,11 @@ use walkdir::WalkDir;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Flavor {
-    /// Đường dẫn kiểu Windows: Windows thật, hoặc bên trong Proton prefix trên Linux
+    /// Windows-style path: real Windows, or inside the Proton prefix on Linux
     Win,
-    /// Đường dẫn Linux native
+    /// Native Linux path
     Linux,
-    /// Tương đối với thư mục Steam hoặc thư mục cài game
+    /// Relative to the Steam folder or the game's install folder
     Any,
 }
 
@@ -45,7 +46,7 @@ pub struct GameCtx {
     pub installdir: String,
     pub base: PathBuf,
     pub steam_root: PathBuf,
-    /// `<library>/steamapps/compatdata/<appid>/pfx/drive_c` (chỉ trên Linux)
+    /// `<library>/steamapps/compatdata/<appid>/pfx/drive_c` (Linux only)
     pub proton_drive_c: PathBuf,
 }
 
@@ -152,7 +153,7 @@ fn os_user_name(flavor: Flavor) -> String {
         .unwrap_or_else(|_| "*".into())
 }
 
-/// Tách `<token>/rest` → ("token", "/rest")
+/// Split `<token>/rest` → ("token", "/rest")
 fn split_token(path: &str) -> Option<(&str, &str)> {
     let p = path.strip_prefix('<')?;
     let end = p.find('>')?;
@@ -243,7 +244,7 @@ fn rel_string(p: &Path, base: &Path) -> Option<String> {
 
 pub fn scan(ctx: &GameCtx, rules: &[FileRule], include_config: bool) -> LocalScan {
     let mut all: Vec<FileRule> = rules.to_vec();
-    // Steam Cloud vẫn ghi save vào userdata/<account>/<appid>/remote dù đang offline
+    // Steam Cloud still writes saves to userdata/<account>/<appid>/remote while offline
     all.push(FileRule {
         path: format!("<root>/userdata/*/{}/remote", ctx.appid),
         tags: vec!["save".into()],
@@ -259,7 +260,7 @@ pub fn scan(ctx: &GameCtx, rules: &[FileRule], include_config: bool) -> LocalSca
             continue;
         }
         let Some((token, rest)) = split_token(&rule.path) else { continue };
-        // Không bao giờ backup nguyên thư mục cài game hay thư mục Steam
+        // Never back up a whole game install folder or the whole Steam folder
         if (token == "base" || token == "root") && rest.trim_matches('/').is_empty() {
             continue;
         }
@@ -323,29 +324,30 @@ pub fn scan(ctx: &GameCtx, rules: &[FileRule], include_config: bool) -> LocalSca
     scan
 }
 
-/// Đường dẫn logic → đường dẫn thật trên máy hiện tại.
+/// Logical path → real path on this machine.
 pub fn logical_to_real(logical: &str, ctx: &GameCtx) -> Result<PathBuf> {
     let mut it = logical.splitn(3, '/');
     let (Some(fl), Some(token), Some(rel)) = (it.next(), it.next(), it.next()) else {
-        bail!("Đường dẫn trong bản backup không hợp lệ: {logical}");
+        bail!("{}", tr!("err.bad_backup_path", path = logical));
     };
-    let flavor = Flavor::from_tag(fl).ok_or_else(|| anyhow!("Loại đường dẫn lạ: {fl}"))?;
+    let flavor = Flavor::from_tag(fl).ok_or_else(|| anyhow!("{}", tr!("err.unknown_path_kind", kind = fl)))?;
     let dir = match resolve(flavor, token, ctx) {
         Some(d) => d,
         None => {
             if flavor == Flavor::Win && cfg!(not(windows)) {
-                bail!("Chưa có Proton prefix cho game này. Chạy game 1 lần trên máy này rồi restore lại.");
+                bail!("{}", tr!("err.no_proton_prefix"));
             }
             if flavor == Flavor::Linux && cfg!(windows) {
+                // Marker, not shown to the user: the caller skips native-Linux files on Windows
                 bail!("SKIP_LINUX_NATIVE");
             }
-            bail!("Không xác định được thư mục <{token}> trên máy này");
+            bail!("{}", tr!("err.unknown_folder", token = token));
         }
     };
     let mut out = dir;
     for part in rel.split('/') {
         if part.is_empty() || part == "." || part == ".." || part.contains(':') {
-            bail!("Đường dẫn trong bản backup không an toàn: {logical}");
+            bail!("{}", tr!("err.unsafe_backup_path", path = logical));
         }
         out.push(part);
     }

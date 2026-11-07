@@ -1,7 +1,8 @@
-//! Nơi lưu backup: thư mục thường (Drive for Desktop / rclone mount) hoặc rclone remote.
+//! Backup storage: a plain folder (Drive for Desktop / rclone mount) or an rclone remote.
 
 use crate::config::Backend;
 use anyhow::{bail, Context, Result};
+use crate::tr;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,11 +18,11 @@ pub trait Storage: Send {
 
 pub fn open(backend: &Backend) -> Result<Box<dyn Storage>> {
     match backend {
-        Backend::None => bail!("Chưa chọn nơi lưu backup. Vào Cài đặt để kết nối Google Drive."),
+        Backend::None => bail!("{}", tr!("err.no_backend")),
         Backend::Folder { path } => {
             let root = PathBuf::from(path);
             if !root.exists() {
-                fs::create_dir_all(&root).with_context(|| format!("Không tạo được thư mục {path}"))?;
+                fs::create_dir_all(&root).with_context(|| tr!("err.create_folder", path = path).to_string())?;
             }
             Ok(Box::new(FolderStorage { root }))
         }
@@ -32,12 +33,12 @@ pub fn open(backend: &Backend) -> Result<Box<dyn Storage>> {
     }
 }
 
-/// Nơi app tự cài rclone (không cần quyền admin).
+/// Where the app installs its own rclone (no admin rights needed).
 pub fn managed_rclone_path() -> PathBuf {
     crate::config::data_dir().join("bin").join(if cfg!(windows) { "rclone.exe" } else { "rclone" })
 }
 
-/// Tìm rclone: đường dẫn trong cấu hình → bản app tự cài → PATH → thư mục cài của winget (bản mới nhất).
+/// Find rclone: configured path → app-managed copy → PATH → winget install folder (newest).
 pub fn resolve_rclone(configured: Option<&str>) -> String {
     if let Some(b) = configured.map(str::trim).filter(|b| !b.is_empty()) {
         return b.to_string();
@@ -99,11 +100,11 @@ impl Storage for FolderStorage {
         if let Some(parent) = p.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(local, &p).with_context(|| format!("Không copy được lên {}", p.display()))?;
+        fs::copy(local, &p).with_context(|| tr!("err.copy_to", path = p.display()).to_string())?;
         Ok(())
     }
     fn download(&self, rel: &str, local: &Path) -> Result<()> {
-        fs::copy(self.full(rel), local).context("Không tải được file backup")?;
+        fs::copy(self.full(rel), local).context(tr!("err.download_backup").to_string())?;
         Ok(())
     }
     fn delete(&self, rel: &str) -> Result<()> {
@@ -139,11 +140,11 @@ impl RcloneStorage {
         rclone_command(&self.bin)
             .args(args)
             .output()
-            .with_context(|| format!("Không chạy được rclone ({}). Đã cài rclone chưa?", self.bin))
+            .with_context(|| tr!("err.rclone_run", bin = self.bin).to_string())
     }
     fn check(out: std::process::Output, what: &str) -> Result<()> {
         if !out.status.success() {
-            bail!("rclone {what} lỗi: {}", String::from_utf8_lossy(&out.stderr).trim());
+            bail!("{}", tr!("err.rclone_failed", what = what, detail = String::from_utf8_lossy(&out.stderr).trim()));
         }
         Ok(())
     }
@@ -159,7 +160,7 @@ impl Storage for RcloneStorage {
         if err.contains("not found") || err.contains("doesn't exist") || err.contains("does not exist") {
             return Ok(None);
         }
-        bail!("rclone cat lỗi: {}", err.trim())
+        bail!("{}", tr!("err.rclone_failed", what = "cat", detail = err.trim()))
     }
     fn write(&self, rel: &str, data: &[u8]) -> Result<()> {
         let mut child = rclone_command(&self.bin)
@@ -168,7 +169,7 @@ impl Storage for RcloneStorage {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .context("Không chạy được rclone")?;
+            .with_context(|| tr!("err.rclone_run", bin = self.bin).to_string())?;
         child.stdin.take().context("rclone stdin")?.write_all(data)?;
         Self::check(child.wait_with_output()?, "rcat")
     }

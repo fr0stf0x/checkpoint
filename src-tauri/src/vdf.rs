@@ -1,4 +1,4 @@
-//! Parser tối giản cho định dạng KeyValues (VDF) dạng text của Valve.
+//! Minimal parser for Valve's text KeyValues (VDF) format.
 
 #[derive(Debug, Clone)]
 pub enum Vdf {
@@ -85,7 +85,7 @@ fn tokenize(s: &str) -> Vec<Tok> {
                     buf.push(c[i]);
                     i += 1;
                 }
-                // Bỏ qua điều kiện kiểu [$WIN32]
+                // Skip conditionals such as [$WIN32]
                 if !buf.starts_with('[') {
                     out.push(Tok::S(buf));
                 }

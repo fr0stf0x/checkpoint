@@ -18,6 +18,12 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Move a game's save from one Steam account to another (for example when you have to switch accounts): copies the account's save folder to the new account, fixes `steam_autocloud.vdf`, optionally replaces the SteamID inside save files, then lets you test in game and **keep** or **undo** in one click. The original account's files are never touched. Restore can also write a backup into a different account.
 - Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID.
 
+## Languages
+
+The app is available in English and Vietnamese. It follows the system language by default; change it in **Settings → Language**. Translations live in [`src-tauri/locales/`](src-tauri/locales) (`en.yml`, `vi.yml`) and are used by both the Rust backend ([rust-i18n](https://crates.io/crates/rust-i18n)) and the UI. To add a language, copy `en.yml`, translate it, and add it to `LANGUAGES` in `config.rs` and `LOCALE_FILES` in `main.rs`; the unit tests check that every key exists. Logs are always written in English.
+
+The website (`site/`) uses [i18next](https://www.i18next.com/) with `site/locales/<lang>.json`.
+
 ## Reporting bugs
 
 - The app writes a log to `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`), rotated at 2 MB. Home folder paths are replaced with `~`; tokens, client secrets and Steam account names are never logged.
@@ -80,7 +86,7 @@ Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases.
 
 ## Website
 
-`site/` is a static site (home, setup guide, Privacy Policy, Terms of Service) in Vietnamese (`/`) and English (`/en`). Deploy it to Vercel with `site` as the Root Directory. Stars, download count and the download buttons come live from the GitHub API.
+`site/` is a static site (home with setup guide, Privacy Policy, Terms of Service). The home page is a single page translated with i18next (English and Vietnamese, picked from `?lng=`, the last choice, or the browser language; `/en` and `/vi` redirect to it). Deploy it to Vercel with `site` as the Root Directory. Stars, download count and the download buttons come live from the GitHub API.
 
 ## Known limitations
 

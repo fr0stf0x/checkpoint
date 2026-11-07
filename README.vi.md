@@ -18,6 +18,12 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Chuyển save của một game từ tài khoản Steam này sang tài khoản khác (ví dụ khi phải đổi tài khoản): copy thư mục save sang tài khoản mới, sửa `steam_autocloud.vdf`, tùy chọn thay SteamID bên trong file save, rồi để bạn thử trong game và **Giữ** hoặc **Hoàn tác** bằng 1 click. File của tài khoản cũ không bao giờ bị đụng tới. Restore cũng ghi được bản backup vào tài khoản khác.
 - Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn.
 
+## Ngôn ngữ
+
+App có tiếng Anh và tiếng Việt, mặc định theo ngôn ngữ hệ thống, đổi trong **Cài đặt → Ngôn ngữ**. Bản dịch nằm ở [`src-tauri/locales/`](src-tauri/locales) (`en.yml`, `vi.yml`), dùng chung cho backend Rust ([rust-i18n](https://crates.io/crates/rust-i18n)) và giao diện. Muốn thêm ngôn ngữ: copy `en.yml`, dịch, rồi thêm vào `LANGUAGES` trong `config.rs` và `LOCALE_FILES` trong `main.rs`; unit test sẽ kiểm tra đủ khóa. Log luôn ghi bằng tiếng Anh.
+
+Trang web (`site/`) dùng [i18next](https://www.i18next.com/) với `site/locales/<lang>.json`.
+
 ## Báo lỗi
 
 - App ghi log vào `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`), quá 2 MB thì xoay vòng. Đường dẫn thư mục người dùng được thay bằng `~`; không bao giờ ghi token, client secret hay tên tài khoản Steam.
@@ -80,7 +86,7 @@ Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release.
 
 ## Trang web
 
-`site/` là trang tĩnh (trang chủ, hướng dẫn, Privacy Policy, Terms of Service), tiếng Việt ở `/` và tiếng Anh ở `/en`. Deploy lên Vercel với Root Directory là `site`. Số sao, lượt tải và nút tải lấy trực tiếp từ GitHub API.
+`site/` là trang tĩnh (trang chủ kèm hướng dẫn, Privacy Policy, Terms of Service). Trang chủ là 1 trang dịch bằng i18next (tiếng Anh và tiếng Việt, chọn theo `?lng=`, lựa chọn lần trước, hoặc ngôn ngữ trình duyệt; `/en` và `/vi` chuyển hướng về đó). Deploy lên Vercel với Root Directory là `site`. Số sao, lượt tải và nút tải lấy trực tiếp từ GitHub API.
 
 ## Hạn chế
 

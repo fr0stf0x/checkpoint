@@ -1,9 +1,10 @@
-//! Ghi log ra file trên máy người dùng để dễ báo lỗi.
+//! File logging on the user's machine, to make bug reports useful.
 //!
-//! - File: `<data>/logs/checkpoint.log`, quá 2 MB thì đổi thành `checkpoint.1.log` (giữ 1 bản cũ).
-//! - Đường dẫn thư mục home được thay bằng `~` ngay khi ghi.
-//! - Khi lấy log để gửi báo cáo, SteamID64 cũng được che bớt.
-//! - Không bao giờ ghi token, client secret hay tên tài khoản Steam vào log.
+//! - File: `<data>/logs/checkpoint.log`, renamed to `checkpoint.1.log` past 2 MB (one old file kept).
+//! - The home folder path is replaced with `~` when writing.
+//! - When the log is exported for a report, SteamID64s are masked as well.
+//! - Tokens, client secrets and Steam account names are never logged.
+//! - Log messages are always in English, whatever the UI language.
 
 use crate::config::data_dir;
 use log::{Level, LevelFilter, Log, Metadata, Record};
@@ -48,7 +49,7 @@ impl FileLogger {
 
 impl Log for FileLogger {
     fn enabled(&self, m: &Metadata) -> bool {
-        // Log của app từ mức Info, của thư viện chỉ từ Warn
+        // App logs from Info, third-party crates only from Warn
         if m.target().starts_with("checkpoint") { m.level() <= Level::Info } else { m.level() <= Level::Warn }
     }
 
@@ -102,7 +103,7 @@ pub fn init() {
     }
 }
 
-/// Che SteamID64 (17 chữ số bắt đầu bằng 7656), chỉ giữ 3 số cuối để vẫn phân biệt được.
+/// Mask SteamID64s (17 digits starting with 7656), keeping the last 3 digits to tell them apart.
 pub fn redact_ids(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = String::with_capacity(s.len());
@@ -126,7 +127,7 @@ pub fn redact_ids(s: &str) -> String {
     out
 }
 
-/// `n` dòng log cuối (gồm cả file cũ nếu cần), đã che SteamID.
+/// The last `n` log lines (including the rotated file if needed), with SteamIDs masked.
 pub fn tail(n: usize) -> String {
     let mut lines: Vec<String> = Vec::new();
     for p in [old_log_path(), log_path()] {
@@ -147,6 +148,7 @@ mod tests {
         assert_eq!(redact_ids("Steam/76561199698261377/x.sav"), "Steam/7656…377/x.sav");
         assert_eq!(redact_ids("appid 4115450, 12 file"), "appid 4115450, 12 file");
         assert_eq!(redact_ids("176561199698261377"), "176561199698261377");
-        assert_eq!(redact_ids("đã backup 76561198000000101."), "đã backup 7656…101.");
+        // multi-byte text around the ID must survive
+        assert_eq!(redact_ids("café backup 76561198000000101."), "café backup 7656…101.");
     }
 }

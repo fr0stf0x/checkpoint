@@ -1,7 +1,8 @@
-//! Manifest vị trí save của Ludusavi (dữ liệu cộng đồng, lấy từ PCGamingWiki).
-//! Tải YAML gốc một lần, lọc lại các game có Steam AppID, lưu thành JSON nhỏ để mở nhanh.
+//! Ludusavi's save-location manifest (community data from PCGamingWiki).
+//! Downloads the YAML once, keeps only games with a Steam AppID and caches it as a small JSON.
 
 use anyhow::{Context, Result};
+use crate::tr;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -75,11 +76,11 @@ pub fn download_and_build() -> Result<Index> {
     let resp = ureq::get(MANIFEST_URL)
         .timeout(std::time::Duration::from_secs(180))
         .call()
-        .context("Không tải được manifest từ GitHub")?;
+        .context(tr!("err.manifest_download").to_string())?;
     let mut buf = Vec::new();
     resp.into_reader().read_to_end(&mut buf)?;
     let raw: HashMap<String, RawGame> =
-        serde_yaml::from_slice(&buf).context("Manifest YAML không đọc được")?;
+        serde_yaml::from_slice(&buf).context(tr!("err.manifest_parse").to_string())?;
 
     let mut games = HashMap::new();
     for (name, g) in raw {

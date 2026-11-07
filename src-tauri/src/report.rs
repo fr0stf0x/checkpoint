@@ -1,13 +1,14 @@
-//! Tạo link "New issue" trên GitHub với nội dung điền sẵn.
+//! Builds a prefilled GitHub "New issue" link.
 //!
-//! Không cần token GitHub trong app: link mở trong trình duyệt, người dùng tự đăng nhập GitHub
-//! và bấm Submit. Các ô của issue form (.github/ISSUE_TEMPLATE/*.yml) được điền qua tham số URL
-//! theo `id` của từng ô. URL giới hạn khoảng 8 KB nên log được cắt bớt từ đầu cho vừa.
+//! No GitHub token in the app: the link opens in the browser, the user signs in to GitHub
+//! and presses Submit. Issue form fields (.github/ISSUE_TEMPLATE/*.yml) are prefilled through
+//! URL parameters named after each field's `id`. URLs are limited to about 8 KB, so the log
+//! is trimmed from the start to fit. The prefilled text is English for the public tracker.
 
 use crate::logger;
 
 pub const REPO: &str = "fr0stf0x/checkpoint";
-/// Giữ URL dưới ngưỡng GitHub chấp nhận (~8 KB), chừa khoảng an toàn.
+/// Keep the URL below what GitHub accepts (~8 KB), with a safety margin.
 const MAX_URL: usize = 7600;
 
 fn enc(s: &str) -> String {
@@ -41,7 +42,7 @@ pub fn issue_url(kind: &str, title: &str, error: Option<&str>) -> IssueLink {
         };
     }
     let what = match error {
-        Some(e) if !e.trim().is_empty() => format!("Thông báo lỗi trong app / Error shown in the app:\n\n```\n{}\n```\n\n", logger::redact_ids(e.trim())),
+        Some(e) if !e.trim().is_empty() => format!("Error shown in the app:\n\n```\n{}\n```\n\n", logger::redact_ids(e.trim())),
         _ => String::new(),
     };
     let head = format!(
@@ -70,12 +71,12 @@ mod tests {
 
     #[test]
     fn encodes_and_fits() {
-        assert_eq!(enc("a b&c=đ"), "a%20b%26c%3D%C4%91");
-        let l = issue_url("bug", "[Lỗi] Backup thất bại", Some("rclone lỗi: 76561199698261377"));
-        assert!(l.url.len() <= MAX_URL + 10, "url dài {}", l.url.len());
+        assert_eq!(enc("a b&c=é"), "a%20b%26c%3D%C3%A9");
+        let l = issue_url("bug", "[Bug] Backup failed", Some("rclone failed: 76561199698261377"));
+        assert!(l.url.len() <= MAX_URL + 10, "url too long: {}", l.url.len());
         assert!(l.url.contains("template=bug_report.yml"));
-        assert!(!l.url.contains("76561199698261377"), "SteamID phải được che");
-        let f = issue_url("feature", "Ý tưởng", None);
+        assert!(!l.url.contains("76561199698261377"), "SteamID must be masked");
+        let f = issue_url("feature", "Idea", None);
         assert!(f.url.contains("template=feature_request.yml") && !f.url.contains("logs="));
     }
 }

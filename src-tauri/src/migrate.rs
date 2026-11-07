@@ -1,17 +1,18 @@
-//! Chuyển save của một game từ tài khoản Steam A sang tài khoản B.
+//! Moves a game's save from Steam account A to account B.
 //!
-//! Nguyên tắc:
-//! - Chỉ COPY. Không sửa, không xóa file nào của A.
-//! - File của B bị ghi đè được chụp lại trước; thư mục mới tạo được ghi nhớ.
-//!   Nhờ vậy "Hoàn tác" đưa B về đúng trạng thái trước khi chuyển.
-//! - Mỗi lần chuyển là một bản ghi ở `<data>/migrations/<id>.json`, trạng thái
-//!   pending → kept | undone. Người dùng thử trong game rồi mới chọn giữ hay hoàn tác.
+//! Rules:
+//! - COPY only. Nothing of A's is ever modified or deleted.
+//! - B's files that get overwritten are captured first, and newly created folders are recorded,
+//!   so "Undo" puts B back exactly as it was before the move.
+//! - Each move is a record in `<data>/migrations/<id>.json` with state
+//!   pending → kept | undone. The user tests in game, then keeps or undoes.
 
 use crate::config::{data_dir, Config};
 use crate::paths::{self, GameCtx, LocalScan, SaveFile};
 use crate::storage;
 use crate::sync::{self, Env, Procs};
 use anyhow::{bail, Context, Result};
+use crate::tr;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs::{self, File};
@@ -20,7 +21,7 @@ use std::path::{Path, PathBuf};
 
 const STEAMID64_BASE: u64 = 76561197960265728;
 
-/// Một tài khoản ở cả 2 dạng: SteamID64 (thư mục save của game) và AccountID (userdata, steam_autocloud.vdf).
+/// An account in both forms: SteamID64 (game save folders) and AccountID (userdata, steam_autocloud.vdf).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ids {
     pub sid64: String,
@@ -29,16 +30,16 @@ pub struct Ids {
 
 impl Ids {
     pub fn parse(s: &str) -> Result<Ids> {
-        let n: u64 = s.trim().parse().with_context(|| format!("ID tài khoản không hợp lệ: {s}"))?;
+        let n: u64 = s.trim().parse().with_context(|| tr!("err.bad_account_id", id = s).to_string())?;
         if n == 0 {
-            bail!("ID tài khoản không hợp lệ: {s}");
+            bail!("{}", tr!("err.bad_account_id", id = s));
         }
         let (sid, acct) = if n >= STEAMID64_BASE { (n, n - STEAMID64_BASE) } else { (n + STEAMID64_BASE, n) };
         Ok(Ids { sid64: sid.to_string(), acct: acct.to_string() })
     }
 }
 
-/// Đổi các đoạn đường dẫn mang ID của `from` sang `to`. Trả None nếu đường dẫn không gắn với `from`.
+/// Rewrite the path segments carrying `from`'s ID to `to`. None if the path is not tied to `from`.
 pub fn remap_logical(logical: &str, from: &Ids, to: &Ids) -> Option<String> {
     let mut changed = false;
     let parts: Vec<String> = logical
@@ -66,7 +67,7 @@ pub fn is_autocloud_vdf(p: &Path) -> bool {
     p.file_name().map(|n| n.to_string_lossy().eq_ignore_ascii_case("steam_autocloud.vdf")).unwrap_or(false)
 }
 
-/// steam_autocloud.vdf chỉ ghi `"accountid" "<AccountID>"`, Steam dùng nó để biết thư mục thuộc ai.
+/// steam_autocloud.vdf only holds `"accountid" "<AccountID>"`; Steam uses it to know who owns the folder.
 pub fn rewrite_autocloud(data: &[u8], from: &Ids, to: &Ids) -> Vec<u8> {
     String::from_utf8_lossy(data)
         .replace(&format!("\"{}\"", from.acct), &format!("\"{}\"", to.acct))
@@ -78,8 +79,8 @@ fn utf16(s: &str) -> Vec<u8> {
     s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
 }
 
-/// Các dạng SteamID64 có thể nằm trong file: chữ ASCII, chữ UTF-16, số u64 little-endian.
-/// Cặp nào cũng cùng độ dài nên thay thế không làm xê dịch dữ liệu.
+/// Forms a SteamID64 can take inside a file: ASCII text, UTF-16 text, little-endian u64.
+/// Each pair has the same length, so replacing never shifts data.
 fn id_patterns(from: &Ids, to: &Ids) -> Vec<(Vec<u8>, Vec<u8>)> {
     let f: u64 = from.sid64.parse().unwrap_or(0);
     let t: u64 = to.sid64.parse().unwrap_or(0);
@@ -115,7 +116,7 @@ fn replace_same_len(data: &mut [u8], from: &[u8], to: &[u8]) -> usize {
     n
 }
 
-/// Shannon entropy (bit/byte). Gần 8 nghĩa là file nén hoặc mã hóa.
+/// Shannon entropy in bits per byte. Close to 8 means compressed or encrypted.
 fn entropy(data: &[u8]) -> f64 {
     if data.is_empty() {
         return 0.0;
@@ -131,7 +132,7 @@ fn entropy(data: &[u8]) -> f64 {
     }).sum()
 }
 
-// ---------- lập kế hoạch ----------
+// ---------- planning ----------
 
 #[derive(Debug, Clone)]
 struct Item {
@@ -164,7 +165,7 @@ pub struct Preview {
     pub class: String,
     pub files: Vec<FilePlan>,
     pub overwrite: usize,
-    /// Tài khoản B đã có thư mục save của game này (thường nghĩa là B đã mở game ít nhất 1 lần)
+    /// B already has a save folder for this game (usually means B launched it at least once)
     pub target_dir_exists: bool,
     pub running: bool,
     pub max_entropy: f64,
@@ -181,7 +182,7 @@ fn plan_items(ctx: &GameCtx, scan: &LocalScan, from: &Ids, to: &Ids) -> Result<V
         let (hits, ent) = if autocloud {
             (0, 0.0)
         } else {
-            let data = fs::read(&f.real).with_context(|| format!("Không đọc được {}", f.real.display()))?;
+            let data = fs::read(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
             let sample = &data[..data.len().min(1 << 20)];
             (pats.iter().map(|(a, _)| count(&data, a)).sum(), entropy(sample))
         };
@@ -203,7 +204,7 @@ fn classify(items: &[Item]) -> &'static str {
     }
 }
 
-/// Thư mục tài khoản của B cho game (đoạn đường dẫn đầu tiên bị đổi ID).
+/// B's account folder for the game (the first path segment whose ID was changed).
 fn target_account_dir(item: &Item, ctx: &GameCtx) -> Option<PathBuf> {
     let src: Vec<&str> = item.src.logical.split('/').collect();
     let dst: Vec<&str> = item.dst_logical.split('/').collect();
@@ -215,7 +216,7 @@ fn mig_dir() -> PathBuf {
     data_dir().join("migrations")
 }
 
-// ---------- bản ghi chuyển save ----------
+// ---------- move records ----------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Migration {
@@ -245,9 +246,9 @@ impl Migration {
     }
     fn load(dir: &Path, id: &str) -> Result<Migration> {
         if !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
-            bail!("Mã chuyển save không hợp lệ");
+            bail!("{}", tr!("err.migration_bad_id"));
         }
-        let d = fs::read(Self::path(dir, id)).context("Không tìm thấy bản ghi chuyển save")?;
+        let d = fs::read(Self::path(dir, id)).context(tr!("err.migration_not_found").to_string())?;
         Ok(serde_json::from_slice(&d)?)
     }
 }
@@ -265,7 +266,7 @@ fn list_in(dir: &Path) -> Vec<Migration> {
     v
 }
 
-/// Thư mục cao nhất chưa tồn tại trên đường tới `p` (sẽ được tạo mới khi ghi `p`).
+/// Highest folder on the way to `p` that does not exist yet (it will be created when `p` is written).
 fn topmost_missing(p: &Path) -> Option<PathBuf> {
     let mut cur = p.parent()?;
     let mut top = None;
@@ -281,7 +282,7 @@ fn apply_items(dir: &Path, appid: u32, name: &str, from: &Ids, to: &Ids, items: 
     let id = format!("{appid}-{}", now.format("%Y%m%dT%H%M%S%3fZ"));
     fs::create_dir_all(dir)?;
 
-    // Chụp lại file của B sắp bị ghi đè
+    // Capture B's files that are about to be overwritten
     let overwritten: Vec<PathBuf> = items.iter().filter(|i| i.exists).map(|i| i.dst.clone()).collect();
     if !overwritten.is_empty() {
         use zip::write::SimpleFileOptions;
@@ -300,7 +301,7 @@ fn apply_items(dir: &Path, appid: u32, name: &str, from: &Ids, to: &Ids, items: 
             dirs.insert(t);
         }
     }
-    // Bỏ thư mục con nếu thư mục cha cũng mới tạo
+    // Drop sub-folders whose parent is also new
     let created_dirs: Vec<PathBuf> = dirs.iter().filter(|d| !dirs.iter().any(|o| o != *d && d.starts_with(o))).cloned().collect();
 
     let mut mig = Migration {
@@ -317,12 +318,12 @@ fn apply_items(dir: &Path, appid: u32, name: &str, from: &Ids, to: &Ids, items: 
         created_dirs,
         overwritten,
     };
-    // Ghi bản ghi trước khi copy, để lỡ hỏng giữa chừng vẫn hoàn tác được
+    // Write the record before copying, so a failure halfway can still be undone
     mig.save(dir)?;
 
     let pats = id_patterns(from, to);
     for i in items {
-        let mut data = fs::read(&i.src.real).with_context(|| format!("Không đọc được {}", i.src.real.display()))?;
+        let mut data = fs::read(&i.src.real).with_context(|| tr!("err.read_file", path = i.src.real.display()).to_string())?;
         if i.autocloud {
             data = rewrite_autocloud(&data, from, to);
         } else if patch_in_file && i.hits > 0 {
@@ -334,7 +335,7 @@ fn apply_items(dir: &Path, appid: u32, name: &str, from: &Ids, to: &Ids, items: 
         if let Some(parent) = i.dst.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::write(&i.dst, &data).with_context(|| format!("Không ghi được {}", i.dst.display()))?;
+        fs::write(&i.dst, &data).with_context(|| tr!("err.write_file", path = i.dst.display()).to_string())?;
     }
     mig.save(dir)?;
     Ok(mig)
@@ -343,21 +344,21 @@ fn apply_items(dir: &Path, appid: u32, name: &str, from: &Ids, to: &Ids, items: 
 fn undo_in(dir: &Path, id: &str) -> Result<Migration> {
     let mut m = Migration::load(dir, id)?;
     if m.state != "pending" {
-        bail!("Lần chuyển này đã được {} rồi.", if m.state == "kept" { "giữ" } else { "hoàn tác" });
+        bail!("{}", tr!("err.migration_done"));
     }
     for d in &m.created_dirs {
         if d.exists() {
-            fs::remove_dir_all(d).with_context(|| format!("Không xóa được {}", d.display()))?;
+            fs::remove_dir_all(d).with_context(|| tr!("err.delete_path", path = d.display()).to_string())?;
         }
     }
     for f in &m.created_files {
         if f.exists() {
-            fs::remove_file(f).with_context(|| format!("Không xóa được {}", f.display()))?;
+            fs::remove_file(f).with_context(|| tr!("err.delete_path", path = f.display()).to_string())?;
         }
     }
     if !m.overwritten.is_empty() {
         let zp = dir.join(format!("{}.zip", m.id));
-        let mut za = zip::ZipArchive::new(File::open(&zp).context("Mất file chụp lại save cũ của tài khoản đích")?)?;
+        let mut za = zip::ZipArchive::new(File::open(&zp).context(tr!("err.migration_capture_missing").to_string())?)?;
         for (n, p) in m.overwritten.iter().enumerate() {
             let mut e = za.by_name(&n.to_string())?;
             let mut buf = Vec::new();
@@ -373,7 +374,7 @@ fn undo_in(dir: &Path, id: &str) -> Result<Migration> {
     Ok(m)
 }
 
-// ---------- API cho giao diện ----------
+// ---------- API for the UI ----------
 
 struct Ready {
     name: String,
@@ -384,7 +385,7 @@ struct Ready {
 
 fn prepare(cfg: &Config, appid: u32, from: &Ids, to: &Ids) -> Result<Ready> {
     if from == to {
-        bail!("Tài khoản nguồn và đích giống nhau.");
+        bail!("{}", tr!("err.same_account"));
     }
     let env = Env::load(cfg)?;
     let g = env.game(appid)?;
@@ -428,14 +429,14 @@ pub fn preview(cfg: &Config, appid: u32, from: &str, to: &str) -> Result<Preview
 pub fn apply(cfg: &Config, appid: u32, from: &str, to: &str, patch_in_file: bool) -> Result<Migration> {
     let (f, t) = (Ids::parse(from)?, Ids::parse(to)?);
     if let Some(p) = list_in(&mig_dir()).into_iter().find(|m| m.appid == appid && m.state == "pending") {
-        bail!("{} còn một lần chuyển save chưa xác nhận. Chọn Giữ hoặc Hoàn tác trước. ({})", p.game_name, p.id);
+        bail!("{}", tr!("err.migration_pending", game = p.game_name));
     }
     let r = prepare(cfg, appid, &f, &t)?;
     if r.running {
-        bail!("{} đang chạy. Tắt game rồi chuyển save.", r.name);
+        bail!("{}", tr!("err.game_running", game = r.name));
     }
     if r.items.is_empty() {
-        bail!("Không thấy save nào của tài khoản {} cho {} trên máy này.", f.sid64, r.name);
+        bail!("{}", tr!("err.migration_nothing", game = r.name));
     }
     apply_items(&mig_dir(), appid, &r.name, &f, &t, &r.items, patch_in_file)
 }
@@ -445,19 +446,19 @@ pub fn undo(cfg: &Config, id: &str) -> Result<Migration> {
     let env = Env::load(cfg)?;
     if let Ok(g) = env.game(m.appid) {
         if Procs::snapshot().running(&env.ctx(g).base) {
-            bail!("{} đang chạy. Tắt game rồi hoàn tác.", m.game_name);
+            bail!("{}", tr!("err.game_running", game = m.game_name));
         }
     }
     undo_in(&mig_dir(), id)
 }
 
-/// Giữ kết quả. Ghi cặp A → B lên cloud để máy khác restore bản của A tự ghi vào B.
-/// Trả về cảnh báo (nếu không ghi được lên cloud) thay vì báo lỗi, vì save trên máy đã xong.
+/// Keep the result. Stores the A → B pair in the cloud so other PCs restore A's backups into B.
+/// Returns a warning (instead of failing) when the cloud write fails, since the local move is done.
 pub fn keep(cfg: &Config, id: &str) -> Result<(Migration, Option<String>)> {
     let dir = mig_dir();
     let mut m = Migration::load(&dir, id)?;
     if m.state != "pending" {
-        bail!("Lần chuyển này đã xử lý rồi.");
+        bail!("{}", tr!("err.migration_done"));
     }
     m.state = "kept".into();
     m.save(&dir)?;
@@ -469,7 +470,7 @@ pub fn keep(cfg: &Config, id: &str) -> Result<(Migration, Option<String>)> {
             sync::save_index(&*st, &idx)
         })
         .err()
-        .map(|e| format!("Chưa ghi được cặp tài khoản lên cloud: {e:#}"));
+        .map(|e| tr!("err.alias_not_saved", detail = format!("{e:#}")).to_string());
     Ok((m, warn))
 }
 
@@ -485,7 +486,7 @@ mod tests {
     const A: &str = "76561198000000101";
     const B: &str = "76561198000000202";
 
-    /// Chỉ đọc: `cargo test preview_real -- --ignored --nocapture`
+    /// Read-only: `cargo test preview_real -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn preview_real() {
@@ -525,7 +526,7 @@ mod tests {
         let lib = root.join("lib");
         let a_dir = lib.join(format!("steamapps/common/G/Saved/Steam/{A}"));
         fs::create_dir_all(a_dir.join("1RealTime")).unwrap();
-        // file "mã hóa": byte ngẫu nhiên giả
+        // pseudo-random bytes standing in for an encrypted save
         let noise: Vec<u8> = (0..4096u32).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
         fs::write(a_dir.join("Save.sav"), &noise).unwrap();
         fs::write(a_dir.join("1RealTime/old.sav"), b"old").unwrap();
@@ -543,7 +544,7 @@ mod tests {
         let (a, b) = (Ids::parse(A).unwrap(), Ids::parse(B).unwrap());
         let scan = paths::scan(&ctx, &rules, false);
         let items = plan_items(&ctx, &scan, &a, &b).unwrap();
-        assert_eq!(items.len(), 3, "chỉ file trong thư mục của A, không có shared.cfg");
+        assert_eq!(items.len(), 3, "only files in A's folder, not shared.cfg");
         assert_eq!(classify(&items), "opaque");
 
         let dir = root.join("mig");
@@ -555,12 +556,12 @@ mod tests {
         assert!(vdf.contains(&format!("\"{}\"", b.acct)) && !vdf.contains(&a.acct));
         assert_eq!(m.created_dirs, vec![b_dir.clone()]);
 
-        // game tạo thêm file khi B chơi thử, hoàn tác phải dọn sạch
+        // the game creates more files while B tests it; undo must clean them up too
         fs::write(b_dir.join("new_by_game.sav"), b"x").unwrap();
         undo_in(&dir, &m.id).unwrap();
         assert!(!b_dir.exists());
-        assert!(a_dir.join("Save.sav").exists(), "bản của A còn nguyên");
-        assert!(undo_in(&dir, &m.id).is_err(), "không hoàn tác 2 lần");
+        assert!(a_dir.join("Save.sav").exists(), "A's copy untouched");
+        assert!(undo_in(&dir, &m.id).is_err(), "cannot undo twice");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -568,7 +569,7 @@ mod tests {
     fn undo_restores_overwritten_files_and_patch_works() {
         let (root, ctx, rules, a_dir) = setup("over");
         let (a, b) = (Ids::parse(A).unwrap(), Ids::parse(B).unwrap());
-        // ID nằm trong file ở dạng chữ
+        // ID stored as text inside the file
         fs::write(a_dir.join("Save.sav"), format!("player={A};lvl=9")).unwrap();
         let b_dir = a_dir.parent().unwrap().join(B);
         fs::create_dir_all(&b_dir).unwrap();

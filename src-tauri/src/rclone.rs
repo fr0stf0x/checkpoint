@@ -1,7 +1,8 @@
-//! Phát hiện, cài đặt và cấu hình rclone cho Google Drive.
+//! Detects, installs and configures rclone for Google Drive.
 
 use crate::storage::{managed_rclone_path, rclone_command, resolve_rclone};
 use anyhow::{bail, Context, Result};
+use crate::tr;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -16,7 +17,7 @@ pub struct RemoteInfo {
     pub name: String,
     pub kind: String,
     pub scope: Option<String>,
-    /// true nếu remote dùng client_id riêng (không dùng client_id chung của rclone)
+    /// true when the remote uses its own client_id (not rclone's shared one)
     pub custom_client: bool,
 }
 
@@ -32,7 +33,7 @@ pub struct RcloneStatus {
     pub remote: Option<RemoteInfo>,
 }
 
-/// Tên nền tảng theo cách đặt tên file của rclone, ví dụ "windows-amd64".
+/// Platform name as used in rclone's download file names, e.g. "windows-amd64".
 fn platform() -> Option<String> {
     let os = match std::env::consts::OS {
         "windows" => "windows",
@@ -57,7 +58,7 @@ fn version_of(bin: &str) -> Option<String> {
     String::from_utf8_lossy(&out.stdout).lines().next().map(|l| l.trim().to_string())
 }
 
-/// Đọc cấu hình 1 remote. Chỉ lấy các trường cần thiết, không bao giờ trả token ra ngoài.
+/// Read one remote's config. Only the fields we need; tokens are never returned.
 fn remote_info(bin: &str, name: &str) -> Option<RemoteInfo> {
     let out = rclone_command(bin).args(["config", "dump"]).output().ok()?;
     if !out.status.success() {
@@ -94,18 +95,18 @@ fn get_string(url: &str) -> Result<String> {
     ureq::get(url)
         .timeout(Duration::from_secs(60))
         .call()
-        .with_context(|| format!("Không tải được {url}"))?
+        .with_context(|| tr!("err.download_url", url = url).to_string())?
         .into_string()
-        .context("Phản hồi không đọc được")
+        .context(tr!("err.bad_response").to_string())
 }
 
-/// Tải bản rclone mới nhất từ downloads.rclone.org, kiểm tra SHA256, giải nén vào thư mục của app.
+/// Download the latest rclone from downloads.rclone.org, verify its SHA-256 and unpack it into the app folder.
 pub fn install() -> Result<String> {
-    let plat = platform().context("Hệ điều hành hoặc CPU này không có bản rclone dựng sẵn")?;
+    let plat = platform().context(tr!("err.rclone_no_build").to_string())?;
     let ver_line = get_string(&format!("{DOWNLOADS}/version.txt"))?;
     let ver = ver_line.trim().strip_prefix("rclone ").unwrap_or(ver_line.trim()).to_string();
     if !ver.starts_with('v') || !ver[1..].chars().all(|c| c.is_ascii_digit() || c == '.') {
-        bail!("Không đọc được số phiên bản rclone: {ver_line}");
+        bail!("{}", tr!("err.rclone_bad_version", version = ver_line.trim()));
     }
     let file = format!("rclone-{ver}-{plat}.zip");
     let sums = get_string(&format!("{DOWNLOADS}/{ver}/SHA256SUMS"))?;
@@ -117,24 +118,24 @@ pub fn install() -> Result<String> {
         })
         .find(|(_, name)| *name == file)
         .map(|(h, _)| h.to_lowercase())
-        .with_context(|| format!("Không có mã kiểm tra cho {file}"))?;
+        .with_context(|| tr!("err.rclone_no_checksum", file = file).to_string())?;
 
     let resp = ureq::get(&format!("{DOWNLOADS}/{ver}/{file}"))
         .timeout(Duration::from_secs(300))
         .call()
-        .context("Không tải được rclone")?;
+        .context(tr!("err.rclone_download").to_string())?;
     let mut buf = Vec::new();
     resp.into_reader().take(200 * 1024 * 1024).read_to_end(&mut buf)?;
     let got = hex::encode(Sha256::digest(&buf));
     if got != expected {
-        bail!("File rclone tải về sai mã SHA256, đã hủy cài đặt.");
+        bail!("{}", tr!("err.rclone_checksum"));
     }
 
     let exe_name = if cfg!(windows) { "rclone.exe" } else { "rclone" };
-    let mut za = zip::ZipArchive::new(std::io::Cursor::new(buf)).context("File zip rclone hỏng")?;
+    let mut za = zip::ZipArchive::new(std::io::Cursor::new(buf)).context(tr!("err.rclone_bad_zip").to_string())?;
     let idx = (0..za.len())
         .find(|&i| za.by_index(i).map(|e| e.name().rsplit('/').next() == Some(exe_name)).unwrap_or(false))
-        .context("Trong file zip không có rclone")?;
+        .context(tr!("err.rclone_bad_zip").to_string())?;
     let dest = managed_rclone_path();
     fs::create_dir_all(dest.parent().unwrap())?;
     let tmp = dest.with_extension("download");
@@ -149,7 +150,7 @@ pub fn install() -> Result<String> {
         fs::set_permissions(&tmp, fs::Permissions::from_mode(0o755))?;
     }
     fs::rename(&tmp, &dest)?;
-    let v = version_of(&dest.to_string_lossy()).context("Đã tải rclone nhưng không chạy được")?;
+    let v = version_of(&dest.to_string_lossy()).context(tr!("err.rclone_not_runnable").to_string())?;
     Ok(v)
 }
 
@@ -158,23 +159,23 @@ fn valid_client_id(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
 }
 
-/// Tạo (hoặc tạo lại) remote Google Drive bằng client_id riêng. Mở trình duyệt để đăng nhập Google.
+/// Create (or recreate) the Google Drive remote with the user's own client_id. Opens the browser for Google sign-in.
 pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client_secret: &str) -> Result<()> {
     let client_id = client_id.trim();
     let client_secret = client_secret.trim();
     if !valid_client_id(client_id) {
-        bail!("Client ID không đúng dạng (phải kết thúc bằng .apps.googleusercontent.com)");
+        bail!("{}", tr!("err.client_id_format"));
     }
     if client_secret.is_empty() || client_secret.chars().any(|c| c.is_whitespace()) {
-        bail!("Client secret trống hoặc có khoảng trắng");
+        bail!("{}", tr!("err.client_secret_format"));
     }
     let bin = resolve_rclone(configured_bin);
-    version_of(&bin).context("Chưa có rclone. Bấm Cài rclone trước.")?;
+    version_of(&bin).context(tr!("err.rclone_missing").to_string())?;
 
     if remote_info(&bin, name).is_some() {
         let out = rclone_command(&bin).args(["config", "delete", name]).output()?;
         if !out.status.success() {
-            bail!("Không xóa được remote cũ: {}", String::from_utf8_lossy(&out.stderr).trim());
+            bail!("{}", tr!("err.rclone_delete_remote", detail = String::from_utf8_lossy(&out.stderr).trim()));
         }
     }
 
@@ -192,9 +193,9 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
-        .context("Không chạy được rclone")?;
+        .with_context(|| tr!("err.rclone_run", bin = bin).to_string())?;
 
-    // Chờ người dùng đăng nhập trong trình duyệt, tối đa 5 phút
+    // Wait for the user to sign in in the browser, at most 5 minutes
     let start = Instant::now();
     let status = loop {
         if let Some(s) = child.try_wait()? {
@@ -203,7 +204,7 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
         if start.elapsed() > Duration::from_secs(300) {
             let _ = child.kill();
             let _ = rclone_command(&bin).args(["config", "delete", name]).output();
-            bail!("Quá 5 phút chưa đăng nhập xong. Bấm Kết nối lại.");
+            bail!("{}", tr!("err.signin_timeout"));
         }
         std::thread::sleep(Duration::from_millis(400));
     };
@@ -213,12 +214,12 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
             let _ = e.read_to_string(&mut err);
         }
         let last = err.lines().filter(|l| !l.trim().is_empty()).last().unwrap_or("").to_string();
-        bail!("Đăng nhập Google không thành công: {last}");
+        bail!("{}", tr!("err.signin_failed", detail = last));
     }
 
     let out = rclone_command(&bin).args(["mkdir", &format!("{name}:Checkpoint")]).output()?;
     if !out.status.success() {
-        bail!("Đã đăng nhập nhưng không tạo được thư mục Checkpoint: {}", String::from_utf8_lossy(&out.stderr).trim());
+        bail!("{}", tr!("err.drive_folder", detail = String::from_utf8_lossy(&out.stderr).trim()));
     }
     Ok(())
 }
@@ -239,8 +240,8 @@ mod tests {
     #[test]
     #[ignore]
     fn install_real() {
-        let v = install().expect("cài rclone");
-        println!("đã cài: {v} -> {}", managed_rclone_path().display());
+        let v = install().expect("install rclone");
+        println!("installed: {v} -> {}", managed_rclone_path().display());
         let st = status(None, "gdrive");
         println!("status: found={} managed={} version={:?} remote={:?}", st.found, st.managed, st.version, st.remote);
         assert!(st.managed);

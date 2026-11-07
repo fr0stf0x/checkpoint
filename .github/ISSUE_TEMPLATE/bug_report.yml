@@ -1,6 +1,6 @@
 name: Báo lỗi / Bug report
 description: App chạy sai, báo lỗi hoặc làm mất save / Something is broken
-title: "[Lỗi] "
+title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown

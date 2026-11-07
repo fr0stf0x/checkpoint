@@ -56,7 +56,7 @@ Giao diện app thật (`ui/`) đi theo prototype này: sidebar Game / Tài kho�
 | **Chuyển save sang tài khoản Steam khác** (A → B), xem mục bên dưới | Xong (`migrate.rs`), chưa thử với game thật |
 | Save trong Registry | Chưa làm |
 | Giữ 1 tiến trình `rclone rcd` chạy nền thay vì gọi rclone mỗi lệnh (~3 giây/lệnh hiện tại) | Chưa làm |
-| Giao diện tiếng Anh cho app (hiện app chỉ có tiếng Việt, site có cả 2) | Chưa làm |
+| App đa ngôn ngữ (Anh/Việt, rust-i18n, tự theo hệ thống) + site dùng i18next | Xong |
 | Log ở máy client (`logger.rs`), popup lỗi có nút "Tạo issue", nút "Báo lỗi / Góp ý", issue template bug/feature | Xong. Issue tạo bằng URL điền sẵn (`report.rs`), không nhúng credentials GitHub; field `id` trong template phải khớp tham số URL (`version`, `os`, `what-happened`, `logs`) |
 
 ## Use case: chơi tiếp bằng tài khoản khác (A → B)
@@ -83,8 +83,17 @@ UI đã chốt trong mockup: trình hướng dẫn 3 bước (Chọn A → B và
 
 ## Quy ước làm việc
 
-- Trao đổi với chủ dự án bằng tiếng Việt, xưng "tao/mày" theo cách chủ dự án dùng. Giao diện app và comment code viết tiếng Việt; README.md và `site/en.html` có bản tiếng Anh, giữ 2 bản đồng bộ khi sửa.
+- Trao đổi với chủ dự án bằng tiếng Việt, xưng "tao/mày" theo cách chủ dự án dùng.
+- **Code, comment, commit message và log: tiếng Anh.** Không hard-code chuỗi hiển thị cho người dùng.
+- **Chuỗi người dùng thấy** nằm trong `src-tauri/locales/en.yml` và `vi.yml` (rust-i18n):
+  - lỗi backend: `tr!("err.*")` (macro trong `i18n.rs`, vừa dịch vừa nhớ bản tiếng Anh để `blocking()` ghi log tiếng Anh);
+  - thông báo thành công: `t!("msg.*")`;
+  - giao diện: nhánh `ui.*`, lấy qua lệnh `get_strings`, dùng `t()`/`h()` trong `app.js` (`h` escape giá trị khi chèn HTML). Số nhiều: khóa `_one`/`_other` theo `%{n}`.
+  - Thêm khóa thì thêm ở **cả hai** file; test `locale_files_have_same_keys` và `ui_code_keys_exist` bắt thiếu khóa.
+  - Văn phong tiếng Việt trong app xưng "bạn".
+- README.md (tiếng Anh) và README.vi.md giữ đồng bộ. Site dùng i18next, bản dịch ở `site/locales/en.json`, `vi.json`.
 - Frontend là HTML/JS thuần trong `ui/` (không Node, không bundler). Sau khi sửa `ui/` phải build lại Rust vì Tauri nhúng frontend vào binary.
+- Thử giao diện không cần app: `CHECKPOINT_DUMP=<dir> cargo test dump_ui_strings -- --ignored` xuất bản dịch ra JSON, rồi dùng một `mock.js` giả `window.__TAURI__` (có lệnh `get_strings`).
 - Trên máy Windows của chủ dự án, PowerShell mở sẵn có thể chưa có PATH mới: thêm `$env:Path = [Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [Environment]::GetEnvironmentVariable("Path","User") + ";$env:USERPROFILE\.cargo\bin"` trước khi gọi `cargo`/`git`.
 - Phải tắt `checkpoint.exe` đang chạy trước khi `cargo build`, vì file exe bị khóa.
 - Test thật trên máy: `cargo test smoke -- --ignored --nocapture` (quét Steam, backup vào thư mục tạm), `cargo test drive_real -- --ignored --nocapture` (backup thật lên nơi lưu đang cấu hình), `cargo test install_real -- --ignored --nocapture` (tải rclone thật). Không restore đè lên save thật khi test.

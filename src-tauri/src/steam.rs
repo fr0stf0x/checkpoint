@@ -1,5 +1,5 @@
-//! Đọc thông tin Steam từ đĩa: thư mục cài, thư viện, game đã cài, tài khoản.
-//! Tất cả đều là file local nên chạy được khi Steam ở offline mode.
+//! Reads Steam data from disk: install folder, libraries, installed games, accounts.
+//! Everything is a local file, so this works while Steam is in offline mode.
 
 use crate::vdf;
 use serde::Serialize;
@@ -75,7 +75,7 @@ pub struct InstalledGame {
     pub library: PathBuf,
 }
 
-/// Các app không phải game (runtime, Proton, redistributable).
+/// Apps that are not games (runtimes, Proton, redistributables).
 fn is_tool(appid: u32, name: &str) -> bool {
     const TOOL_IDS: &[u32] = &[228980, 1070560, 1391110, 1628350, 1493710, 2180100];
     let n = name.to_lowercase();
@@ -152,7 +152,7 @@ pub fn accounts(root: &Path) -> Vec<Account> {
             userdata_apps,
         });
     }
-    // Không có MostRecent thì coi account đăng nhập gần nhất (timestamp lớn nhất) là hiện tại
+    // Without a MostRecent flag, treat the latest sign-in (largest timestamp) as current
     if !out.iter().any(|a| a.most_recent) {
         if let Some(a) = out.iter_mut().max_by_key(|a| a.timestamp) {
             a.most_recent = true;

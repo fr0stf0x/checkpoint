@@ -1,4 +1,4 @@
-//! Cấu hình máy này + trạng thái đồng bộ lần cuối của từng game.
+//! This machine's settings plus the last sync state of each game.
 
 use anyhow::Result;
 use rand::Rng;
@@ -21,9 +21,9 @@ pub fn data_dir() -> PathBuf {
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Backend {
     None,
-    /// Thư mục thường: ví dụ "G:\My Drive\Checkpoint" của Google Drive for Desktop
+    /// Plain folder, e.g. "G:\My Drive\Checkpoint" from Google Drive for Desktop
     Folder { path: String },
-    /// rclone remote, ví dụ "gdrive:Checkpoint"
+    /// rclone remote, e.g. "gdrive:Checkpoint"
     Rclone {
         remote: String,
         #[serde(default)]
@@ -42,16 +42,36 @@ pub struct Config {
     pub keep_versions: usize,
     #[serde(default)]
     pub steam_root_override: Option<String>,
+    /// "auto" (follow the OS), "en" or "vi"
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 fn default_keep() -> usize {
     10
 }
 
+fn default_language() -> String {
+    "auto".into()
+}
+
+pub const LANGUAGES: &[&str] = &["en", "vi"];
+
+impl Config {
+    /// The UI language actually in use: the configured one, or the OS language when set to "auto".
+    pub fn effective_language(&self) -> String {
+        if LANGUAGES.contains(&self.language.as_str()) {
+            return self.language.clone();
+        }
+        let sys = sys_locale::get_locale().unwrap_or_default().to_lowercase();
+        LANGUAGES.iter().find(|l| sys.starts_with(*l)).unwrap_or(&"en").to_string()
+    }
+}
+
 fn host_name() -> String {
     sysinfo::System::host_name()
         .or_else(|| std::env::var("COMPUTERNAME").ok())
-        .unwrap_or_else(|| "may-nay".into())
+        .unwrap_or_else(|| "this-pc".into())
 }
 
 impl Config {
@@ -64,6 +84,7 @@ impl Config {
             include_config: false,
             keep_versions: 10,
             steam_root_override: None,
+            language: default_language(),
         }
     }
 
@@ -86,8 +107,8 @@ impl Config {
     }
 }
 
-/// Lần đồng bộ cuối trên máy này: hash local lúc đó và hash bản cloud lúc đó.
-/// Dùng để biết bên nào đã thay đổi kể từ lần đồng bộ trước.
+/// Last sync on this machine: the local hash and the cloud hash at that moment.
+/// Used to tell which side changed since the previous sync.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncBase {
     pub local: String,

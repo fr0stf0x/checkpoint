@@ -1,8 +1,8 @@
-//! Backup, restore, so sánh trạng thái local và cloud.
+//! Backup, restore and local-vs-cloud status.
 //!
-//! Trên cloud:
-//!   index.json                         danh sách phiên bản của mọi game (mới nhất đứng đầu)
-//!   games/<appid>/<stamp>_<device>.zip file save + checkpoint-meta.json
+//! In the cloud:
+//!   index.json                         every version of every game (newest first)
+//!   games/<appid>/<stamp>_<device>.zip save files + checkpoint-meta.json
 
 use crate::config::{cache_dir, data_dir, Config, State, SyncBase};
 use crate::manifest::{self, FileRule, Index};
@@ -10,6 +10,8 @@ use crate::paths::{self, GameCtx, LocalScan};
 use crate::steam::{self, InstalledGame};
 use crate::storage::{self, Storage};
 use anyhow::{bail, Context, Result};
+use crate::tr;
+use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -42,8 +44,8 @@ pub struct VersionMeta {
 pub struct CloudIndex {
     #[serde(default)]
     pub games: BTreeMap<String, Vec<VersionMeta>>,
-    /// Tài khoản cũ → tài khoản mới (SteamID64), ghi khi chuyển save A → B thành công.
-    /// Restore bản của A trên máy khác sẽ mặc định ghi vào B.
+    /// Old account → new account (SteamID64), stored when a save move A → B is kept.
+    /// Restoring A's backup on another PC then defaults to writing into B.
     #[serde(default)]
     pub account_aliases: BTreeMap<String, String>,
 }
@@ -71,7 +73,7 @@ pub struct GameRow {
     pub status: String,
     pub running: bool,
     pub steamid_bound: bool,
-    /// SteamID64 / AccountID xuất hiện trong đường dẫn save trên máy này
+    /// SteamID64 / AccountID found in this machine's save paths
     pub steam_ids: Vec<String>,
 }
 
@@ -102,7 +104,7 @@ pub fn set_manifest(idx: Index) -> usize {
     n
 }
 
-// ---------- môi trường Steam ----------
+// ---------- Steam environment ----------
 
 pub struct Env {
     pub root: PathBuf,
@@ -113,13 +115,13 @@ pub struct Env {
 impl Env {
     pub fn load(cfg: &Config) -> Result<Env> {
         let root = steam::find_root(cfg.steam_root_override.as_deref())
-            .context("Không tìm thấy thư mục Steam. Chỉ đường dẫn trong Cài đặt.")?;
+            .context(tr!("err.no_steam").to_string())?;
         let libs = steam::libraries(&root);
         Ok(Env { games: steam::installed_games(&libs), root, manifest: manifest() })
     }
 
     pub(crate) fn game(&self, appid: u32) -> Result<&InstalledGame> {
-        self.games.iter().find(|g| g.appid == appid).context("Game này không còn cài trên máy")
+        self.games.iter().find(|g| g.appid == appid).context(tr!("err.game_not_installed").to_string())
     }
 
     pub(crate) fn rules(&self, appid: u32) -> &[FileRule] {
@@ -131,7 +133,7 @@ impl Env {
     }
 }
 
-// ---------- tiện ích ----------
+// ---------- helpers ----------
 
 pub fn hash_scan(scan: &LocalScan) -> Result<Option<String>> {
     if scan.files.is_empty() {
@@ -141,14 +143,14 @@ pub fn hash_scan(scan: &LocalScan) -> Result<Option<String>> {
     for f in &scan.files {
         h.update(f.logical.as_bytes());
         h.update([0u8]);
-        let mut file = File::open(&f.real).with_context(|| format!("Không đọc được {}", f.real.display()))?;
+        let mut file = File::open(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
         io::copy(&mut file, &mut h)?;
         h.update([0xffu8]);
     }
     Ok(Some(hex::encode(h.finalize())))
 }
 
-/// SteamID64 / AccountID xuất hiện trong đường dẫn save: dấu hiệu save gắn với account.
+/// SteamID64 / AccountID present in save paths: a sign the save is tied to an account.
 pub(crate) fn steam_ids(scan: &LocalScan) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for f in &scan.files {
@@ -219,7 +221,7 @@ fn norm(s: &str) -> String {
 
 pub fn load_index(st: &dyn Storage) -> Result<CloudIndex> {
     match st.read(INDEX)? {
-        Some(d) => serde_json::from_slice(&d).context("index.json trên cloud bị hỏng"),
+        Some(d) => serde_json::from_slice(&d).context(tr!("err.index_corrupt").to_string()),
         None => Ok(CloudIndex::default()),
     }
 }
@@ -243,7 +245,7 @@ fn write_zip(path: &Path, scan: &LocalScan, meta: Option<&VersionMeta>) -> Resul
         .large_file(true);
     for f in &scan.files {
         zw.start_file(f.logical.clone(), opts)?;
-        let mut src = File::open(&f.real).with_context(|| format!("Không đọc được {}", f.real.display()))?;
+        let mut src = File::open(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
         io::copy(&mut src, &mut zw)?;
     }
     if let Some(m) = meta {
@@ -259,7 +261,7 @@ fn snapshot_local(appid: u32, scan: &LocalScan) -> Result<PathBuf> {
     let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
     let path = dir.join(format!("{stamp}.zip"));
     write_zip(&path, scan, None)?;
-    // giữ 5 snapshot gần nhất
+    // keep the 5 most recent snapshots
     let mut all: Vec<PathBuf> = fs::read_dir(&dir)?.flatten().map(|e| e.path()).collect();
     all.sort();
     while all.len() > 5 {
@@ -270,7 +272,7 @@ fn snapshot_local(appid: u32, scan: &LocalScan) -> Result<PathBuf> {
 
 fn fmt_time(ms: i64) -> String {
     chrono::DateTime::from_timestamp_millis(ms)
-        .map(|t| t.with_timezone(&chrono::Local).format("%d/%m %H:%M").to_string())
+        .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_default()
 }
 
@@ -328,11 +330,11 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
     let g = env.game(appid)?;
     let ctx = env.ctx(g);
     if Procs::snapshot().running(&ctx.base) {
-        bail!("{} đang chạy. Tắt game rồi backup.", g.name);
+        bail!("{}", tr!("err.game_running", game = g.name));
     }
     let scan = paths::scan(&ctx, env.rules(appid), cfg.include_config);
     let Some(hash) = hash_scan(&scan)? else {
-        bail!("Không tìm thấy file save nào của {} trên máy này.", g.name);
+        bail!("{}", tr!("err.no_save_files", game = g.name));
     };
     let st = storage::open(&cfg.backend)?;
     let idx = load_index(&*st)?;
@@ -345,7 +347,7 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
         if c.content_hash == hash {
             state.games.insert(key, SyncBase { local: hash.clone(), cloud: hash, at_utc: now.timestamp_millis() });
             state.save()?;
-            return Ok(OpResult { outcome: "unchanged".into(), message: format!("{}: không có gì thay đổi, bỏ qua upload.", g.name) });
+            return Ok(OpResult { outcome: "unchanged".into(), message: t!("msg.backup_unchanged", game = g.name).to_string() });
         }
     }
     let s = status(Some(&hash), latest.as_ref(), state.games.get(&key), true);
@@ -375,7 +377,7 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
     let _ = fs::remove_file(&tmp);
     up?;
 
-    // Đọc lại index ngay trước khi ghi để hạn chế đè lên thay đổi của máy khác
+    // Re-read the index right before writing to avoid clobbering another PC's update
     let mut idx = load_index(&*st)?;
     let list = idx.games.entry(key.clone()).or_default();
     list.insert(0, meta);
@@ -389,11 +391,11 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
     state.save()?;
     Ok(OpResult {
         outcome: "uploaded".into(),
-        message: format!("{}: đã backup {} file ({}).", g.name, scan.files.len(), human(scan.bytes())),
+        message: t!("msg.backup_done", game = g.name, files = scan.files.len(), size = human(scan.bytes())).to_string(),
     })
 }
 
-/// `remap`: (tài khoản trong bản backup, tài khoản đích) để ghi save của A vào chỗ của B.
+/// `remap`: (account in the backup, target account) to write A's save into B's place.
 pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool, remap: Option<(String, String)>) -> Result<OpResult> {
     let remap = match remap {
         Some((a, b)) if a != b => Some((crate::migrate::Ids::parse(&a)?, crate::migrate::Ids::parse(&b)?)),
@@ -403,7 +405,7 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     let g = env.game(appid)?;
     let ctx = env.ctx(g);
     if Procs::snapshot().running(&ctx.base) {
-        bail!("{} đang chạy. Tắt game rồi restore.", g.name);
+        bail!("{}", tr!("err.game_running", game = g.name));
     }
     let rules = env.rules(appid);
     let scan = paths::scan(&ctx, rules, cfg.include_config);
@@ -412,20 +414,20 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     let st = storage::open(&cfg.backend)?;
     let idx = load_index(&*st)?;
     let key = appid.to_string();
-    let versions = idx.games.get(&key).filter(|v| !v.is_empty()).context("Chưa có bản backup nào của game này trên cloud.")?;
+    let versions = idx.games.get(&key).filter(|v| !v.is_empty()).context(tr!("err.no_cloud_backup").to_string())?;
     let latest = versions[0].clone();
     let ver = match &version_id {
-        Some(id) => versions.iter().find(|v| &v.id == id).cloned().context("Không tìm thấy phiên bản đã chọn")?,
+        Some(id) => versions.iter().find(|v| &v.id == id).cloned().context(tr!("err.version_not_found").to_string())?,
         None => latest.clone(),
     };
     let mut state = State::load();
     let now = chrono::Utc::now().timestamp_millis();
 
-    // Ghi sang tài khoản khác thì vẫn phải chạy dù save của tài khoản gốc đã giống hệt
+    // Writing into another account must run even if the source account's save is identical
     if remap.is_none() && local_hash.as_deref() == Some(ver.content_hash.as_str()) {
         state.games.insert(key, SyncBase { local: ver.content_hash.clone(), cloud: latest.content_hash, at_utc: now });
         state.save()?;
-        return Ok(OpResult { outcome: "unchanged".into(), message: format!("{}: bản local đã giống bản này, không cần restore.", g.name) });
+        return Ok(OpResult { outcome: "unchanged".into(), message: t!("msg.restore_unchanged", game = g.name).to_string() });
     }
     let s = status(local_hash.as_deref(), Some(&latest), state.games.get(&key), true);
     if !force && local_hash.is_some() && matches!(s, "local" | "conflict" | "diverged") {
@@ -433,7 +435,7 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     }
 
     if !scan.files.is_empty() {
-        snapshot_local(appid, &scan).context("Không tạo được snapshot local trước khi restore")?;
+        snapshot_local(appid, &scan).context(tr!("err.snapshot").to_string())?;
     }
 
     let tmp = cache_dir().join("tmp").join(format!("restore-{}.zip", ver.id));
@@ -448,19 +450,21 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     let after = hash_scan(&paths::scan(&ctx, rules, cfg.include_config))?.unwrap_or_default();
     state.games.insert(key, SyncBase { local: after, cloud: latest.content_hash, at_utc: now });
     state.save()?;
-    let mut message = format!("{}: đã restore {} file từ bản của {} lúc {}.", g.name, restored, ver.device_name, fmt_time(ver.created_utc));
+    let mut message = t!("msg.restore_done", game = g.name, files = restored, device = ver.device_name, time = fmt_time(ver.created_utc)).to_string();
     if skipped > 0 {
-        message.push_str(&format!(" Bỏ qua {skipped} file của bản Linux native (không dùng được trên Windows)."));
+        message.push(' ');
+        message.push_str(&t!("msg.restore_skipped_linux", files = skipped));
     }
     if let Some((_, to)) = &remap {
-        message.push_str(&format!(" Đã ghi vào tài khoản {}.", to.sid64));
+        message.push(' ');
+        message.push_str(&t!("msg.restore_into_account", account = to.sid64));
     }
     Ok(OpResult { outcome: "restored".into(), message })
 }
 
 pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::migrate::Ids, crate::migrate::Ids)>) -> Result<(usize, usize)> {
-    let mut za = zip::ZipArchive::new(File::open(zip_path)?).context("File backup bị hỏng")?;
-    // Kiểm tra toàn bộ đường dẫn trước khi ghi bất kỳ file nào
+    let mut za = zip::ZipArchive::new(File::open(zip_path)?).context(tr!("err.backup_corrupt").to_string())?;
+    // Validate every path before writing any file
     let mut plan = Vec::new();
     let mut skipped = 0;
     for i in 0..za.len() {
@@ -492,10 +496,10 @@ pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::mig
                 let mut buf = Vec::new();
                 io::Read::read_to_end(&mut e, &mut buf)?;
                 fs::write(dest, crate::migrate::rewrite_autocloud(&buf, from, to))
-                    .with_context(|| format!("Không ghi được {}", dest.display()))?;
+                    .with_context(|| tr!("err.write_file", path = dest.display()).to_string())?;
             }
             _ => {
-                let mut out = File::create(dest).with_context(|| format!("Không ghi được {}", dest.display()))?;
+                let mut out = File::create(dest).with_context(|| tr!("err.write_file", path = dest.display()).to_string())?;
                 io::copy(&mut e, &mut out)?;
             }
         }
@@ -538,12 +542,12 @@ mod tests {
         SyncBase { local: l.into(), cloud: c.into(), at_utc: 0 }
     }
 
-    /// Chạy trên máy thật: `cargo test smoke -- --ignored --nocapture`
+    /// Runs on the real machine: `cargo test smoke -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn smoke_real_machine() {
         if manifest().is_none() {
-            set_manifest(manifest::download_and_build().expect("tải manifest"));
+            set_manifest(manifest::download_and_build().expect("download manifest"));
         }
         let state_path = crate::config::config_dir().join("state.json");
         let had_state = state_path.exists();
@@ -553,22 +557,22 @@ mod tests {
         cfg.backend = crate::config::Backend::Folder { path: tmp.to_string_lossy().to_string() };
 
         let l = list(&cfg).expect("list");
-        println!("steam root: {} · manifest {} game", l.steam_root, l.manifest_games);
+        println!("steam root: {} · manifest {} games", l.steam_root, l.manifest_games);
         for g in &l.games {
-            println!("{:>8} {:<40} {:<9} {:>4} file {:>10} B  {}", g.appid, g.name, g.status, g.files, g.bytes, g.roots.join(" | "));
+            println!("{:>8} {:<40} {:<9} {:>4} files {:>10} B  {}", g.appid, g.name, g.status, g.files, g.bytes, g.roots.join(" | "));
         }
         let Some(g) = l.games.iter().filter(|g| g.local_hash.is_some() && !g.running).min_by_key(|g| g.bytes) else {
-            println!("Không có game nào có save để thử backup");
+            println!("No game with saves to test a backup");
             return;
         };
         let r = backup(&cfg, g.appid, false).expect("backup");
         println!("backup: {}", r.message);
-        let again = backup(&cfg, g.appid, false).expect("backup lần 2");
+        let again = backup(&cfg, g.appid, false).expect("second backup");
         assert_eq!(again.outcome, "unchanged");
         let l2 = list(&cfg).expect("list 2");
         let row = l2.games.iter().find(|x| x.appid == g.appid).unwrap();
         assert_eq!(row.status, "sync");
-        println!("sau backup: {} = {}", row.name, row.status);
+        println!("after backup: {} = {}", row.name, row.status);
         if !had_state {
             let _ = fs::remove_file(&state_path);
         } else {
@@ -579,20 +583,20 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
     }
 
-    /// Backup thật lên nơi lưu đang cấu hình: `cargo test drive_real -- --ignored --nocapture`
+    /// Real backup to the configured storage: `cargo test drive_real -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn drive_real() {
         let cfg = Config::load();
         let l = list(&cfg).expect("list");
-        assert!(l.cloud_error.is_none(), "cloud lỗi: {:?}", l.cloud_error);
-        let g = l.games.iter().filter(|g| g.local_hash.is_some() && !g.running).min_by_key(|g| g.bytes).expect("game có save");
-        println!("game: {} ({} file, {} B), trạng thái trước: {}", g.name, g.files, g.bytes, g.status);
+        assert!(l.cloud_error.is_none(), "cloud error: {:?}", l.cloud_error);
+        let g = l.games.iter().filter(|g| g.local_hash.is_some() && !g.running).min_by_key(|g| g.bytes).expect("a game with saves");
+        println!("game: {} ({} files, {} B), status before: {}", g.name, g.files, g.bytes, g.status);
         let r = backup(&cfg, g.appid, false).expect("backup");
         println!("backup: {} -> {}", r.outcome, r.message);
         let l2 = list(&cfg).expect("list 2");
         let row = l2.games.iter().find(|x| x.appid == g.appid).unwrap();
-        println!("sau backup: {}, {} bản trên cloud", row.status, row.versions);
+        println!("after backup: {}, {} versions in the cloud", row.status, row.versions);
         assert_eq!(row.status, "sync");
 
         let v = versions(&cfg, g.appid).expect("versions");
@@ -601,13 +605,13 @@ mod tests {
         st.download(&v[0].zip, &tmp).expect("download");
         let za = zip::ZipArchive::new(File::open(&tmp).unwrap()).unwrap();
         let names: Vec<String> = za.file_names().map(String::from).collect();
-        println!("zip tải về: {} entry: {:?}", names.len(), names);
+        println!("downloaded zip: {} entries: {:?}", names.len(), names);
         assert!(names.iter().any(|n| n == META_IN_ZIP));
         assert_eq!(names.len(), v[0].files + 1);
         let _ = fs::remove_file(&tmp);
 
         let rr = restore(&cfg, g.appid, None, false, None).expect("restore");
-        println!("restore cùng bản: {} -> {}", rr.outcome, rr.message);
+        println!("restore of the same version: {} -> {}", rr.outcome, rr.message);
         assert_eq!(rr.outcome, "unchanged");
     }
 
