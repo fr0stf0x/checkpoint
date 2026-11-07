@@ -15,6 +15,7 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Keeps the last 10 versions per game in the cloud. Takes a local snapshot before every restore.
 - Refuses to back up or restore while the game is running. Flags games whose saves are tied to a SteamID.
 - Saves made on Windows restore into the Proton prefix on Linux, and the other way round.
+- Move a game's save from one Steam account to another (for example when you have to switch accounts): copies the account's save folder to the new account, fixes `steam_autocloud.vdf`, optionally replaces the SteamID inside save files, then lets you test in game and **keep** or **undo** in one click. The original account's files are never touched. Restore can also write a backup into a different account.
 - Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID.
 
 ## How it works
@@ -77,7 +78,7 @@ Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases.
 
 ## Known limitations
 
-- A save tied to a SteamID only works on that Steam account.
+- A save tied to a SteamID may only work on that Steam account. Moving it to another account works for many games but not all (encrypted saves that check the account inside cannot be fixed).
 - On Linux, run the game once through Proton before restoring a Windows backup, so the Proton prefix exists.
 - Saves stored in the Windows Registry are not supported yet.
 - Games missing from the manifest cannot be added manually yet.

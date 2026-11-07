@@ -53,7 +53,7 @@ Giao diện app thật (`ui/`) đi theo prototype này: sidebar Game / Tài kho�
 | **Khóa "đang chơi ở máy X"** (`lock.json` trên Drive) để tránh xung đột | Chưa làm |
 | Game ngoài Steam / giả lập / tự khai báo đường dẫn (custom entry) | Chưa làm |
 | Backup định kỳ chạy ngầm + icon khay hệ thống | Chưa làm |
-| **Chuyển save sang tài khoản Steam khác** (A → B), xem mục bên dưới | Chưa làm, đã có mockup (Phần 4 của prototype) |
+| **Chuyển save sang tài khoản Steam khác** (A → B), xem mục bên dưới | Xong (`migrate.rs`), chưa thử với game thật |
 | Save trong Registry | Chưa làm |
 | Giữ 1 tiến trình `rclone rcd` chạy nền thay vì gọi rclone mỗi lệnh (~3 giây/lệnh hiện tại) | Chưa làm |
 | Giao diện tiếng Anh cho app (hiện app chỉ có tiếng Việt, site có cả 2) | Chưa làm |
@@ -72,6 +72,13 @@ Phân loại save (quyết định app làm được gì):
 Phantom Blade Zero (appid 4115450): save ở `<base>/ProjectPBZ/Saved/SaveGames/Steam/<SteamID64>/` gồm `PBZSaveGame.sav`, thư mục `1RealTime`, `2Hourly`, `3Daily`, và `steam_autocloud.vdf`. File `.sav` có header `PBZS`, entropy ~8 bit/byte (mã hóa hoặc nén), không có SteamID ở dạng đọc được → thuộc nhóm "phải thử".
 
 UI đã chốt trong mockup: trình hướng dẫn 3 bước (Chọn A → B và game → Chuẩn bị: checklist + bảng đổi đường dẫn → Thử trong game: "Chạy được, giữ" / "Không được, hoàn tác"). Lối vào: nút trên thẻ tài khoản, menu "⋯" của game có save gắn SteamID, và hộp thoại Restore tự phát hiện bản cloud của account khác. Sau khi chuyển thành công, lưu cặp A → B lên Drive để các máy khác restore tự ghi vào B. Luôn copy, không bao giờ sửa hay xóa bản của A; chụp snapshot save hiện có của B trước khi ghi.
+
+Đã cài đặt (`src-tauri/src/migrate.rs`):
+- `migrate_preview` phân loại none/folder/in_file/opaque, kiểm tra B đã có thư mục save chưa, số file sẽ ghi đè, game có đang chạy.
+- `migrate_apply` ghi bản ghi `<data>/migrations/<id>.json` **trước** khi copy (lỗi giữa chừng vẫn hoàn tác được), chụp file sẽ bị ghi đè vào `<id>.zip`, nhớ thư mục mới tạo. Trạng thái `pending` tới khi người dùng chọn.
+- `migrate_undo` xóa thư mục mới tạo (kể cả file game tự tạo khi chơi thử), trả file bị ghi đè. `migrate_keep` ghi `account_aliases[A] = B` vào `index.json` trên cloud.
+- Restore có `remap_from`/`remap_to`: ghi bản của A vào chỗ của B, sửa `steam_autocloud.vdf`. Hộp thoại Restore mặc định chọn theo `account_aliases`.
+- Mỗi game chỉ có 1 lần chuyển đang chờ. Banner ở màn hình Game nhắc tới khi chọn Giữ/Hoàn tác.
 
 ## Quy ước làm việc
 

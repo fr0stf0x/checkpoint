@@ -69,6 +69,7 @@
     S.loading = true; render();
     try { S.list = await call('list_games'); }
     catch (e) { S.list = null; toast(String(e), true); }
+    try { S.pending = await call('migrate_pending'); } catch (e) { S.pending = []; }
     S.loading = false;
     $('#cGames').textContent = S.list ? S.list.games.length : '';
     render();
@@ -96,6 +97,10 @@
 
   function banners() {
     const out = [];
+    (S.pending || []).forEach((m) => {
+      out.push(`<div class="banner warn"><p><b>${esc(m.game_name)}: đã chuyển save từ ${esc(acctName(m.from))} sang ${esc(acctName(m.to))}, chờ mày thử.</b> Mở game bằng ${esc(acctName(m.to))}, vào Continue / Load. Save lên đúng thì Giữ, không thì Hoàn tác.</p>
+        <button class="btn" data-act="migUndo" data-mid="${esc(m.id)}">Không được, hoàn tác</button><button class="btn primary" data-act="migKeep" data-mid="${esc(m.id)}">Chạy được, giữ</button></div>`);
+    });
     if (S.info && !S.info.manifest_games) {
       out.push(`<div class="banner warn"><p><b>Chưa có manifest vị trí save.</b> Không có nó thì chỉ tìm được save trong thư mục Steam Cloud (userdata). Tải một lần, khoảng vài chục MB.</p><button class="btn primary" data-act="manifest">Tải manifest</button></div>`);
     }
@@ -137,6 +142,7 @@
           <td><div class="acts">
             <button class="btn sm" data-act="backup" data-id="${g.appid}" ${g.local_hash ? dis : 'disabled'}>Backup</button>
             <button class="btn sm" data-act="restore" data-id="${g.appid}" ${g.cloud ? dis : 'disabled'}>Restore</button>
+            ${g.steam_ids && g.steam_ids.length ? `<button class="btn sm" data-act="migrate" data-id="${g.appid}" title="Chuyển save sang tài khoản Steam khác" ${g.running || S.busy ? 'disabled' : ''}>Đổi tài khoản</button>` : ''}
           </div></td></tr>`;
       }).join('');
     pane.innerHTML = `
@@ -162,12 +168,17 @@
     pane.innerHTML = `<div class="panehead"><h2>Tài khoản Steam</h2></div><div class="loading"><span class="spin"></span>Đang đọc…</div>`;
     if (!S.accounts) await loadAccounts();
     if (S.view !== 'accounts') return;
-    const cards = (S.accounts || []).map((a) => `
+    const cards = (S.accounts || []).map((a) => {
+      const games = gamesOfAccount(a.steamid64);
+      return `
       <div class="card"><div class="gname">${esc(a.persona_name || a.account_name)} ${a.most_recent ? statusPill('sync').replace(STATUS.sync, 'Đăng nhập gần nhất') : ''}</div>
         <div class="k">login: ${esc(a.account_name)}</div>
         <div class="k">SteamID64: ${esc(a.steamid64)}</div>
         <div class="k">userdata/${a.account_id} ${a.has_userdata ? `· ${a.userdata_apps} app` : '· chưa có'}</div>
-        <div class="note">${a.offline_mode ? 'Đang để offline mode · ' : ''}Lần đăng nhập: ${fmt(a.timestamp * 1000)}</div></div>`).join('');
+        <div class="note">${a.offline_mode ? 'Đang để offline mode · ' : ''}Lần đăng nhập: ${fmt(a.timestamp * 1000)}</div>
+        <div class="note">${S.list ? (games.length ? `Có save gắn tài khoản ở ${games.length} game: ${esc(games.map((g) => g.name).join(', '))}` : 'Không có save nào gắn riêng với tài khoản này') : ''}</div>
+        ${games.length ? `<div><button class="btn sm" data-act="migrateAcct" data-sid="${esc(a.steamid64)}">Chuyển save sang tài khoản khác…</button></div>` : ''}</div>`;
+    }).join('');
     pane.innerHTML = `<div class="panehead"><h2>Tài khoản Steam</h2></div>
       <div class="cards">${cards || '<div class="empty">Không thấy tài khoản nào trong loginusers.vdf</div>'}</div>
       <p class="note">Đọc từ <span class="mono">config/loginusers.vdf</span>. Save của game gắn SteamID chỉ nên restore cho đúng account đã tạo ra nó.</p>`;
@@ -231,6 +242,173 @@
     loadRclone();
   }
 
+  // ---------- tài khoản ----------
+  const SID_BASE = 76561197960265728n;
+  function toSid(id) {
+    try { const n = BigInt(id); return (n >= SID_BASE ? n : n + SID_BASE).toString(); } catch (e) { return String(id); }
+  }
+  function acctName(sid) {
+    const a = (S.accounts || []).find((x) => x.steamid64 === sid);
+    return a ? (a.persona_name || a.account_name) + (a.account_name && a.persona_name ? ` (${a.account_name})` : '') : `SteamID …${String(sid).slice(-6)}`;
+  }
+  function gamesOfAccount(sid) {
+    return (S.list ? S.list.games : []).filter((g) => (g.steam_ids || []).some((x) => toSid(x) === sid));
+  }
+
+  // ---------- chuyển save sang tài khoản khác ----------
+  let W = null;
+  const CLASS = {
+    none: ['Không có save của tài khoản này', 's-new'],
+    folder: ['ID chỉ ở tên thư mục', 's-sync'],
+    in_file: ['ID nằm trong file · thử nghiệm', 's-local'],
+    opaque: ['File mã hóa · phải thử trong game', 's-local'],
+  };
+
+  function openMigrate(opts) {
+    if (!S.list) { toast('Đợi quét game xong rồi thử lại.', true); return; }
+    const pool = opts.appid ? [game(opts.appid)] : S.list.games;
+    const sids = [...new Set(pool.flatMap((g) => (g.steam_ids || []).map(toSid)))];
+    if (!sids.length) { toast('Không thấy save nào gắn với tài khoản Steam.', true); return; }
+    const from = opts.from && sids.includes(opts.from) ? opts.from : sids[0];
+    W = { step: 1, sids, from, to: null, only: opts.appid || null, picked: null, previews: [], results: [], errors: [] };
+    renderWizard();
+  }
+
+  function wizSteps() {
+    return `<div class="wsteps">${['Chọn', 'Chuẩn bị', 'Thử trong game'].map((t, i) => `<span class="${W.step === i + 1 ? 'on' : ''}">${i + 1} · ${t}</span>`).join('')}</div>`;
+  }
+
+  function renderWizard() {
+    if (!W) return;
+    if (W.step === 1) return wizardStep1();
+    if (W.step === 2) return wizardStep2();
+    return wizardStep3();
+  }
+
+  function wizardStep1() {
+    const targets = (S.accounts || []).filter((a) => a.steamid64 !== W.from);
+    if (!W.to || W.to === W.from || !targets.some((a) => a.steamid64 === W.to)) {
+      const cur = targets.find((a) => a.most_recent);
+      W.to = (cur || targets[0] || {}).steamid64 || null;
+    }
+    const games = gamesOfAccount(W.from).filter((g) => !W.only || g.appid === W.only);
+    if (!W.picked) W.picked = new Set(games.map((g) => g.appid));
+    const fromOpts = W.sids.map((s) => `<option value="${esc(s)}" ${s === W.from ? 'selected' : ''}>${esc(acctName(s))} · ${esc(s)}</option>`).join('');
+    const toOpts = targets.map((a) => `<option value="${esc(a.steamid64)}" ${a.steamid64 === W.to ? 'selected' : ''}>${esc(acctName(a.steamid64))}${a.most_recent ? ' · đang đăng nhập' : ''}</option>`).join('');
+    const list = games.map((g) => `<label class="grow" for="wg${g.appid}"><input type="checkbox" id="wg${g.appid}" data-wg="${g.appid}" ${W.picked.has(g.appid) ? 'checked' : ''}>
+        <span><b>${esc(g.name)}</b><br><span class="note">${g.files} file · ${human(g.bytes)}${g.cloud ? ` · backup gần nhất ${fmt(g.cloud.created_utc)}` : ' · chưa backup lên cloud'}</span></span></label>`).join('');
+    modal(`<h3>Chuyển save sang tài khoản khác</h3>${wizSteps()}
+      <div class="acctpick">
+        <div class="field"><label class="l" for="wFrom">Từ tài khoản (bản gốc giữ nguyên)</label><select id="wFrom">${fromOpts}</select></div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="field"><label class="l" for="wTo">Sang tài khoản</label>${targets.length ? `<select id="wTo">${toOpts}</select>` : '<span class="note">Máy này chưa có tài khoản nào khác. Đăng nhập Steam bằng tài khoản mới 1 lần để nó hiện ở đây.</span>'}</div>
+      </div>
+      <div class="glist">${list || '<div class="empty">Tài khoản này không có save gắn riêng ở game nào.</div>'}</div>
+      <p class="note">Chỉ copy file của tài khoản nguồn sang chỗ của tài khoản đích. Không xóa hay sửa gì của tài khoản nguồn.</p>
+      <div class="mfoot"><button class="btn" data-close="1">Hủy</button><button class="btn primary" data-act="wzNext" ${targets.length && games.length ? '' : 'disabled'}>Tiếp</button></div>`);
+    $('#wFrom').addEventListener('change', (e) => { W.from = e.target.value; W.picked = null; wizardStep1(); });
+    const t = $('#wTo'); if (t) t.addEventListener('change', (e) => { W.to = e.target.value; });
+    layer.querySelectorAll('[data-wg]').forEach((c) => c.addEventListener('change', () => {
+      const id = +c.dataset.wg; if (c.checked) W.picked.add(id); else W.picked.delete(id);
+    }));
+  }
+
+  async function wizardPrepare() {
+    const ids = [...W.picked];
+    if (!ids.length) { toast('Chọn ít nhất 1 game.', true); return; }
+    busyModal('Chuyển save sang tài khoản khác');
+    W.previews = [];
+    for (const appid of ids) {
+      try { W.previews.push(await call('migrate_preview', { appid, from: W.from, to: W.to })); }
+      catch (e) { W.previews.push({ appid, name: game(appid).name, error: String(e) }); }
+    }
+    W.step = 2; renderWizard();
+  }
+
+  function blockedReason(p) {
+    if (p.error) return p.error;
+    if (p.running) return 'Game đang chạy. Tắt game trước.';
+    if (p.pending_id) return 'Còn một lần chuyển save chưa xác nhận. Giữ hoặc Hoàn tác trước.';
+    if (p.class === 'none') return 'Không có file nào của tài khoản nguồn.';
+    return null;
+  }
+
+  function wizardStep2() {
+    const cards = W.previews.map((p) => {
+      const blocked = blockedReason(p);
+      const g = game(p.appid);
+      const [cl, cc] = CLASS[p.class] || ['', ''];
+      const ck = (ok, text) => `<div><span class="ck ${ok ? 'ok' : 'todo'}">${ok ? '✓' : '!'}</span><span>${text}</span></div>`;
+      const checks = blocked ? `<div class="alert bad">${esc(blocked)}</div>` : `<div class="checklist">
+          ${ck(true, 'Game không chạy')}
+          ${g && g.cloud ? ck(true, `Đã có bản backup trên cloud lúc ${fmt(g.cloud.created_utc)}`) : ck(false, '<b>Chưa có bản backup trên cloud.</b> Nên Backup game này trước để chắc ăn.')}
+          ${p.target_dir_exists ? ck(true, `${esc(acctName(W.to))} đã có thư mục save của game`) : ck(false, `<b>${esc(acctName(W.to))} chưa mở game này lần nào.</b> Nên đăng nhập tài khoản này, vào game tới màn hình chính rồi tắt, để chắc tài khoản có quyền chơi. Bỏ qua cũng được, app tự tạo thư mục.`)}
+          ${p.overwrite ? ck(false, `<b>${esc(acctName(W.to))} đã có ${p.overwrite} file save sẽ bị ghi đè.</b> Các file này được chụp lại, hoàn tác sẽ trả về.`) : ''}
+          ${p.class === 'opaque' ? ck(false, `File save bị mã hóa hoặc nén (entropy ${p.max_entropy.toFixed(3)} trên tối đa 8). Không biết game có kiểm tra tài khoản bên trong không, phải mở game thử.`) : ''}
+          ${p.class === 'in_file' ? `<label class="check" for="patch${p.appid}"><input type="checkbox" id="patch${p.appid}" checked> <span>Thay SteamID bên trong file save (${p.files.filter((f) => f.id_hits).length} file có ID). Thử nghiệm: game có checksum thì vẫn có thể báo hỏng.</span></label>` : ''}
+        </div>`;
+      const f = p.files && p.files[0];
+      const map = f ? `<div class="pathmap"><span class="del">  ${esc(f.from)}</span>\n<span class="add">→ ${esc(f.to)}</span>${p.files.length > 1 ? `\n<span class="del">  … và ${p.files.length - 1} file khác</span>` : ''}</div>` : '';
+      return `<div class="step ${blocked ? 'todo' : 'done'}"><div class="row"><b>${esc(p.name)}</b><span class="spacer"></span>${cl ? `<span class="pill ${cc}">${cl}</span>` : ''}</div>${checks}${map}</div>`;
+    }).join('');
+    const ready = W.previews.filter((p) => !blockedReason(p)).length;
+    modal(`<h3>Chuyển save: ${esc(acctName(W.from))} → ${esc(acctName(W.to))}</h3>${wizSteps()}
+      <div class="steps">${cards}</div>
+      <div class="mfoot"><button class="btn" data-act="wzBack">Quay lại</button><button class="btn primary" data-act="wzApply" ${ready ? '' : 'disabled'}>Chuyển save ${ready} game</button></div>`);
+  }
+
+  async function wizardApply() {
+    const todo = W.previews.filter((p) => !blockedReason(p));
+    const patch = {};
+    todo.forEach((p) => { const c = $('#patch' + p.appid); patch[p.appid] = !!(c && c.checked); });
+    busyModal('Đang chuyển save');
+    S.busy = true;
+    W.results = []; W.errors = [];
+    for (const p of todo) {
+      const t = $('#busyText'); if (t) t.textContent = p.name;
+      try { W.results.push(await call('migrate_apply', { appid: p.appid, from: W.from, to: W.to, patchInFile: patch[p.appid] })); }
+      catch (e) { W.errors.push(`${p.name}: ${e}`); }
+    }
+    S.busy = false;
+    W.step = 3; W.done = {};
+    renderWizard();
+    loadGames();
+  }
+
+  function wizardStep3() {
+    const rows = W.results.map((m) => {
+      const d = W.done[m.id];
+      const right = d === 'keep' ? '<span class="pill s-sync">Đã giữ</span>'
+        : d === 'undo' ? '<span class="pill s-new">Đã hoàn tác</span>'
+        : `<button class="btn sm" data-act="migUndo" data-mid="${esc(m.id)}">Không được, hoàn tác</button><button class="btn sm primary" data-act="migKeep" data-mid="${esc(m.id)}">Chạy được, giữ</button>`;
+      return `<div class="row mrow2"><span><b>${esc(m.game_name)}</b><br><span class="note">${m.files} file${m.patched ? ` · đã thay ID trong ${m.patched} file` : ''}</span></span><span class="spacer"></span>${right}</div>`;
+    }).join('');
+    const pending = W.results.some((m) => !W.done[m.id]);
+    modal(`<h3>Thử trong game</h3>${wizSteps()}
+      ${W.results.length ? `<div class="alert"><b>Đã copy save sang ${esc(acctName(W.to))}.</b><span>Đăng nhập Steam bằng ${esc(acctName(W.to))}, mở từng game, chọn Continue / Load. Save lên đúng tiến trình thì Giữ. Game báo save hỏng hoặc vào New Game thì Hoàn tác: bản copy bị xóa, save cũ của ${esc(acctName(W.to))} (nếu có) được trả lại.</span></div>` : ''}
+      ${W.errors.map((e) => `<div class="alert bad">${esc(e)}</div>`).join('')}
+      <div class="glist">${rows}</div>
+      <p class="note">Có thể đóng hộp thoại này để mở game. Màn hình Game sẽ nhắc cho tới khi mày chọn Giữ hoặc Hoàn tác. Khi Giữ, app nhớ ${esc(acctName(W.from))} → ${esc(acctName(W.to))} trên cloud để máy khác restore tự ghi vào tài khoản mới.</p>
+      <div class="mfoot"><button class="btn ${pending ? '' : 'primary'}" data-close="1">${pending ? 'Đóng, để thử game' : 'Xong'}</button></div>`);
+  }
+
+  async function migDecide(kind, id) {
+    const inWizard = W && W.step === 3 && W.results.some((m) => m.id === id);
+    if (!inWizard) busyModal(kind === 'keep' ? 'Giữ kết quả' : 'Hoàn tác');
+    try {
+      if (kind === 'keep') {
+        const r = await call('migrate_keep', { id });
+        toast(`${r.migration.game_name}: đã giữ. Lần sau backup sẽ có save của tài khoản mới.`);
+        if (r.warning) toast(r.warning, true);
+      } else {
+        const m = await call('migrate_undo', { id });
+        toast(`${m.game_name}: đã hoàn tác, trả lại như trước khi chuyển.`);
+      }
+      if (inWizard) { W.done[id] = kind; renderWizard(); } else close();
+    } catch (e) { if (!inWizard) close(); toast(String(e), true); }
+    loadGames();
+  }
+
   const OS_NAME = { windows: 'Windows', linux: 'Linux', macos: 'macOS' };
 
   async function loadRclone() {
@@ -286,7 +464,7 @@
     try {
       const r = kind === 'backup'
         ? await call('backup_game', { appid: g.appid, force: !!opts.force })
-        : await call('restore_game', { appid: g.appid, versionId: opts.versionId || null, force: !!opts.force });
+        : await call('restore_game', { appid: g.appid, versionId: opts.versionId || null, force: !!opts.force, remapFrom: opts.remapFrom || null, remapTo: opts.remapTo || null });
       close(); toast(r.message);
       S.busy = false;
       await loadGames();
@@ -340,7 +518,22 @@
     else if (g.status === 'diverged') alert = `<div class="alert warn"><b>Máy này chưa đồng bộ game này lần nào</b><span>và save local khác bản cloud. Bản cloud mới hơn ${diff(v.created_utc - g.local_mtime)} theo ngày sửa file.</span></div>`;
     else alert = `<div class="alert">Bản cloud mới hơn, từ ${esc(v.device_name)}. Restore an toàn.</div>`;
     if (v.id !== latest.id) alert += `<div class="alert warn">Đây là bản cũ, không phải bản mới nhất (${fmt(latest.created_utc)}).</div>`;
-    if (v.steam_ids && v.steam_ids.length) alert += `<div class="alert">Save gắn với SteamID/AccountID <span class="mono">${esc(v.steam_ids.join(', '))}</span>. Chỉ chơi được trên đúng account đó.</div>`;
+    // Bản backup gắn với đúng 1 tài khoản: cho chọn ghi vào tài khoản khác
+    const verAccts = [...new Set((v.steam_ids || []).map(toSid))];
+    let acctPick = '';
+    if (verAccts.length === 1) {
+      const src = verAccts[0];
+      const alias = S.list && S.list.account_aliases ? S.list.account_aliases[src] : null;
+      const cur = (S.accounts || []).find((a) => a.most_recent);
+      const def = alias || src;
+      const others = (S.accounts || []).filter((a) => a.steamid64 !== src);
+      const opt = (sid, label) => `<option value="${esc(sid)}" ${sid === def ? 'selected' : ''}>${esc(label)}</option>`;
+      acctPick = `<div class="field"><label class="l" for="remapTo">Ghi save vào tài khoản</label>
+        <select id="remapTo" data-from="${esc(src)}">${opt(src, `${acctName(src)} (như bản gốc)`)}${others.map((a) => opt(a.steamid64, `${acctName(a.steamid64)}${a.most_recent ? ' · đang đăng nhập' : ''}`)).join('')}</select>
+        <span class="note">${alias ? `Đã nhớ: ${esc(acctName(src))} được thay bằng ${esc(acctName(alias))}.` : cur && cur.steamid64 !== src ? `Bản này của ${esc(acctName(src))}, máy đang đăng nhập ${esc(acctName(cur.steamid64))}. Chọn tài khoản đang đăng nhập để chơi tiếp bằng nó (game mã hóa save có thể không nhận).` : 'Save gắn với tài khoản Steam. Chỉ đổi khi muốn chơi tiếp bằng tài khoản khác.'}</span></div>`;
+    } else if (v.steam_ids && v.steam_ids.length) {
+      alert += `<div class="alert">Save gắn với SteamID/AccountID <span class="mono">${esc(v.steam_ids.join(', '))}</span>. Chỉ chơi được trên đúng account đó.</div>`;
+    }
     if (S.info.os === 'linux' && v.os === 'windows') alert += `<div class="alert">Bản từ Windows sẽ được ghi vào Proton prefix của game. Nếu chưa chạy game lần nào trên máy này thì chạy 1 lần trước.</div>`;
     const danger = hasLocal && !same && (g.status === 'local' || g.status === 'conflict' || g.status === 'diverged' || localNewer);
     const opts = versions.map((x) => `<option value="${esc(x.id)}" ${x.id === v.id ? 'selected' : ''}>${fmt(x.created_utc)} · ${esc(x.device_name)} · ${x.files} file · ${human(x.bytes)}</option>`).join('');
@@ -348,11 +541,18 @@
       <div class="field"><label class="l" for="ver">Phiên bản trên cloud</label><select id="ver">${opts}</select></div>
       <div class="cmp">${box('Local · máy này', g.local_mtime, hasLocal ? `${ago(g.local_mtime)} · ${g.files} file` : 'không có save', localNewer)}${box('Cloud · ' + v.device_name, v.created_utc, `${ago(v.created_utc)} · ${v.os}`, !localNewer && !same && hasLocal)}</div>
       ${alert}
+      ${acctPick}
       ${hasLocal && !same ? '<p class="note">Bản local hiện tại sẽ được chụp snapshot trước khi ghi đè.</p>' : ''}
       <div class="mfoot"><button class="btn" data-close="1">Hủy</button>
         ${danger ? `<button class="btn primary" data-act="toBackup" data-id="${g.appid}">Backup thay vì restore</button>` : ''}
         <button class="btn ${danger ? 'danger' : 'primary'}" data-act="doRestore" data-id="${g.appid}" data-ver="${esc(v.id)}" ${same ? 'disabled' : ''}>${danger ? 'Vẫn restore, ghi đè local' : 'Restore'}</button></div>`);
     $('#ver').addEventListener('change', (e) => renderRestore(g, versions, e.target.value));
+    const rt = $('#remapTo');
+    const syncBtn = () => {
+      const b = layer.querySelector('[data-act="doRestore"]');
+      if (b) b.disabled = same && (!rt || rt.value === rt.dataset.from);
+    };
+    if (rt) { rt.addEventListener('change', syncBtn); syncBtn(); }
   }
 
   function planFor(kind) {
@@ -425,7 +625,17 @@
       else if (a === 'forceBackup') doOp('backup', game(id), { force: true });
       else if (a === 'toRestore') openRestore(game(id));
       else if (a === 'toBackup') { close(); confirmOrBackup(game(id)); }
-      else if (a === 'doRestore') doOp('restore', game(id), { versionId: n.dataset.ver, force: true });
+      else if (a === 'doRestore') {
+        const sel = $('#remapTo');
+        const remap = sel && sel.value !== sel.dataset.from ? { remapFrom: sel.dataset.from, remapTo: sel.value } : {};
+        doOp('restore', game(id), { versionId: n.dataset.ver, force: true, ...remap });
+      }
+      else if (a === 'migrate') openMigrate({ appid: id });
+      else if (a === 'migrateAcct') openMigrate({ from: n.dataset.sid });
+      else if (a === 'wzBack') { W.step = 1; renderWizard(); }
+      else if (a === 'wzNext') wizardPrepare();
+      else if (a === 'wzApply') wizardApply();
+      else if (a === 'migKeep' || a === 'migUndo') migDecide(a === 'migKeep' ? 'keep' : 'undo', n.dataset.mid);
       else if (a === 'backupAll') openAll('backup');
       else if (a === 'restoreAll') openAll('restore');
       else if (a === 'runAll') runAll(n.dataset.kind);

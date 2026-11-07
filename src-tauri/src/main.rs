@@ -2,6 +2,7 @@
 
 mod config;
 mod manifest;
+mod migrate;
 mod paths;
 mod rclone;
 mod steam;
@@ -90,12 +91,62 @@ async fn backup_game(appid: u32, force: bool) -> Result<sync::OpResult, String> 
 }
 
 #[tauri::command]
-async fn restore_game(appid: u32, version_id: Option<String>, force: bool) -> Result<sync::OpResult, String> {
+async fn restore_game(
+    appid: u32,
+    version_id: Option<String>,
+    force: bool,
+    remap_from: Option<String>,
+    remap_to: Option<String>,
+) -> Result<sync::OpResult, String> {
     blocking(move || {
         let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
-        sync::restore(&Config::load(), appid, version_id, force)
+        let remap = remap_from.zip(remap_to);
+        sync::restore(&Config::load(), appid, version_id, force, remap)
     })
     .await
+}
+
+#[tauri::command]
+async fn migrate_preview(appid: u32, from: String, to: String) -> Result<migrate::Preview, String> {
+    blocking(move || migrate::preview(&Config::load(), appid, &from, &to)).await
+}
+
+#[tauri::command]
+async fn migrate_apply(appid: u32, from: String, to: String, patch_in_file: bool) -> Result<migrate::Migration, String> {
+    blocking(move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        migrate::apply(&Config::load(), appid, &from, &to, patch_in_file)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn migrate_undo(id: String) -> Result<migrate::Migration, String> {
+    blocking(move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        migrate::undo(&Config::load(), &id)
+    })
+    .await
+}
+
+#[derive(Serialize)]
+struct KeepResult {
+    migration: migrate::Migration,
+    warning: Option<String>,
+}
+
+#[tauri::command]
+async fn migrate_keep(id: String) -> Result<KeepResult, String> {
+    blocking(move || {
+        let (migration, warning) = migrate::keep(&Config::load(), &id)?;
+        Ok(KeepResult { migration, warning })
+    })
+    .await
+}
+
+#[tauri::command]
+async fn migrate_pending() -> Result<Vec<migrate::Migration>, String> {
+    blocking(|| Ok(migrate::pending())).await
 }
 
 #[tauri::command]
@@ -181,6 +232,11 @@ fn main() {
             list_versions,
             history,
             pick_folder,
+            migrate_preview,
+            migrate_apply,
+            migrate_undo,
+            migrate_keep,
+            migrate_pending,
             rclone_status,
             rclone_install,
             rclone_connect

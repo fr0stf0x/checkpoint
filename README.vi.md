@@ -15,6 +15,7 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Giữ 10 bản gần nhất mỗi game trên cloud. Chụp snapshot bản local trước mỗi lần restore.
 - Không cho backup hoặc restore khi game đang chạy. Đánh dấu game có save gắn với SteamID.
 - Save tạo trên Windows restore được vào Proton prefix trên Linux và ngược lại.
+- Chuyển save của một game từ tài khoản Steam này sang tài khoản khác (ví dụ khi phải đổi tài khoản): copy thư mục save sang tài khoản mới, sửa `steam_autocloud.vdf`, tùy chọn thay SteamID bên trong file save, rồi để bạn thử trong game và **Giữ** hoặc **Hoàn tác** bằng 1 click. File của tài khoản cũ không bao giờ bị đụng tới. Restore cũng ghi được bản backup vào tài khoản khác.
 - Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn.
 
 ## Cách hoạt động
@@ -77,7 +78,7 @@ Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release.
 
 ## Hạn chế
 
-- Save gắn với SteamID chỉ chơi được trên đúng account Steam đó.
+- Save gắn với SteamID có thể chỉ chơi được trên đúng account đó. Chuyển sang tài khoản khác được với nhiều game nhưng không phải tất cả (save mã hóa có kiểm tra tài khoản bên trong thì không sửa được).
 - Trên Linux, chạy game 1 lần qua Proton trước khi restore bản từ Windows, để Proton tạo prefix.
 - Chưa hỗ trợ save lưu trong Registry của Windows.
 - Chưa tự khai báo được game không có trong manifest.

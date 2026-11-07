@@ -42,6 +42,10 @@ pub struct VersionMeta {
 pub struct CloudIndex {
     #[serde(default)]
     pub games: BTreeMap<String, Vec<VersionMeta>>,
+    /// Tài khoản cũ → tài khoản mới (SteamID64), ghi khi chuyển save A → B thành công.
+    /// Restore bản của A trên máy khác sẽ mặc định ghi vào B.
+    #[serde(default)]
+    pub account_aliases: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -67,6 +71,8 @@ pub struct GameRow {
     pub status: String,
     pub running: bool,
     pub steamid_bound: bool,
+    /// SteamID64 / AccountID xuất hiện trong đường dẫn save trên máy này
+    pub steam_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -75,6 +81,7 @@ pub struct ListResult {
     pub cloud_error: Option<String>,
     pub steam_root: String,
     pub manifest_games: usize,
+    pub account_aliases: BTreeMap<String, String>,
 }
 
 // ---------- manifest cache ----------
@@ -111,15 +118,15 @@ impl Env {
         Ok(Env { games: steam::installed_games(&libs), root, manifest: manifest() })
     }
 
-    fn game(&self, appid: u32) -> Result<&InstalledGame> {
+    pub(crate) fn game(&self, appid: u32) -> Result<&InstalledGame> {
         self.games.iter().find(|g| g.appid == appid).context("Game này không còn cài trên máy")
     }
 
-    fn rules(&self, appid: u32) -> &[FileRule] {
+    pub(crate) fn rules(&self, appid: u32) -> &[FileRule] {
         self.manifest.as_ref().and_then(|m| m.games.get(&appid)).map(|e| e.files.as_slice()).unwrap_or(&[])
     }
 
-    fn ctx(&self, g: &InstalledGame) -> GameCtx {
+    pub(crate) fn ctx(&self, g: &InstalledGame) -> GameCtx {
         GameCtx::new(g.appid, &g.installdir, &g.library, &self.root)
     }
 }
@@ -142,7 +149,7 @@ pub fn hash_scan(scan: &LocalScan) -> Result<Option<String>> {
 }
 
 /// SteamID64 / AccountID xuất hiện trong đường dẫn save: dấu hiệu save gắn với account.
-fn steam_ids(scan: &LocalScan) -> Vec<String> {
+pub(crate) fn steam_ids(scan: &LocalScan) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     for f in &scan.files {
         let parts: Vec<&str> = f.logical.split('/').collect();
@@ -177,10 +184,10 @@ pub fn status(local: Option<&str>, cloud: Option<&VersionMeta>, base: Option<&Sy
     }
 }
 
-struct Procs(Vec<String>);
+pub(crate) struct Procs(Vec<String>);
 
 impl Procs {
-    fn snapshot() -> Procs {
+    pub(crate) fn snapshot() -> Procs {
         use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
         let mut sys = System::new();
         sys.refresh_processes_specifics(
@@ -199,7 +206,7 @@ impl Procs {
         }
         Procs(v)
     }
-    fn running(&self, base: &Path) -> bool {
+    pub(crate) fn running(&self, base: &Path) -> bool {
         let b = norm(&base.to_string_lossy());
         b.len() > 10 && self.0.iter().any(|s| s.contains(&b))
     }
@@ -217,7 +224,7 @@ pub fn load_index(st: &dyn Storage) -> Result<CloudIndex> {
     }
 }
 
-fn save_index(st: &dyn Storage, idx: &CloudIndex) -> Result<()> {
+pub(crate) fn save_index(st: &dyn Storage, idx: &CloudIndex) -> Result<()> {
     st.write(INDEX, &serde_json::to_vec_pretty(idx)?)
 }
 
@@ -304,6 +311,7 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
             versions,
             status: st.to_string(),
             running: procs.running(&ctx.base),
+            steam_ids: ids,
         });
     }
     Ok(ListResult {
@@ -311,6 +319,7 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
         cloud_error,
         steam_root: env.root.to_string_lossy().to_string(),
         manifest_games: env.manifest.as_ref().map(|m| m.games.len()).unwrap_or(0),
+        account_aliases: idx.account_aliases,
     })
 }
 
@@ -384,7 +393,12 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
     })
 }
 
-pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool) -> Result<OpResult> {
+/// `remap`: (tài khoản trong bản backup, tài khoản đích) để ghi save của A vào chỗ của B.
+pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool, remap: Option<(String, String)>) -> Result<OpResult> {
+    let remap = match remap {
+        Some((a, b)) if a != b => Some((crate::migrate::Ids::parse(&a)?, crate::migrate::Ids::parse(&b)?)),
+        _ => None,
+    };
     let env = Env::load(cfg)?;
     let g = env.game(appid)?;
     let ctx = env.ctx(g);
@@ -407,7 +421,8 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     let mut state = State::load();
     let now = chrono::Utc::now().timestamp_millis();
 
-    if local_hash.as_deref() == Some(ver.content_hash.as_str()) {
+    // Ghi sang tài khoản khác thì vẫn phải chạy dù save của tài khoản gốc đã giống hệt
+    if remap.is_none() && local_hash.as_deref() == Some(ver.content_hash.as_str()) {
         state.games.insert(key, SyncBase { local: ver.content_hash.clone(), cloud: latest.content_hash, at_utc: now });
         state.save()?;
         return Ok(OpResult { outcome: "unchanged".into(), message: format!("{}: bản local đã giống bản này, không cần restore.", g.name) });
@@ -426,7 +441,7 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
         fs::create_dir_all(p)?;
     }
     st.download(&ver.zip, &tmp)?;
-    let result = extract(&tmp, &ctx);
+    let result = extract(&tmp, &ctx, remap.as_ref());
     let _ = fs::remove_file(&tmp);
     let (restored, skipped) = result?;
 
@@ -437,10 +452,13 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     if skipped > 0 {
         message.push_str(&format!(" Bỏ qua {skipped} file của bản Linux native (không dùng được trên Windows)."));
     }
+    if let Some((_, to)) = &remap {
+        message.push_str(&format!(" Đã ghi vào tài khoản {}.", to.sid64));
+    }
     Ok(OpResult { outcome: "restored".into(), message })
 }
 
-fn extract(zip_path: &Path, ctx: &GameCtx) -> Result<(usize, usize)> {
+pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::migrate::Ids, crate::migrate::Ids)>) -> Result<(usize, usize)> {
     let mut za = zip::ZipArchive::new(File::open(zip_path)?).context("File backup bị hỏng")?;
     // Kiểm tra toàn bộ đường dẫn trước khi ghi bất kỳ file nào
     let mut plan = Vec::new();
@@ -451,19 +469,36 @@ fn extract(zip_path: &Path, ctx: &GameCtx) -> Result<(usize, usize)> {
         if e.is_dir() || name == META_IN_ZIP {
             continue;
         }
-        match paths::logical_to_real(&name, ctx) {
-            Ok(p) => plan.push((i, p)),
+        let (logical, rewrite_vdf) = match remap {
+            Some((from, to)) => match crate::migrate::remap_logical(&name, from, to) {
+                Some(n) => (n, true),
+                None => (name.clone(), false),
+            },
+            None => (name.clone(), false),
+        };
+        match paths::logical_to_real(&logical, ctx) {
+            Ok(p) => plan.push((i, p, rewrite_vdf)),
             Err(err) if err.to_string() == "SKIP_LINUX_NATIVE" => skipped += 1,
             Err(err) => return Err(err),
         }
     }
-    for (i, dest) in &plan {
+    for (i, dest, rewrite_vdf) in &plan {
         let mut e = za.by_index(*i)?;
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
         }
-        let mut out = File::create(dest).with_context(|| format!("Không ghi được {}", dest.display()))?;
-        io::copy(&mut e, &mut out)?;
+        match (remap, *rewrite_vdf && crate::migrate::is_autocloud_vdf(dest)) {
+            (Some((from, to)), true) => {
+                let mut buf = Vec::new();
+                io::Read::read_to_end(&mut e, &mut buf)?;
+                fs::write(dest, crate::migrate::rewrite_autocloud(&buf, from, to))
+                    .with_context(|| format!("Không ghi được {}", dest.display()))?;
+            }
+            _ => {
+                let mut out = File::create(dest).with_context(|| format!("Không ghi được {}", dest.display()))?;
+                io::copy(&mut e, &mut out)?;
+            }
+        }
     }
     Ok((plan.len(), skipped))
 }
@@ -571,7 +606,7 @@ mod tests {
         assert_eq!(names.len(), v[0].files + 1);
         let _ = fs::remove_file(&tmp);
 
-        let rr = restore(&cfg, g.appid, None, false).expect("restore");
+        let rr = restore(&cfg, g.appid, None, false, None).expect("restore");
         println!("restore cùng bản: {} -> {}", rr.outcome, rr.message);
         assert_eq!(rr.outcome, "unchanged");
     }
@@ -597,10 +632,37 @@ mod tests {
         let h2 = hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap();
         assert_ne!(h1, h2);
 
-        let (n, skipped) = extract(&zip, &ctx).unwrap();
+        let (n, skipped) = extract(&zip, &ctx, None).unwrap();
         assert_eq!((n, skipped), (1, 0));
         assert_eq!(fs::read(saves.join("a.sav")).unwrap(), b"progress-1");
         assert_eq!(hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap(), h1);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn restore_with_remap_writes_into_other_account() {
+        let root = std::env::temp_dir().join(format!("checkpoint-remap-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let lib = root.join("lib");
+        let a = "76561198000000101";
+        let b = "76561198000000202";
+        let a_dir = lib.join(format!("steamapps/common/G/Saved/{a}"));
+        fs::create_dir_all(&a_dir).unwrap();
+        fs::write(a_dir.join("s.sav"), b"prog").unwrap();
+        let acct_a = crate::migrate::Ids::parse(a).unwrap().acct;
+        fs::write(a_dir.join("steam_autocloud.vdf"), format!("\"accountid\" \"{acct_a}\"")).unwrap();
+        let ctx = GameCtx::new(9, "G", &lib, &root.join("steam"));
+        let rules = vec![FileRule { path: "<base>/Saved".into(), tags: vec![], when: vec![] }];
+        let zip = root.join("v.zip");
+        write_zip(&zip, &paths::scan(&ctx, &rules, false), None).unwrap();
+        fs::remove_dir_all(&a_dir).unwrap();
+
+        let remap = (crate::migrate::Ids::parse(a).unwrap(), crate::migrate::Ids::parse(b).unwrap());
+        extract(&zip, &ctx, Some(&remap)).unwrap();
+        let b_dir = lib.join(format!("steamapps/common/G/Saved/{b}"));
+        assert_eq!(fs::read(b_dir.join("s.sav")).unwrap(), b"prog");
+        assert!(fs::read_to_string(b_dir.join("steam_autocloud.vdf")).unwrap().contains(&remap.1.acct));
+        assert!(!a_dir.exists());
         let _ = fs::remove_dir_all(&root);
     }
 
