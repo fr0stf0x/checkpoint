@@ -2,6 +2,10 @@
 
 [English](README.md) · **Tiếng Việt**
 
+[![Latest release](https://img.shields.io/github/v/release/fr0stf0x/checkpoint)](https://github.com/fr0stf0x/checkpoint/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/fr0stf0x/checkpoint/total)](https://github.com/fr0stf0x/checkpoint/releases)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-fr0stf0x-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fr0stf0x)
+
 Backup và restore save game Steam giữa các máy của bạn (Windows và Linux, kể cả Bazzite) qua chính Google Drive của bạn. Dùng được khi Steam chạy offline mode, lúc Steam Cloud không hoạt động.
 
 Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases/latest) · Trang web và hướng dẫn: xem thư mục `site/`
@@ -87,6 +91,10 @@ Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release.
 ## Trang web
 
 `site/` là trang tĩnh (trang chủ kèm hướng dẫn, Privacy Policy, Terms of Service). Trang chủ là 1 trang dịch bằng i18next (tiếng Anh và tiếng Việt, chọn theo `?lng=`, lựa chọn lần trước, hoặc ngôn ngữ trình duyệt; `/en` và `/vi` chuyển hướng về đó). Deploy lên Vercel với Root Directory là `site`. Số sao, lượt tải và nút tải lấy trực tiếp từ GitHub API.
+
+## Ủng hộ
+
+Checkpoint miễn phí và mã nguồn mở. Nếu app giữ được tiến trình chơi của bạn, bạn có thể [mời mình một ly cà phê](https://buymeacoffee.com/fr0stf0x) ☕. Báo lỗi và góp ý trên [GitHub Issues](https://github.com/fr0stf0x/checkpoint/issues) cũng giúp rất nhiều.
 
 ## Hạn chế
 

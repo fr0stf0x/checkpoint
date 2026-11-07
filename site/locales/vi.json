@@ -6,7 +6,13 @@
   "nav": {
     "guide": "Hướng dẫn",
     "google": "Kết nối Google",
+    "coffee": "☕ Ủng hộ",
     "switch": "English"
+  },
+  "support": {
+    "title": "Ủng hộ Checkpoint",
+    "body": "Checkpoint miễn phí và mã nguồn mở. Nếu app giữ được tiến trình chơi của bạn, bạn có thể mời mình một ly cà phê. Báo lỗi và góp ý trên GitHub cũng giúp rất nhiều.",
+    "button": "☕ Mời mình ly cà phê"
   },
   "hero": {
     "title": "Đồng bộ save game Steam giữa các máy của bạn",

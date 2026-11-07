@@ -6,7 +6,13 @@
   "nav": {
     "guide": "Guide",
     "google": "Connect Google",
+    "coffee": "☕ Support",
     "switch": "Tiếng Việt"
+  },
+  "support": {
+    "title": "Support Checkpoint",
+    "body": "Checkpoint is free and open source. If it saved your progress, you can buy me a coffee. Bug reports and ideas on GitHub help just as much.",
+    "button": "☕ Buy me a coffee"
   },
   "hero": {
     "title": "Sync Steam save games between your PCs",

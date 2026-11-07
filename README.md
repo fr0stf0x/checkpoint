@@ -2,6 +2,10 @@
 
 **English** · [Tiếng Việt](README.vi.md)
 
+[![Latest release](https://img.shields.io/github/v/release/fr0stf0x/checkpoint)](https://github.com/fr0stf0x/checkpoint/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/fr0stf0x/checkpoint/total)](https://github.com/fr0stf0x/checkpoint/releases)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-fr0stf0x-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fr0stf0x)
+
 Back up and restore Steam save games between your own PCs (Windows and Linux, including Bazzite) through your own Google Drive. Works while Steam runs in offline mode, where Steam Cloud is unavailable.
 
 Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/latest) · Website and setup guide: see `site/`
@@ -87,6 +91,10 @@ Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases.
 ## Website
 
 `site/` is a static site (home with setup guide, Privacy Policy, Terms of Service). The home page is a single page translated with i18next (English and Vietnamese, picked from `?lng=`, the last choice, or the browser language; `/en` and `/vi` redirect to it). Deploy it to Vercel with `site` as the Root Directory. Stars, download count and the download buttons come live from the GitHub API.
+
+## Support
+
+Checkpoint is free and open source. If it saved your progress, you can [buy me a coffee](https://buymeacoffee.com/fr0stf0x) ☕. Bug reports and ideas on [GitHub Issues](https://github.com/fr0stf0x/checkpoint/issues) help just as much.
 
 ## Known limitations
 
