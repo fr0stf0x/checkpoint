@@ -1,0 +1,122 @@
+{
+  "meta": {
+    "title": "Checkpoint · Đồng bộ save game",
+    "description": "Checkpoint backup và restore save game Steam giữa các máy của bạn qua chính Google Drive của bạn."
+  },
+  "nav": {
+    "guide": "Hướng dẫn",
+    "google": "Kết nối Google",
+    "switch": "English"
+  },
+  "hero": {
+    "title": "Đồng bộ save game Steam giữa các máy của bạn",
+    "lead": "App desktop cho Windows và Linux (Bazzite, SteamOS…). Backup và restore save game vào chính Google Drive của bạn, kể cả khi Steam chạy offline mode."
+  },
+  "dl": {
+    "latest": "Tải bản mới nhất",
+    "all": "Tất cả phiên bản",
+    "win": "Tải cho Windows ({{tag}})",
+    "lin": "Tải cho Linux / Bazzite ({{tag}})",
+    "win_alt": "Bản Windows",
+    "lin_alt": "Bản Linux / Bazzite"
+  },
+  "stats": {
+    "stars": "sao trên GitHub",
+    "downloads": "lượt tải",
+    "version": "phiên bản mới nhất",
+    "none": "chưa có",
+    "no_release": "bản phát hành",
+    "released": "phát hành {{date}}"
+  },
+  "features": {
+    "local_title": "Chạy trên máy bạn",
+    "local_body": "Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn.",
+    "scope_title": "Quyền tối thiểu",
+    "scope_body": "Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.",
+    "safe_title": "Không ghi đè nhầm",
+    "safe_body": "So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản cloud, chụp snapshot trước mỗi lần restore, giữ 10 bản gần nhất.",
+    "cross_title": "Windows ↔ Bazzite",
+    "cross_body": "Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game).",
+    "account_title": "Đổi tài khoản Steam",
+    "account_body": "Phải chuyển sang tài khoản Steam khác? Copy save của game sang tài khoản mới, thử trong game, rồi Giữ hoặc Hoàn tác bằng 1 click."
+  },
+  "guide": {
+    "title": "Hướng dẫn sử dụng",
+    "install_title": "Cài app",
+    "install_list": "<li><b>Windows:</b> tải <code>Checkpoint_x.y.z_x64-setup.exe</code> và chạy. Windows SmartScreen có thể cảnh báo vì app chưa ký số: bấm <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> tải file <code>.AppImage</code>, chuột phải → <i>Properties → Permissions</i> → cho phép chạy (hoặc <code>chmod +x Checkpoint_*.AppImage</code>), rồi mở ở Desktop Mode.</li><li>Mở app lần đầu: bấm <b>Tải manifest</b> để app biết vị trí save của các game. App dùng ngôn ngữ của hệ thống; đổi trong <b>Cài đặt → Ngôn ngữ</b>.</li>",
+    "client_title": "Tạo Google Client ID (làm 1 lần, dùng cho mọi máy)",
+    "client_body": "Xem phần <a href=\"#google\">Kết nối Google Drive</a> bên dưới. Mất khoảng 5–10 phút.",
+    "connect_title": "Kết nối trong app",
+    "connect_list": "<li>Vào <b>Cài đặt → Nơi lưu backup</b>. Nếu chưa có rclone, bấm <b>Cài rclone</b>: app tải bản chính thức từ downloads.rclone.org và kiểm tra SHA-256, không cần quyền admin.</li><li>Dán <b>Client ID</b> và <b>Client secret</b>, bấm <b>Kết nối Google Drive</b>, đăng nhập trong trình duyệt vừa mở.</li><li>Làm lại bước này trên từng máy, với <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>.</li>",
+    "daily_title": "Dùng hằng ngày",
+    "daily_list": "<li>Chơi xong trên máy A: bấm <b>Backup</b> (hoặc <b>Backup toàn bộ</b>).</li><li>Trước khi chơi trên máy B: bấm <b>Restore</b> (hoặc <b>Restore toàn bộ</b>).</li><li>Tắt game trước khi backup hoặc restore. App không cho thao tác khi game đang chạy.</li>",
+    "th_status": "Trạng thái",
+    "th_meaning": "Nghĩa là",
+    "th_todo": "Nên làm",
+    "st_sync": "Đã đồng bộ",
+    "st_sync_m": "Save trên máy giống hệt bản mới nhất trên cloud.",
+    "st_sync_t": "Không cần làm gì.",
+    "st_local": "Local mới hơn",
+    "st_local_m": "Bạn vừa chơi trên máy này.",
+    "st_local_t": "Backup.",
+    "st_cloud": "Cloud mới hơn",
+    "st_cloud_m": "Máy khác đã backup tiến trình mới.",
+    "st_cloud_t": "Restore.",
+    "st_conflict": "Xung đột",
+    "st_conflict_m": "Cả máy này lẫn cloud đều đổi từ lần đồng bộ trước.",
+    "st_conflict_t": "Mở Restore, so ngày, chọn giữ một bản. Bản kia vẫn còn trong lịch sử.",
+    "st_diverged": "Khác nhau",
+    "st_diverged_m": "Máy này chưa đồng bộ game này lần nào.",
+    "st_diverged_t": "So ngày trong hộp thoại rồi quyết định.",
+    "st_unknown": "Chưa rõ vị trí save",
+    "st_unknown_m": "Game không có trong manifest.",
+    "st_unknown_t": "Chưa hỗ trợ tự khai báo (sắp có)."
+  },
+  "google": {
+    "title": "Kết nối Google Drive",
+    "intro": "Checkpoint dùng <a href=\"https://rclone.org\">rclone</a> để nói chuyện với Google Drive. Client ID dùng chung của rclone đang bị Google giới hạn rất chậm và sắp ngừng, nên bạn cần tạo <b>Client ID riêng</b> trong Google Cloud. Miễn phí, và chỉ bạn dùng.",
+    "project_title": "Tạo project",
+    "project_list": "<li>Mở <a href=\"https://console.cloud.google.com/projectcreate\">console.cloud.google.com/projectcreate</a>, đăng nhập đúng tài khoản Google sẽ chứa backup.</li><li>Đặt tên, ví dụ <code>checkpoint-rclone</code>. Organization để <i>No organization</i>. Bấm <b>Create</b>, rồi chọn project vừa tạo ở ô chọn project trên cùng.</li>",
+    "api_title": "Bật Google Drive API",
+    "api_list": "<li>Mở <a href=\"https://console.cloud.google.com/apis/library/drive.googleapis.com\">Google Drive API</a>, bấm <b>Enable</b>.</li>",
+    "consent_title": "Cấu hình màn hình xin quyền",
+    "consent_1": "Mở <a href=\"https://console.cloud.google.com/auth/overview\">Google Auth Platform</a>, bấm <b>Get started</b>.",
+    "consent_2": "<b>App name:</b> <code>Checkpoint</code>. <b>User support email</b> và <b>Contact email</b>: email của bạn. <b>Audience:</b> chọn <b>External</b>. Đồng ý điều khoản, bấm <b>Create</b>.",
+    "consent_3": "Vào <b>Branding</b>, phần <i>App domain</i>, điền:",
+    "kv_home": "Application home page",
+    "kv_privacy": "Privacy policy link",
+    "kv_terms": "Terms of service link",
+    "kv_domains": "Authorized domains",
+    "kv_hint": "Bấm vào ô để copy. Bỏ trống ô logo để không phải chờ Google duyệt logo.",
+    "consent_4": "Vào <b>Audience</b>, bấm <b>Publish app</b> → <b>Confirm</b>. Trạng thái phải là <b>In production</b>.",
+    "testing_warn": "<b>Đừng để ở “Testing”.</b> Ở chế độ Testing, đăng nhập chỉ có hiệu lực 7 ngày, sau đó app không backup được nữa cho tới khi kết nối lại.",
+    "no_verify": "Không cần gửi xác minh: quyền <code>drive.file</code> không phải quyền nhạy cảm.",
+    "client_title": "Tạo OAuth client",
+    "client_list": "<li>Mở <a href=\"https://console.cloud.google.com/auth/clients\">Clients</a> → <b>Create client</b>.</li><li><b>Application type:</b> <b>Desktop app</b>. Tên tùy ý. Bấm <b>Create</b>.</li><li>Copy <b>Client ID</b> (dạng <code>….apps.googleusercontent.com</code>) và <b>Client secret</b> (dạng <code>GOCSPX-…</code>). Bấm <b>Download JSON</b> để giữ lại, vì Google chỉ hiện secret một lần.</li>",
+    "paste_title": "Dán vào Checkpoint và đăng nhập",
+    "paste_1": "Trong app: <b>Cài đặt → Nơi lưu backup</b>, dán Client ID và Client secret, bấm <b>Kết nối Google Drive</b>.",
+    "paste_2": "Trình duyệt mở trang đăng nhập Google. Chọn tài khoản, rồi:",
+    "unverified": "Google hiện <b>“Google hasn’t verified this app”</b>: bấm <b>Advanced</b> → <b>Go to Checkpoint (unsafe)</b>. Đây là app của chính bạn nên an toàn.",
+    "paste_3": "Bấm <b>Continue</b> để cho phép quyền xem và quản lý file do app tạo trong Drive.",
+    "refused": "Nếu sau đó trình duyệt báo <b>“127.0.0.1 refused to connect”</b> thì <b>bỏ qua</b>. Đó là máy chủ tạm của rclone trên máy bạn: nó nhận mã đăng nhập rồi tắt ngay, nên lần tải lại trang tiếp theo sẽ báo lỗi. Quay lại app là thấy đã kết nối.",
+    "faq_title": "Gặp lỗi?",
+    "faq": "<dt>Báo “Error 403: access_denied”</dt><dd>App vẫn ở chế độ Testing và tài khoản đang đăng nhập không nằm trong Test users. Bấm <b>Publish app</b> như bước 3.</dd><dt>Báo “redirect_uri_mismatch”</dt><dd>Client tạo sai loại. Tạo lại client loại <b>Desktop app</b>, không phải Web application.</dd><dt>Sau 7 ngày không backup được</dt><dd>App đang ở Testing. Publish app, rồi bấm <b>Kết nối lại Google Drive</b> trong app.</dd><dt>Máy khác không thấy bản backup</dt><dd>Hai máy phải dùng <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>. Với quyền <code>drive.file</code>, Client ID khác sẽ không thấy file do client kia tạo.</dd><dt>Muốn xóa hết dữ liệu</dt><dd>Xóa thư mục <code>Checkpoint</code> trong Google Drive, và thu hồi quyền ở <a href=\"https://myaccount.google.com/permissions\">myaccount.google.com/permissions</a>.</dd>"
+  },
+  "notes": {
+    "title": "Lưu ý",
+    "list": "<li><b>Save gắn SteamID:</b> một số game (Elden Ring, Sekiro, Dark Souls…) chỉ đọc được save trên đúng tài khoản Steam đã tạo ra nó. App đánh dấu những game này và có thể chuyển save sang tài khoản khác bằng nút <b>Đổi tài khoản</b> (được với nhiều game, không phải tất cả).</li><li><b>Trên Bazzite:</b> chạy game ít nhất 1 lần qua Proton trước khi restore bản từ Windows, để Proton tạo thư mục prefix.</li><li><b>Snapshot:</b> trước mỗi lần restore, bản trên máy được lưu ở <code>%LOCALAPPDATA%\\Checkpoint\\snapshots</code> (Linux: <code>~/.local/share/Checkpoint/snapshots</code>).</li><li><b>File cài đặt đồ họa</b> mặc định không được backup, để máy khác GPU không bị đè độ phân giải. Bật trong Cài đặt nếu muốn.</li><li><b>Gặp lỗi?</b> Dùng nút <b>Báo lỗi / Góp ý</b> trong app: nó mở issue trên GitHub với phiên bản, hệ điều hành và log điền sẵn.</li>"
+  },
+  "gdata": {
+    "title": "Google user data",
+    "body": "Checkpoint requests the Google Drive scope <code>https://www.googleapis.com/auth/drive.file</code> only to create, read and update the backup files it creates in a folder named <code>Checkpoint</code> in the user's own Google Drive. Data is transferred directly between the user's computer and Google. It is not sent to any server operated by the developer and is not shared with anyone. See the <a href=\"/privacy\">Privacy Policy</a>."
+  },
+  "footer": {
+    "about": "Checkpoint · dự án cá nhân mã nguồn mở, không liên kết với Valve hay Google.",
+    "bug": "Báo lỗi",
+    "privacy": "Privacy",
+    "terms": "Terms"
+  },
+  "copy": {
+    "title": "Bấm để copy"
+  }
+}

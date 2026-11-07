@@ -1,0 +1,122 @@
+{
+  "meta": {
+    "title": "Checkpoint · Save game sync",
+    "description": "Checkpoint backs up and restores Steam save games between your own PCs using your own Google Drive."
+  },
+  "nav": {
+    "guide": "Guide",
+    "google": "Connect Google",
+    "switch": "Tiếng Việt"
+  },
+  "hero": {
+    "title": "Sync Steam save games between your PCs",
+    "lead": "A desktop app for Windows and Linux (Bazzite, SteamOS and others). It backs up and restores Steam save games to your own Google Drive, even when Steam runs in offline mode."
+  },
+  "dl": {
+    "latest": "Download latest",
+    "all": "All releases",
+    "win": "Download for Windows ({{tag}})",
+    "lin": "Download for Linux / Bazzite ({{tag}})",
+    "win_alt": "Windows version",
+    "lin_alt": "Linux / Bazzite version"
+  },
+  "stats": {
+    "stars": "GitHub stars",
+    "downloads": "downloads",
+    "version": "latest version",
+    "none": "none yet",
+    "no_release": "releases",
+    "released": "released {{date}}"
+  },
+  "features": {
+    "local_title": "Runs on your PC",
+    "local_body": "No server. The app reads your Steam folder and save files, zips them and sends them straight to your Drive.",
+    "scope_title": "Minimal access",
+    "scope_body": "Uses only the <code>drive.file</code> scope: the app sees the files it created and nothing else in your Drive.",
+    "safe_title": "No accidental overwrites",
+    "safe_body": "Compares content hashes, warns when the copy on this PC is newer than the cloud, snapshots before every restore and keeps the last 10 versions.",
+    "cross_title": "Windows ↔ Bazzite",
+    "cross_body": "Saves from Windows go into the right Proton prefix on Linux and back. Save locations come from Ludusavi's PCGamingWiki data (about 20,000 games).",
+    "account_title": "Switch Steam accounts",
+    "account_body": "Moving to another Steam account? Copy a game's save to the new account, test it in game, then keep or undo in one click."
+  },
+  "guide": {
+    "title": "How to use",
+    "install_title": "Install the app",
+    "install_list": "<li><b>Windows:</b> download <code>Checkpoint_x.y.z_x64-setup.exe</code> and run it. Windows SmartScreen may warn because the app is not code-signed: click <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> download the <code>.AppImage</code>, right-click → <i>Properties → Permissions</i> → allow executing (or <code>chmod +x Checkpoint_*.AppImage</code>), then open it in Desktop Mode.</li><li>On first launch, click <b>Download manifest</b> so the app knows where games keep their saves. The app follows your system language; change it in <b>Settings → Language</b>.</li>",
+    "client_title": "Create a Google client ID (once, reused on every PC)",
+    "client_body": "See <a href=\"#google\">Connect Google Drive</a> below. It takes about 5–10 minutes.",
+    "connect_title": "Connect in the app",
+    "connect_list": "<li>Open <b>Settings → Backup location</b>. If rclone is missing, click <b>Install rclone</b>: the app downloads the official build from downloads.rclone.org and verifies its SHA-256. No admin rights needed.</li><li>Paste the <b>Client ID</b> and <b>Client secret</b>, click <b>Connect Google Drive</b> and sign in in the browser window that opens.</li><li>Repeat on every PC with the <b>same client ID</b> and the <b>same Google account</b>.</li>",
+    "daily_title": "Day to day",
+    "daily_list": "<li>Done playing on PC A: click <b>Backup</b> (or <b>Back up all</b>).</li><li>Before playing on PC B: click <b>Restore</b> (or <b>Restore all</b>).</li><li>Close the game first. The app blocks backup and restore while a game is running.</li>",
+    "th_status": "Status",
+    "th_meaning": "Meaning",
+    "th_todo": "What to do",
+    "st_sync": "In sync",
+    "st_sync_m": "The save on this PC matches the latest cloud version.",
+    "st_sync_t": "Nothing.",
+    "st_local": "Local is newer",
+    "st_local_m": "You just played on this PC.",
+    "st_local_t": "Back up.",
+    "st_cloud": "Cloud is newer",
+    "st_cloud_m": "Another PC backed up newer progress.",
+    "st_cloud_t": "Restore.",
+    "st_conflict": "Conflict",
+    "st_conflict_m": "Both this PC and the cloud changed since the last sync.",
+    "st_conflict_t": "Open Restore, compare the dates and keep one. The other stays in history.",
+    "st_diverged": "Different",
+    "st_diverged_m": "This PC has never synced this game.",
+    "st_diverged_t": "Compare the dates in the dialog and decide.",
+    "st_unknown": "Save location unknown",
+    "st_unknown_m": "The game is not in the manifest.",
+    "st_unknown_t": "Custom entries are not supported yet."
+  },
+  "google": {
+    "title": "Connect Google Drive",
+    "intro": "Checkpoint talks to Google Drive through <a href=\"https://rclone.org\">rclone</a>. rclone's shared client ID is heavily rate limited by Google and is being retired, so you need your <b>own client ID</b> in Google Cloud. It is free and only you use it.",
+    "project_title": "Create a project",
+    "project_list": "<li>Open <a href=\"https://console.cloud.google.com/projectcreate\">console.cloud.google.com/projectcreate</a> and sign in with the Google account that will hold the backups.</li><li>Name it, for example <code>checkpoint-rclone</code>. Leave Organization as <i>No organization</i>. Click <b>Create</b>, then select the new project in the project picker at the top.</li>",
+    "api_title": "Enable the Google Drive API",
+    "api_list": "<li>Open <a href=\"https://console.cloud.google.com/apis/library/drive.googleapis.com\">Google Drive API</a> and click <b>Enable</b>.</li>",
+    "consent_title": "Set up the consent screen",
+    "consent_1": "Open <a href=\"https://console.cloud.google.com/auth/overview\">Google Auth Platform</a> and click <b>Get started</b>.",
+    "consent_2": "<b>App name:</b> <code>Checkpoint</code>. <b>User support email</b> and <b>Contact email</b>: your email. <b>Audience:</b> <b>External</b>. Accept the terms and click <b>Create</b>.",
+    "consent_3": "Under <b>Branding</b>, in <i>App domain</i>, fill in:",
+    "kv_home": "Application home page",
+    "kv_privacy": "Privacy policy link",
+    "kv_terms": "Terms of service link",
+    "kv_domains": "Authorized domains",
+    "kv_hint": "Click a value to copy it. Leave the logo empty so you don't have to wait for Google to review it.",
+    "consent_4": "Under <b>Audience</b>, click <b>Publish app</b> → <b>Confirm</b>. The status must read <b>In production</b>.",
+    "testing_warn": "<b>Don't leave it in “Testing”.</b> In Testing mode a sign-in only lasts 7 days, after which backups stop working until you reconnect.",
+    "no_verify": "No verification needed: <code>drive.file</code> is not a sensitive scope.",
+    "client_title": "Create an OAuth client",
+    "client_list": "<li>Open <a href=\"https://console.cloud.google.com/auth/clients\">Clients</a> → <b>Create client</b>.</li><li><b>Application type:</b> <b>Desktop app</b>. Any name. Click <b>Create</b>.</li><li>Copy the <b>Client ID</b> (<code>….apps.googleusercontent.com</code>) and the <b>Client secret</b> (<code>GOCSPX-…</code>). Click <b>Download JSON</b> to keep a copy, because Google shows the secret only once.</li>",
+    "paste_title": "Paste into Checkpoint and sign in",
+    "paste_1": "In the app: <b>Settings → Backup location</b>, paste the Client ID and Client secret, click <b>Connect Google Drive</b>.",
+    "paste_2": "A Google sign-in page opens in your browser. Pick your account, then:",
+    "unverified": "If Google shows <b>“Google hasn’t verified this app”</b>, click <b>Advanced</b> → <b>Go to Checkpoint (unsafe)</b>. It is your own app, so this is safe.",
+    "paste_3": "Click <b>Continue</b> to allow access to the files the app creates in your Drive.",
+    "refused": "If the browser then says <b>“127.0.0.1 refused to connect”</b>, <b>ignore it</b>. That address is rclone's temporary local server: it receives the sign-in code and shuts down right away, so any reload afterwards fails. Go back to the app and it shows as connected.",
+    "faq_title": "Troubleshooting",
+    "faq": "<dt>“Error 403: access_denied”</dt><dd>The app is still in Testing and the signed-in account is not a test user. Click <b>Publish app</b> as in step 3.</dd><dt>“redirect_uri_mismatch”</dt><dd>The client has the wrong type. Create a new client of type <b>Desktop app</b>, not Web application.</dd><dt>Backups stop working after 7 days</dt><dd>The app is in Testing. Publish it, then click <b>Reconnect Google Drive</b> in the app.</dd><dt>Another PC can't see my backups</dt><dd>Both PCs must use the <b>same client ID</b> and the <b>same Google account</b>. With <code>drive.file</code>, a different client ID can't see files created by another client.</dd><dt>Delete all data</dt><dd>Delete the <code>Checkpoint</code> folder in Google Drive and revoke access at <a href=\"https://myaccount.google.com/permissions\">myaccount.google.com/permissions</a>.</dd>"
+  },
+  "notes": {
+    "title": "Good to know",
+    "list": "<li><b>Saves tied to a SteamID:</b> some games (Elden Ring, Sekiro, Dark Souls…) only load saves on the Steam account that created them. The app flags these games and can move a save to another account with <b>Switch account</b> (it works for many games, not all).</li><li><b>On Bazzite:</b> run the game through Proton at least once before restoring a Windows backup, so Proton creates its prefix folder.</li><li><b>Snapshots:</b> before every restore the current save is kept in <code>%LOCALAPPDATA%\\Checkpoint\\snapshots</code> (Linux: <code>~/.local/share/Checkpoint/snapshots</code>).</li><li><b>Graphics settings files</b> are not backed up by default, so a PC with a different GPU or screen doesn't get the wrong resolution. Turn this on in Settings if you want it.</li><li><b>Found a bug?</b> Use <b>Report bug / Feedback</b> in the app: it opens a GitHub issue with the version, OS and log filled in.</li>"
+  },
+  "gdata": {
+    "title": "Google user data",
+    "body": "Checkpoint requests the Google Drive scope <code>https://www.googleapis.com/auth/drive.file</code> only to create, read and update the backup files it creates in a folder named <code>Checkpoint</code> in the user's own Google Drive. Data is transferred directly between the user's computer and Google. It is not sent to any server operated by the developer and is not shared with anyone. See the <a href=\"/privacy\">Privacy Policy</a>."
+  },
+  "footer": {
+    "about": "Checkpoint · open-source personal project, not affiliated with Valve or Google.",
+    "bug": "Report a bug",
+    "privacy": "Privacy",
+    "terms": "Terms"
+  },
+  "copy": {
+    "title": "Click to copy"
+  }
+}

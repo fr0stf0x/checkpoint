@@ -2,19 +2,29 @@
   'use strict';
   const REPO = 'fr0stf0x/checkpoint';
   const API = 'https://api.github.com/repos/' + REPO;
+  const LANGS = ['en', 'vi'];
   const $ = (id) => document.getElementById(id);
-  const EN = document.documentElement.lang === 'en';
-  const LOCALE = EN ? 'en-US' : 'vi-VN';
-  const T = EN ? {
-    copy: 'Click to copy', none: 'none yet', noneLbl: 'releases', released: 'released ',
-    win: 'Download for Windows', lin: 'Download for Linux / Bazzite', winAlt: 'Windows version', linAlt: 'Linux / Bazzite version',
-  } : {
-    copy: 'Bấm để copy', none: 'chưa có', noneLbl: 'bản phát hành', released: 'phát hành ',
-    win: 'Tải cho Windows', lin: 'Tải cho Linux / Bazzite', winAlt: 'Bản Windows', linAlt: 'Bản Linux / Bazzite',
-  };
-  const fmtNum = (n) => n.toLocaleString(LOCALE);
+  const t = (k, o) => i18next.t(k, o);
+  const locale = () => (i18next.resolvedLanguage === 'vi' ? 'vi-VN' : 'en-US');
+  let gh = null; // cached GitHub data, re-rendered on language change
 
-  // Điền link thật của trang đang chạy (vd. https://ten-du-an.vercel.app) vào phần hướng dẫn Google
+  // ---------- i18n ----------
+  // Translations are trusted static files (locales/<lang>.json) and may contain markup.
+  function applyTranslations() {
+    document.documentElement.lang = i18next.resolvedLanguage;
+    document.title = t('meta.title');
+    document.querySelectorAll('[data-i18n]').forEach((el) => { el.innerHTML = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-attr]').forEach((el) => {
+      el.dataset.i18nAttr.split(';').forEach((pair) => {
+        const [attr, key] = pair.split(':');
+        el.setAttribute(attr, t(key));
+      });
+    });
+    document.querySelectorAll('code.copy').forEach((el) => { el.title = t('copy.title'); });
+    renderStats();
+  }
+
+  // ---------- copy helpers for the Google Branding values ----------
   document.querySelectorAll('[data-copy-origin]').forEach((el) => {
     el.textContent = location.origin + el.dataset.copyOrigin;
   });
@@ -22,7 +32,6 @@
     el.textContent = location.hostname;
   });
   document.querySelectorAll('code.copy').forEach((el) => {
-    el.title = T.copy;
     el.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(el.textContent);
@@ -35,6 +44,7 @@
     });
   });
 
+  // ---------- GitHub stats and download buttons ----------
   function visitorOs() {
     const ua = navigator.userAgent;
     if (/Windows/i.test(ua)) return 'windows';
@@ -48,51 +58,74 @@
     return r.json();
   }
 
-  async function load() {
-    // Cache 10 phút để không chạm giới hạn 60 request/giờ của GitHub API
-    let data = null;
+  async function loadGitHub() {
+    // Cached for 10 minutes to stay under GitHub's 60 requests/hour limit
     try {
       const c = JSON.parse(sessionStorage.getItem('gh') || 'null');
-      if (c && Date.now() - c.t < 600000) data = c.d;
-    } catch (e) { /* bỏ qua */ }
-    if (!data) {
-      const [repo, releases] = await Promise.all([
-        getJson(API),
-        getJson(API + '/releases?per_page=100').catch(() => []),
-      ]);
-      data = {
-        stars: repo.stargazers_count,
-        releases: releases.filter((r) => !r.draft).map((r) => ({
-          tag: r.tag_name, date: r.published_at, pre: r.prerelease,
-          assets: r.assets.map((a) => ({ name: a.name, url: a.browser_download_url, n: a.download_count })),
-        })),
-      };
-      try { sessionStorage.setItem('gh', JSON.stringify({ t: Date.now(), d: data })); } catch (e) { /* bỏ qua */ }
-    }
+      if (c && Date.now() - c.t < 600000) return c.d;
+    } catch (e) { /* ignore */ }
+    const [repo, releases] = await Promise.all([
+      getJson(API),
+      getJson(API + '/releases?per_page=100').catch(() => []),
+    ]);
+    const data = {
+      stars: repo.stargazers_count,
+      releases: releases.filter((r) => !r.draft).map((r) => ({
+        tag: r.tag_name, date: r.published_at, pre: r.prerelease,
+        assets: r.assets.map((a) => ({ name: a.name, url: a.browser_download_url, n: a.download_count })),
+      })),
+    };
+    try { sessionStorage.setItem('gh', JSON.stringify({ t: Date.now(), d: data })); } catch (e) { /* ignore */ }
+    return data;
+  }
 
-    $('stStars').textContent = fmtNum(data.stars);
-    const total = data.releases.reduce((s, r) => s + r.assets.reduce((x, a) => x + a.n, 0), 0);
-    $('stDl').textContent = fmtNum(total);
-
-    const latest = data.releases.find((r) => !r.pre) || data.releases[0];
-    if (!latest) { $('stVer').textContent = T.none; $('stVerDate').textContent = T.noneLbl; return; }
+  function renderStats() {
+    if (!gh) return;
+    const fmtNum = (n) => n.toLocaleString(locale());
+    $('stStars').textContent = fmtNum(gh.stars);
+    $('stDl').textContent = fmtNum(gh.releases.reduce((s, r) => s + r.assets.reduce((x, a) => x + a.n, 0), 0));
+    const latest = gh.releases.find((r) => !r.pre) || gh.releases[0];
+    if (!latest) { $('stVer').textContent = t('stats.none'); $('stVerDate').textContent = t('stats.no_release'); return; }
     $('stVer').textContent = latest.tag;
-    $('stVerDate').textContent = T.released + new Date(latest.date).toLocaleDateString(LOCALE);
+    $('stVerDate').textContent = t('stats.released', { date: new Date(latest.date).toLocaleDateString(locale()) });
 
     const win = latest.assets.find((a) => /setup\.exe$/i.test(a.name)) || latest.assets.find((a) => /\.(exe|msi)$/i.test(a.name));
     const lin = latest.assets.find((a) => /\.AppImage$/i.test(a.name));
     const main = $('dlMain'), alt = $('dlAlt');
-    const os = visitorOs();
-    if (os === 'linux' && lin) {
-      main.href = lin.url; main.textContent = `${T.lin} (${latest.tag})`;
-      if (win) { alt.href = win.url; alt.textContent = T.winAlt; }
+    if (visitorOs() === 'linux' && lin) {
+      main.href = lin.url; main.textContent = t('dl.lin', { tag: latest.tag });
+      if (win) { alt.href = win.url; alt.textContent = t('dl.win_alt'); }
     } else if (win) {
-      main.href = win.url; main.textContent = `${T.win} (${latest.tag})`;
-      if (lin) { alt.href = lin.url; alt.textContent = T.linAlt; }
+      main.href = win.url; main.textContent = t('dl.win', { tag: latest.tag });
+      if (lin) { alt.href = lin.url; alt.textContent = t('dl.lin_alt'); }
     }
   }
 
-  load().catch(() => {
-    document.getElementById('stats').classList.add('offline');
+  // ---------- boot ----------
+  $('langSwitch').addEventListener('click', (e) => {
+    e.preventDefault();
+    const next = i18next.resolvedLanguage === 'vi' ? 'en' : 'vi';
+    const url = new URL(location.href);
+    url.searchParams.set('lng', next);
+    history.replaceState(null, '', url);
+    i18next.changeLanguage(next);
   });
+
+  i18next
+    .use(i18nextHttpBackend)
+    .use(i18nextBrowserLanguageDetector)
+    .init({
+      supportedLngs: LANGS,
+      fallbackLng: 'en',
+      load: 'languageOnly',
+      backend: { loadPath: '/locales/{{lng}}.json' },
+      detection: { order: ['querystring', 'localStorage', 'navigator'], lookupQuerystring: 'lng', caches: ['localStorage'] },
+      interpolation: { escapeValue: false },
+    })
+    .then(applyTranslations);
+  i18next.on('languageChanged', () => { if (i18next.isInitialized) applyTranslations(); });
+
+  loadGitHub()
+    .then((d) => { gh = d; renderStats(); })
+    .catch(() => { $('stats').classList.add('offline'); });
 })();

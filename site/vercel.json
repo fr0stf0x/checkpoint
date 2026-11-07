@@ -1,4 +1,8 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/en", "destination": "/?lng=en", "permanent": true },
+    { "source": "/vi", "destination": "/?lng=vi", "permanent": true }
+  ]
 }
