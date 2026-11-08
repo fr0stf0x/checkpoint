@@ -6,6 +6,8 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-08
+
 ### Fixed
 - Restoring a backup made with another Steam account no longer loses the save for games that keep it in a shared folder such as the game's install folder (Slay the Spire, for example). Steam marks those folders with the owning account in `steam_autocloud.vdf` and cleared them when a different account started the game; restore now gives them to the account signed in on this PC ([#2](https://github.com/fr0stf0x/checkpoint/issues/2)).
 
@@ -71,7 +73,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.0...v0.3.1
