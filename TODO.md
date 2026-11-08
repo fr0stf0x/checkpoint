@@ -20,7 +20,7 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 - [ ] Custom game entries (games missing from the manifest, non-Steam games, emulators).
 - [ ] Scheduled background backup and a tray icon.
 - [ ] Saves stored in the Windows Registry (Windows ↔ Proton `user.reg`).
-- [ ] Restore a local snapshot from the UI.
+- [x] Restore a local snapshot from the UI.
 - [x] Keep one `rclone rcd` process running instead of starting rclone for every call (~3 s per call today).
 - [x] "Add to Steam library" button: add Checkpoint as a non-Steam game (`userdata/<id>/config/shortcuts.vdf`, Steam must be closed), so it can be opened from Gaming Mode.
 - [x] "Delete everything in the cloud" button (Settings), behind a warning dialog that names the backup location and needs a tick box before the Delete button works.
@@ -32,7 +32,7 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 
 ### Release / housekeeping
 - [x] Update the notes of the v0.1.0–v0.3.0 GitHub Releases with their `CHANGELOG.md` sections (newer releases get them automatically).
-- [ ] Test the AppImage and the Proton-prefix restore on a real Bazzite machine.
+- [x] Test the AppImage and the Proton-prefix restore on a real Bazzite machine.
 
 ## Website
 

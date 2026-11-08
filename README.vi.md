@@ -17,7 +17,8 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Tìm file save bằng [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (dữ liệu PCGamingWiki, khoảng 20.000 game), cộng thêm thư mục `userdata/<account>/<appid>/remote` của Steam Cloud.
 - Backup và restore từng game, nhiều game hoặc toàn bộ cùng lúc. Rê chuột vào game (hoặc di chuyển tới bằng tay cầm) rồi tick ô để chọn; nút trên đầu đổi thành **Backup N game / Restore N game**. Màn hình xem trước liệt kê game nào chạy, game nào bỏ qua, cho bỏ tick từng game, và hiện dung lượng từng game cùng tổng cộng. Thẻ game và danh sách hiện dung lượng save trên máy và bản backup trên cloud.
 - So sánh bằng hash nội dung, không dựa vào ngày sửa file. Phân biệt "local mới hơn", "cloud mới hơn" và xung đột thật, cảnh báo trước khi nút nào đó ghi đè tiến trình mới hơn.
-- Giữ 10 bản gần nhất mỗi game trên cloud. Chụp snapshot bản local trước mỗi lần restore.
+- Giữ 10 bản gần nhất mỗi game trên cloud.
+- Hoàn tác restore: trước khi restore ghi đè save, save trên máy được giữ lại (10 bản gần nhất mỗi game). Bấm **Hoàn tác** trong thông báo sau khi restore, hoặc mở **⋯ → Save cũ trên máy** của game để xem từng bản (chơi lần cuối lúc nào, bị bản nào ghi đè, dung lượng) và quay lại bằng 1 click. Khi quay lại, save hiện tại cũng được giữ, nên bạn đổi ý tiếp được.
 - Không cho backup hoặc restore khi game đang chạy. Đánh dấu game có save gắn với SteamID.
 - Save tạo trên Windows restore được vào Proton prefix trên Linux và ngược lại.
 - Chuyển save của một game từ tài khoản Steam này sang tài khoản khác (ví dụ khi phải đổi tài khoản): copy thư mục save sang tài khoản mới, sửa `steam_autocloud.vdf`, tùy chọn thay SteamID bên trong file save, rồi để bạn thử trong game và **Giữ** hoặc **Hoàn tác** bằng 1 click. File của tài khoản cũ không bao giờ bị đụng tới. Restore cũng ghi được bản backup vào tài khoản khác.
@@ -49,7 +50,7 @@ Trang web (`site/`) dùng [i18next](https://www.i18next.com/) với `site/locale
 - Trạng thái tính từ SHA-256 nội dung save và hash ghi lại lúc đồng bộ lần cuối trên máy này (`state.json`).
 - Với Google Drive, app giữ một tiến trình `rclone rcd` chạy trên 127.0.0.1 (mật khẩu ngẫu nhiên, tắt khi đóng app) thay vì chạy rclone cho mỗi file, nên kết nối Drive luôn sẵn. Nếu không khởi động được thì app quay về chạy rclone từng lần như cũ.
 - Steam đánh dấu chủ của mỗi thư mục save bằng file `steam_autocloud.vdf` và dọn thư mục thuộc tài khoản khác khi mở game. Khi restore, thư mục dùng chung (thư mục cài game, AppData, Documents) được giao cho tài khoản đang đăng nhập trên máy này; thư mục mang tên tài khoản thì giữ nguyên chủ.
-- Trước mỗi lần restore, save hiện tại được nén vào `%LOCALAPPDATA%\Checkpoint\snapshots` (Linux: `~/.local/share/Checkpoint/snapshots`), giữ 5 bản.
+- Trước mỗi lần restore, save hiện tại được nén vào `%LOCALAPPDATA%\Checkpoint\snapshots\<appid>` (Linux: `~/.local/share/Checkpoint/snapshots/<appid>`) kèm file `checkpoint-snapshot.json` mô tả bản đó, giữ 10 bản mỗi game. Quay lại một bản sẽ trả file về đúng như cũ (file tạo sau thời điểm đó bị xóa) và không đổi bản ghi lần đồng bộ cuối, nên nếu game có backup trên cloud thì sau đó sẽ hiện "local mới hơn".
 
 Trên cloud:
 

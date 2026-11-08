@@ -17,7 +17,8 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Finds save files using the [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (PCGamingWiki data, about 20,000 games), plus Steam Cloud's local `userdata/<account>/<appid>/remote` folder.
 - Backup and restore per game, for several games or for all at once. Hover a game (or focus it with the controller) and tick its box to select it; the header buttons then read **Back up N games / Restore N games**. The preview lists what will run and what will be skipped, lets you untick games, and shows each game's size and the total. Cards and the list show the size of the local save and of the cloud backup.
 - Compares by content hash, not file dates. Tells apart "local is newer", "cloud is newer" and real conflicts, and warns before either button would overwrite newer progress.
-- Keeps the last 10 versions per game in the cloud. Takes a local snapshot before every restore.
+- Keeps the last 10 versions per game in the cloud.
+- Undo a restore: before a restore overwrites a save, the save on this PC is kept (the last 10 per game). Click **Undo** in the message after the restore, or open the game's **⋯ → Earlier saves** to see each copy (when it was last played, what replaced it, size) and go back to it in one click. Going back keeps the current save too, so you can change your mind again.
 - Refuses to back up or restore while the game is running. Flags games whose saves are tied to a SteamID.
 - Saves made on Windows restore into the Proton prefix on Linux, and the other way round.
 - Move a game's save from one Steam account to another (for example when you have to switch accounts): copies the account's save folder to the new account, fixes `steam_autocloud.vdf`, optionally replaces the SteamID inside save files, then lets you test in game and **keep** or **undo** in one click. The original account's files are never touched. Restore can also write a backup into a different account.
@@ -49,7 +50,7 @@ The website (`site/`) uses [i18next](https://www.i18next.com/) with `site/locale
 - Status is computed from the SHA-256 of the save content and the hashes recorded at the last sync on this machine (`state.json`).
 - With Google Drive, the app keeps one `rclone rcd` running on 127.0.0.1 (random password, stopped when the app exits) instead of starting rclone for every file, so the Drive connection stays warm. If it cannot start, the app runs rclone per call as before.
 - Steam marks save folders with their owner in `steam_autocloud.vdf` and clears folders owned by another account when a game starts. On restore, shared folders (install folder, AppData, Documents) are given to the account signed in on this PC; folders named after an account keep their owner.
-- Before each restore, the current local save is zipped to `%LOCALAPPDATA%\Checkpoint\snapshots` (`~/.local/share/Checkpoint/snapshots` on Linux). The last 5 are kept.
+- Before each restore, the current local save is zipped to `%LOCALAPPDATA%\Checkpoint\snapshots\<appid>` (`~/.local/share/Checkpoint/snapshots/<appid>` on Linux) with a `checkpoint-snapshot.json` describing it. The last 10 per game are kept. Going back to one restores its files exactly (files added after it are removed) and leaves the last-sync record alone, so the game then shows "local is newer" if it has a cloud backup.
 
 Cloud layout:
 

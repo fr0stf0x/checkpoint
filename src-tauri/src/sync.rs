@@ -75,6 +75,8 @@ pub struct GameRow {
     pub steamid_bound: bool,
     /// SteamID64 / AccountID found in this machine's save paths
     pub steam_ids: Vec<String>,
+    /// Local snapshots kept for this game (taken before restores)
+    pub snapshots: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -234,7 +236,8 @@ fn os_name() -> &'static str {
     if cfg!(windows) { "windows" } else { "linux" }
 }
 
-fn write_zip(path: &Path, scan: &LocalScan, meta: Option<&VersionMeta>) -> Result<()> {
+/// `meta`: (file name, JSON) stored next to the save files.
+fn write_zip(path: &Path, scan: &LocalScan, meta: Option<(&str, &[u8])>) -> Result<()> {
     use zip::write::SimpleFileOptions;
     if let Some(p) = path.parent() {
         fs::create_dir_all(p)?;
@@ -248,26 +251,263 @@ fn write_zip(path: &Path, scan: &LocalScan, meta: Option<&VersionMeta>) -> Resul
         let mut src = File::open(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
         io::copy(&mut src, &mut zw)?;
     }
-    if let Some(m) = meta {
-        zw.start_file(META_IN_ZIP, opts)?;
-        io::Write::write_all(&mut zw, &serde_json::to_vec_pretty(m)?)?;
+    if let Some((name, data)) = meta {
+        zw.start_file(name, opts)?;
+        io::Write::write_all(&mut zw, data)?;
     }
     zw.finish()?;
     Ok(())
 }
 
-fn snapshot_local(appid: u32, scan: &LocalScan) -> Result<PathBuf> {
-    let dir = data_dir().join("snapshots").join(appid.to_string());
-    let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
-    let path = dir.join(format!("{stamp}.zip"));
-    write_zip(&path, scan, None)?;
-    // keep the 5 most recent snapshots
-    let mut all: Vec<PathBuf> = fs::read_dir(&dir)?.flatten().map(|e| e.path()).collect();
-    all.sort();
-    while all.len() > 5 {
+// ---------- local snapshots ----------
+//
+// Before anything overwrites a save on this PC (restoring a cloud version, or going back to a
+// snapshot), the save is zipped to <data>/snapshots/<appid>/<stamp>.zip with the same logical
+// paths as a backup, plus checkpoint-snapshot.json. Snapshots made by versions before 0.7 have no
+// JSON; their details are read from the zip itself.
+
+const SNAP_META: &str = "checkpoint-snapshot.json";
+/// Snapshots kept per game; the oldest go first.
+pub const KEEP_SNAPSHOTS: usize = 10;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnapshotMeta {
+    /// File name without `.zip`
+    #[serde(default)]
+    pub id: String,
+    pub created_utc: i64,
+    /// Same hash as `hash_scan`, so it can be compared with the save on this PC
+    #[serde(default)]
+    pub content_hash: Option<String>,
+    pub files: usize,
+    pub bytes: u64,
+    /// Newest file date in the save: roughly when it was last played
+    #[serde(default)]
+    pub save_mtime: Option<i64>,
+    /// What replaced this save: "restore" (a cloud version), "snapshot" (going back to another
+    /// snapshot), "" (unknown: made by an older version)
+    #[serde(default)]
+    pub reason: String,
+    /// The cloud version's PC, for "restore"
+    #[serde(default)]
+    pub source_device: Option<String>,
+    /// The cloud version's or the other snapshot's time
+    #[serde(default)]
+    pub source_time: Option<i64>,
+    /// Whether graphics settings files were included (decides which files a restore may remove)
+    #[serde(default)]
+    pub include_config: Option<bool>,
+}
+
+pub(crate) enum SnapReason<'a> {
+    Restore(&'a VersionMeta),
+    Snapshot(&'a SnapshotMeta),
+}
+
+fn snapshot_dir(appid: u32) -> PathBuf {
+    data_dir().join("snapshots").join(appid.to_string())
+}
+
+/// The zip of snapshot `id`; ids are only letters, digits and '-' (no path tricks).
+fn snapshot_path(appid: u32, id: &str) -> Result<PathBuf> {
+    let p = snapshot_dir(appid).join(format!("{id}.zip"));
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') || !p.is_file() {
+        bail!("{}", tr!("err.snapshot_not_found"));
+    }
+    Ok(p)
+}
+
+fn snapshot_zips(dir: &Path) -> Vec<PathBuf> {
+    let mut v: Vec<PathBuf> = fs::read_dir(dir)
+        .map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "zip")).collect())
+        .unwrap_or_default();
+    v.sort();
+    v
+}
+
+/// Details of one snapshot. `with_hash`: hash the files of an old snapshot without metadata
+/// (reads the whole zip).
+fn read_snapshot(path: &Path, with_hash: bool) -> Result<SnapshotMeta> {
+    let id = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    let mut za = zip::ZipArchive::new(File::open(path)?).context(tr!("err.backup_corrupt").to_string())?;
+    if let Some(i) = za.index_for_name(SNAP_META) {
+        let mut m: SnapshotMeta = serde_json::from_reader(za.by_index(i)?).context(tr!("err.backup_corrupt").to_string())?;
+        m.id = id;
+        return Ok(m);
+    }
+    let (mut files, mut bytes) = (0, 0);
+    let mut h = Sha256::new();
+    for i in 0..za.len() {
+        let mut e = za.by_index(i)?;
+        if e.is_dir() {
+            continue;
+        }
+        files += 1;
+        bytes += e.size();
+        if with_hash {
+            // Entries are in scan order, as hash_scan reads them
+            h.update(e.name().as_bytes());
+            h.update([0u8]);
+            io::copy(&mut e, &mut h)?;
+            h.update([0xffu8]);
+        }
+    }
+    let created_utc = chrono::NaiveDateTime::parse_from_str(id.get(..16).unwrap_or(""), "%Y%m%dT%H%M%SZ")
+        .map(|t| t.and_utc().timestamp_millis())
+        .or_else(|_| fs::metadata(path)?.modified().map(|m| chrono::DateTime::<chrono::Utc>::from(m).timestamp_millis()))
+        .unwrap_or(0);
+    Ok(SnapshotMeta {
+        id,
+        created_utc,
+        content_hash: (with_hash && files > 0).then(|| hex::encode(h.finalize())),
+        files,
+        bytes,
+        save_mtime: None,
+        reason: String::new(),
+        source_device: None,
+        source_time: None,
+        include_config: None,
+    })
+}
+
+/// Zip the save on this PC before it is overwritten. A snapshot with the same content is replaced
+/// (the new one has the newer date and reason); `protect` is never removed, even when it is the
+/// oldest, because it is the snapshot about to be restored.
+pub(crate) fn snapshot_local(dir: &Path, scan: &LocalScan, hash: &str, reason: SnapReason, include_config: bool, protect: Option<&Path>) -> Result<PathBuf> {
+    fs::create_dir_all(dir)?;
+    for p in snapshot_zips(dir) {
+        if Some(p.as_path()) != protect && read_snapshot(&p, false).ok().and_then(|m| m.content_hash).as_deref() == Some(hash) {
+            let _ = fs::remove_file(&p);
+        }
+    }
+    let now = chrono::Utc::now();
+    let stamp = now.format("%Y%m%dT%H%M%SZ").to_string();
+    let mut id = stamp.clone();
+    let mut n = 1;
+    while dir.join(format!("{id}.zip")).exists() {
+        n += 1;
+        id = format!("{stamp}-{n}");
+    }
+    let (reason, source_device, source_time) = match reason {
+        SnapReason::Restore(v) => ("restore", Some(v.device_name.clone()), Some(v.created_utc)),
+        SnapReason::Snapshot(s) => ("snapshot", None, Some(s.save_mtime.unwrap_or(s.created_utc))),
+    };
+    let meta = SnapshotMeta {
+        id: id.clone(),
+        created_utc: now.timestamp_millis(),
+        content_hash: Some(hash.to_string()),
+        files: scan.files.len(),
+        bytes: scan.bytes(),
+        save_mtime: scan.latest_mtime(),
+        reason: reason.into(),
+        source_device,
+        source_time,
+        include_config: Some(include_config),
+    };
+    // Written under another name first, so a crash never leaves a half-written snapshot
+    let path = dir.join(format!("{id}.zip"));
+    let part = dir.join(format!("{id}.part"));
+    let written = write_zip(&part, scan, Some((SNAP_META, &serde_json::to_vec_pretty(&meta)?))).and_then(|_| Ok(fs::rename(&part, &path)?));
+    if written.is_err() {
+        let _ = fs::remove_file(&part);
+    }
+    written?;
+    let mut all = snapshot_zips(dir);
+    all.retain(|p| Some(p.as_path()) != protect);
+    let keep = KEEP_SNAPSHOTS - usize::from(protect.is_some());
+    while all.len() > keep {
         let _ = fs::remove_file(all.remove(0));
     }
     Ok(path)
+}
+
+/// Snapshots of one game, newest first.
+pub fn snapshots(appid: u32) -> Vec<SnapshotMeta> {
+    snapshots_in(&snapshot_dir(appid))
+}
+
+fn snapshots_in(dir: &Path) -> Vec<SnapshotMeta> {
+    let mut v: Vec<SnapshotMeta> = snapshot_zips(dir)
+        .iter()
+        .filter_map(|p| match read_snapshot(p, true) {
+            Ok(m) => Some(m),
+            Err(e) => {
+                log::warn!("Skipping unreadable snapshot {}: {e:#}", p.display());
+                None
+            }
+        })
+        .collect();
+    v.sort_by(|a, b| b.created_utc.cmp(&a.created_utc).then(b.id.cmp(&a.id)));
+    v
+}
+
+pub fn snapshot_count(appid: u32) -> usize {
+    snapshot_zips(&snapshot_dir(appid)).len()
+}
+
+pub fn snapshot_folder(appid: u32) -> PathBuf {
+    snapshot_dir(appid)
+}
+
+/// Put snapshot `id` back in place of the save on this PC. The current save is snapshotted first,
+/// so this can be undone the same way. Files the snapshot does not have (added later, e.g. by the
+/// restore being undone) are removed, so the save is exactly as it was. Last-sync records are not
+/// changed: if a cloud backup exists, the game then shows "this PC is newer".
+pub fn restore_snapshot(cfg: &Config, appid: u32, id: &str) -> Result<OpResult> {
+    let path = snapshot_path(appid, id)?;
+    let env = Env::load(cfg)?;
+    let g = env.game(appid)?;
+    let ctx = env.ctx(g);
+    if Procs::snapshot().running(&ctx.base) {
+        bail!("{}", tr!("err.game_running", game = g.name));
+    }
+    let snap = read_snapshot(&path, true)?;
+    let Some((restored, removed)) = put_back(&snapshot_dir(appid), &path, &snap, &ctx, env.rules(appid), cfg.include_config)? else {
+        return Ok(OpResult { outcome: "unchanged".into(), message: t!("msg.snapshot_unchanged", game = g.name).to_string() });
+    };
+    let mut message = t!("msg.snapshot_restored", game = g.name, files = restored, time = fmt_time(snap.save_mtime.unwrap_or(snap.created_utc))).to_string();
+    if removed > 0 {
+        message.push(' ');
+        message.push_str(&t!("msg.snapshot_removed", files = removed));
+    }
+    Ok(OpResult { outcome: "restored".into(), message })
+}
+
+/// Snapshot the current save, then write snapshot `path` in its place. Returns (files written,
+/// files removed), or None when the save already matches the snapshot.
+fn put_back(dir: &Path, path: &Path, snap: &SnapshotMeta, ctx: &GameCtx, rules: &[FileRule], include_config: bool) -> Result<Option<(usize, usize)>> {
+    let scan = paths::scan(ctx, rules, include_config);
+    let local_hash = hash_scan(&scan)?;
+    if local_hash.is_some() && local_hash == snap.content_hash {
+        return Ok(None);
+    }
+    if let Some(h) = &local_hash {
+        snapshot_local(dir, &scan, h, SnapReason::Snapshot(snap), include_config, Some(path)).context(tr!("err.snapshot").to_string())?;
+    }
+    let in_snapshot: std::collections::HashSet<String> = {
+        let za = zip::ZipArchive::new(File::open(path)?).context(tr!("err.backup_corrupt").to_string())?;
+        za.file_names().map(String::from).collect()
+    };
+    let (restored, _) = extract(path, ctx, None)?;
+
+    // Only remove files of the kinds the snapshot covered: an old snapshot (no metadata) removes
+    // nothing, one without graphics settings files leaves those alone.
+    let mut removed = 0;
+    if let Some(snap_cfg) = snap.include_config {
+        let covered = if snap_cfg == include_config { scan } else { paths::scan(ctx, rules, snap_cfg && include_config) };
+        for f in covered.files.iter().filter(|f| !in_snapshot.contains(&f.logical)) {
+            match fs::remove_file(&f.real) {
+                Ok(()) => removed += 1,
+                Err(e) => log::warn!("Could not remove {} (not in the snapshot): {e}", f.real.display()),
+            }
+        }
+    }
+    Ok(Some((restored, removed)))
+}
+
+pub fn delete_snapshot(appid: u32, id: &str) -> Result<()> {
+    let path = snapshot_path(appid, id)?;
+    fs::remove_file(&path).with_context(|| tr!("err.write_file", path = path.display()).to_string())
 }
 
 fn fmt_time(ms: i64) -> String {
@@ -314,6 +554,7 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
             status: st.to_string(),
             running: procs.running(&ctx.base),
             steam_ids: ids,
+            snapshots: snapshot_count(g.appid),
         });
     }
     Ok(ListResult {
@@ -406,7 +647,7 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
         steam_ids: steam_ids(&scan),
     };
     let tmp = cache_dir().join("tmp").join(format!("{id}.zip"));
-    write_zip(&tmp, &scan, Some(&meta))?;
+    write_zip(&tmp, &scan, Some((META_IN_ZIP, &serde_json::to_vec_pretty(&meta)?)))?;
     let up = st.upload(&tmp, &zip_rel);
     let _ = fs::remove_file(&tmp);
     up?;
@@ -480,8 +721,8 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
         bail!("NEEDS_CONFIRM:{s}");
     }
 
-    if !scan.files.is_empty() {
-        snapshot_local(appid, &scan).context(tr!("err.snapshot").to_string())?;
+    if let Some(h) = &local_hash {
+        snapshot_local(&snapshot_dir(appid), &scan, h, SnapReason::Restore(&ver), cfg.include_config, None).context(tr!("err.snapshot").to_string())?;
     }
 
     let tmp = cache_dir().join("tmp").join(format!("restore-{}.zip", ver.id));
@@ -558,7 +799,7 @@ pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::mig
     for i in 0..za.len() {
         let e = za.by_index(i)?;
         let name = e.name().to_string();
-        if e.is_dir() || name == META_IN_ZIP {
+        if e.is_dir() || name == META_IN_ZIP || name == SNAP_META {
             continue;
         }
         let (logical, rewrite_vdf) = match remap {
@@ -845,6 +1086,110 @@ mod tests {
         assert_eq!(fs::read(shared.join("IRONCLAD.autosave")).unwrap(), b"run");
         // Running it again changes nothing
         assert_eq!(fix_autocloud_owners(&paths::scan(&ctx, &rules, false), &b).unwrap(), 0);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn snapshot_put_back_is_exact_and_undoable() {
+        let root = std::env::temp_dir().join(format!("checkpoint-snap-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let lib = root.join("lib");
+        let dir = root.join("snapshots");
+        let saves = lib.join("steamapps/common/G/saves");
+        fs::create_dir_all(&saves).unwrap();
+        fs::write(saves.join("a.sav"), b"mine-level-10").unwrap();
+        let ctx = GameCtx::new(7, "G", &lib, &root.join("steam"));
+        let rules = vec![FileRule { path: "<base>/saves".into(), tags: vec!["save".into()], when: vec![] }];
+        let hash_now = || hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap();
+        let mine = hash_now();
+
+        // A cloud restore overwrites a.sav and adds b.sav; the snapshot keeps the save it replaced
+        let cloud = VersionMeta { device_name: "Jonsbo".into(), created_utc: 5, ..meta("c") };
+        let p1 = snapshot_local(&dir, &paths::scan(&ctx, &rules, false), &mine, SnapReason::Restore(&cloud), false, None).unwrap();
+        fs::write(saves.join("a.sav"), b"cloud-level-5").unwrap();
+        fs::write(saves.join("b.sav"), b"cloud-extra").unwrap();
+        let theirs = hash_now();
+
+        let list = snapshots_in(&dir);
+        assert_eq!(list.len(), 1);
+        let s = &list[0];
+        assert_eq!((s.reason.as_str(), s.source_device.as_deref(), s.source_time), ("restore", Some("Jonsbo"), Some(5)));
+        assert_eq!((s.files, s.content_hash.as_deref()), (1, Some(mine.as_str())));
+
+        // Going back: exactly the old save, and the cloud one is kept as a new snapshot
+        assert_eq!(put_back(&dir, &p1, s, &ctx, &rules, false).unwrap(), Some((1, 1)));
+        assert_eq!(fs::read(saves.join("a.sav")).unwrap(), b"mine-level-10");
+        assert!(!saves.join("b.sav").exists());
+        assert_eq!(hash_now(), mine);
+        let list = snapshots_in(&dir);
+        assert_eq!(list.len(), 2);
+        assert_eq!((list[0].reason.as_str(), list[0].content_hash.as_deref()), ("snapshot", Some(theirs.as_str())));
+        assert_eq!(put_back(&dir, &p1, &list[1], &ctx, &rules, false).unwrap(), None, "already the same");
+
+        // Undoing the undo brings the cloud save back, b.sav included
+        let p2 = dir.join(format!("{}.zip", list[0].id));
+        assert_eq!(put_back(&dir, &p2, &list[0], &ctx, &rules, false).unwrap(), Some((2, 0)));
+        assert_eq!(hash_now(), theirs);
+        // The save it replaced (mine) was already kept: replaced by a newer copy, not duplicated
+        let list = snapshots_in(&dir);
+        assert_eq!(list.len(), 2);
+        assert_eq!(list.iter().filter(|m| m.content_hash.as_deref() == Some(mine.as_str())).count(), 1);
+        assert_eq!(list[0].content_hash.as_deref(), Some(mine.as_str()));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn snapshots_are_pruned_but_the_one_restored_stays() {
+        let root = std::env::temp_dir().join(format!("checkpoint-prune-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let lib = root.join("lib");
+        let dir = root.join("snapshots");
+        let saves = lib.join("steamapps/common/G/saves");
+        fs::create_dir_all(&saves).unwrap();
+        let ctx = GameCtx::new(7, "G", &lib, &root.join("steam"));
+        let rules = vec![FileRule { path: "<base>/saves".into(), tags: vec![], when: vec![] }];
+        let mut first = None;
+        for i in 0..KEEP_SNAPSHOTS + 3 {
+            fs::write(saves.join("a.sav"), format!("v{i}")).unwrap();
+            let scan = paths::scan(&ctx, &rules, false);
+            let h = hash_scan(&scan).unwrap().unwrap();
+            let p = snapshot_local(&dir, &scan, &h, SnapReason::Restore(&meta("c")), false, first.as_deref()).unwrap();
+            first.get_or_insert(p);
+        }
+        let zips = snapshot_zips(&dir);
+        assert_eq!(zips.len(), KEEP_SNAPSHOTS);
+        assert!(zips.contains(first.as_ref().unwrap()), "the protected (oldest) snapshot was removed");
+        assert!(fs::read_dir(&dir).unwrap().flatten().all(|e| e.path().extension().is_some_and(|x| x == "zip")), "no leftover .part files");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Snapshots from before 0.7 are plain zips: their details come from the zip itself, and
+    /// putting one back never removes files (it is unknown which kinds it covered).
+    #[test]
+    fn old_snapshots_without_metadata_still_work() {
+        let root = std::env::temp_dir().join(format!("checkpoint-oldsnap-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let lib = root.join("lib");
+        let dir = root.join("snapshots");
+        let saves = lib.join("steamapps/common/G/saves");
+        fs::create_dir_all(&saves).unwrap();
+        fs::write(saves.join("a.sav"), b"old").unwrap();
+        let ctx = GameCtx::new(7, "G", &lib, &root.join("steam"));
+        let rules = vec![FileRule { path: "<base>/saves".into(), tags: vec![], when: vec![] }];
+        let scan = paths::scan(&ctx, &rules, false);
+        let old = hash_scan(&scan).unwrap().unwrap();
+        let p = dir.join("20250102T030405Z.zip");
+        write_zip(&p, &scan, None).unwrap();
+        fs::write(saves.join("a.sav"), b"new").unwrap();
+        fs::write(saves.join("b.sav"), b"extra").unwrap();
+
+        let m = read_snapshot(&p, true).unwrap();
+        assert_eq!((m.files, m.content_hash.as_deref(), m.reason.as_str()), (1, Some(old.as_str()), ""));
+        assert_eq!(m.created_utc, chrono::DateTime::parse_from_rfc3339("2025-01-02T03:04:05Z").unwrap().timestamp_millis());
+        assert_eq!(put_back(&dir, &p, &m, &ctx, &rules, false).unwrap(), Some((1, 0)));
+        assert_eq!(fs::read(saves.join("a.sav")).unwrap(), b"old");
+        assert!(saves.join("b.sav").exists());
+        assert!(snapshot_path(7, "../evil").is_err());
         let _ = fs::remove_dir_all(&root);
     }
 

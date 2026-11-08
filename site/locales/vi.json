@@ -48,7 +48,7 @@
     "scope_title": "Quyền tối thiểu",
     "scope_body": "Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.",
     "safe_title": "Không ghi đè nhầm",
-    "safe_body": "So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản cloud, chụp snapshot trước mỗi lần restore, giữ 10 bản gần nhất.",
+    "safe_body": "So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản cloud, giữ 10 bản gần nhất, và giữ lại save trên máy trước mỗi lần restore để bạn hoàn tác bằng 1 click.",
     "cross_title": "Windows ↔ Bazzite",
     "cross_body": "Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game). Thêm app vào thư viện Steam và dùng ở Gaming Mode bằng tay cầm, hoặc đặt vào launch options của game để tự đồng bộ trước và sau mỗi lần chơi.",
     "account_title": "Đổi tài khoản Steam",
@@ -125,7 +125,7 @@
   },
   "notes": {
     "title": "Lưu ý",
-    "list": "<li><b>Save gắn SteamID:</b> một số game (Elden Ring, Sekiro, Dark Souls…) chỉ đọc được save trên đúng tài khoản Steam đã tạo ra nó. App đánh dấu những game này và có thể chuyển save sang tài khoản khác bằng nút <b>Đổi tài khoản</b> (được với nhiều game, không phải tất cả).</li><li><b>Trên Bazzite:</b> chạy game ít nhất 1 lần qua Proton trước khi restore bản từ Windows, để Proton tạo thư mục prefix.</li><li><b>Snapshot:</b> trước mỗi lần restore, bản trên máy được lưu ở <code>%LOCALAPPDATA%\\Checkpoint\\snapshots</code> (Linux: <code>~/.local/share/Checkpoint/snapshots</code>).</li><li><b>File cài đặt đồ họa</b> mặc định không được backup, để máy khác GPU không bị đè độ phân giải. Bật trong Cài đặt nếu muốn.</li><li><b>Gặp lỗi?</b> Dùng nút <b>Báo lỗi / Góp ý</b> trong app: nó mở issue trên GitHub với phiên bản, hệ điều hành và log điền sẵn.</li>"
+    "list": "<li><b>Save gắn SteamID:</b> một số game (Elden Ring, Sekiro, Dark Souls…) chỉ đọc được save trên đúng tài khoản Steam đã tạo ra nó. App đánh dấu những game này và có thể chuyển save sang tài khoản khác bằng nút <b>Đổi tài khoản</b> (được với nhiều game, không phải tất cả).</li><li><b>Trên Bazzite:</b> chạy game ít nhất 1 lần qua Proton trước khi restore bản từ Windows, để Proton tạo thư mục prefix.</li><li><b>Hoàn tác restore:</b> trước mỗi lần restore, save trên máy được giữ lại (10 bản gần nhất mỗi game). Bấm <b>Hoàn tác</b> sau khi restore, hoặc mở <b>⋯ → Save cũ trên máy</b> của game để quay lại bản bất kỳ. Các bản này nằm ở <code>%LOCALAPPDATA%\\Checkpoint\\snapshots</code> (Linux: <code>~/.local/share/Checkpoint/snapshots</code>).</li><li><b>File cài đặt đồ họa</b> mặc định không được backup, để máy khác GPU không bị đè độ phân giải. Bật trong Cài đặt nếu muốn.</li><li><b>Gặp lỗi?</b> Dùng nút <b>Báo lỗi / Góp ý</b> trong app: nó mở issue trên GitHub với phiên bản, hệ điều hành và log điền sẵn.</li>"
   },
   "gdata": {
     "title": "Google user data",

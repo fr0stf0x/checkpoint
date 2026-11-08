@@ -110,12 +110,22 @@
     return b + ' B';
   }
   const files = (n) => t('common.files', { n });
-  function toast(msg, err) {
+  // action: { label, run } adds a button (e.g. Undo) and keeps the toast up longer
+  function toast(msg, err, action) {
     const el = document.createElement('div');
-    el.className = 'toast' + (err ? ' err' : '');
-    el.textContent = msg;
+    el.className = 'toast' + (err ? ' err' : '') + (action ? ' act' : '');
+    const text = document.createElement('span');
+    text.textContent = msg;
+    el.appendChild(text);
+    if (action) {
+      const b = document.createElement('button');
+      b.className = 'btn sm';
+      b.textContent = action.label;
+      b.addEventListener('click', () => { el.remove(); action.run(); });
+      el.appendChild(b);
+    }
     $('#toasts').appendChild(el);
-    setTimeout(() => el.remove(), err ? 7000 : 3500);
+    setTimeout(() => el.remove(), action ? 12000 : err ? 7000 : 3500);
   }
   async function call(cmd, args) {
     if (!invoke) throw new Error('Checkpoint must run inside the desktop app (Tauri).');
@@ -649,7 +659,11 @@
       const r = kind === 'backup'
         ? await call('backup_game', { appid: g.appid, force: !!opts.force })
         : await call('restore_game', { appid: g.appid, versionId: opts.versionId || null, force: !!opts.force, remapFrom: opts.remapFrom || null, remapTo: opts.remapTo || null });
-      close(); toast(r.message);
+      close();
+      // A restore over a local save kept it as a snapshot: offer to go back to it right away
+      const undo = kind === 'restore' && r.outcome === 'restored' && g.local_hash
+        ? { label: t('snap.undo'), run: () => openSnapshots(g.appid, 'newest') } : null;
+      toast(r.message, false, undo);
       S.busy = false;
       await loadGames();
     } catch (e) {
@@ -846,6 +860,9 @@
         <span class="l">${h('game.save_folders')}</span><div>${where}</div>
         <span class="l">${h('games.col_local')}</span><div>${local}</div>
         <span class="l">${h('games.col_cloud')}</span><div>${cloud}</div>
+        <span class="l">${h('snap.row')}</span><div class="row">${g.snapshots
+          ? `<span>${h('snap.count', { n: g.snapshots })}</span><button class="btn sm" data-act="snaps" data-id="${g.appid}">${ic('history')}${h('snap.view')}</button>`
+          : `<span class="note">${h('snap.none')}</span>`}</div>
       </div>
       ${g.steamid_bound || g.running ? `<div>${gameFlags(g)}</div>` : ''}
       ${S.info && S.info.launch_prefix ? `<div class="field"><label class="l" for="launchOpt">${h('game.launch_option')}</label>
@@ -910,6 +927,118 @@
     if (S.view === 'settings') render();
   }
 
+  // ---------- earlier saves on this PC (local snapshots) ----------
+  // The backend keeps the save that a restore overwrites (sync::KEEP_SNAPSHOTS per game).
+  const KEEP_SNAPSHOTS = 10;
+  let SN = null; // { appid, list, sel }
+
+  /** sel: a snapshot id, 'newest' (the save just replaced, for Undo), or nothing (newest that differs). */
+  async function openSnapshots(appid, sel) {
+    const g = game(appid);
+    if (!g) return;
+    busyModal(t('snap.title', { game: g.name }));
+    let list;
+    try { list = await call('list_snapshots', { appid }); } catch (e) { return fail(t('err.snapshots_failed'), e); }
+    const pickDefault = list.find((x) => x.id === sel) || (sel === 'newest' && list[0]) || list.find((x) => !sameAsLocal(g, x)) || list[0];
+    SN = { appid, list, sel: pickDefault ? pickDefault.id : null };
+    renderSnapshots();
+  }
+
+  const sameAsLocal = (g, s) => !!(g.local_hash && s.content_hash && s.content_hash === g.local_hash);
+  const snapWhen = (s) => s.save_mtime || s.created_utc;
+
+  function snapReason(s) {
+    if (s.reason === 'restore') return h('snap.reason_restore', { device: s.source_device || '?', time: fmt(s.source_time) });
+    if (s.reason === 'snapshot') return h('snap.reason_snapshot', { time: fmt(s.source_time) });
+    return h('snap.reason_unknown');
+  }
+
+  function renderSnapshots() {
+    const g = SN && game(SN.appid);
+    if (!g) return close();
+    const rows = SN.list.map((s) => {
+      const id = 'sn-' + s.id;
+      return `<label class="srow ${s.id === SN.sel ? 'on' : ''}" for="${esc(id)}">
+        <input type="radio" name="snap" id="${esc(id)}" data-snap="${esc(s.id)}" ${s.id === SN.sel ? 'checked' : ''}>
+        <span class="sinfo"><span class="stime">${h(s.save_mtime ? 'snap.played' : 'snap.kept', { time: fmt(snapWhen(s)) })}<span class="note"> · ${esc(ago(snapWhen(s)))}</span></span>
+          <span class="note">${snapReason(s)}${s.save_mtime ? ' · ' + h('snap.kept_at', { time: fmt(s.created_utc) }) : ''}</span>
+          <span class="note">${esc(files(s.files))} · ${human(s.bytes)}</span></span>
+        ${sameAsLocal(g, s) ? statusPill('sync', t('snap.same')) : ''}</label>`;
+    }).join('');
+    const has = SN.list.length > 0;
+    modal(`<div class="ghead">${art('header', g.appid, g.name, 'hdr')}<div><h3>${h('snap.title', { game: g.name })}</h3><div class="note">${h('snap.intro', { n: KEEP_SNAPSHOTS })}</div></div></div>
+      ${g.running ? `<div class="alert bad">${h('snap.running', { game: g.name })}</div>` : ''}
+      ${has ? `<div class="glist snaps" role="radiogroup" aria-label="${h('snap.row')}">${rows}</div><div id="snapDetail"></div>` : `<div class="empty">${h('snap.empty')}</div>`}
+      <div class="mfoot"><button class="btn" data-act="snapFolder" data-id="${g.appid}">${ic('folder')}${h('snap.open_folder')}</button>
+        ${has ? `<button class="btn" data-act="snapDel">${ic('trash')}${h('snap.delete_btn')}</button>` : ''}<span class="spacer"></span>
+        <button class="btn" data-close="1" ${has ? '' : 'data-autofocus'}>${h('common.close')}</button>
+        ${has ? `<button class="btn primary" data-act="snapGo">${ic('history')}${h('snap.restore_btn')}</button>` : ''}</div>`);
+    layer.querySelectorAll('[data-snap]').forEach((r) => r.addEventListener('change', () => { SN.sel = r.dataset.snap; snapDetail(); }));
+    snapDetail();
+    // The focused button may have just been disabled (e.g. the chosen save is the current one)
+    const f = document.activeElement;
+    if (!f || f === document.body || f.disabled) {
+      const r = layer.querySelector('[data-snap]:checked') || layer.querySelector('[data-close]');
+      if (r) r.focus();
+    }
+  }
+
+  // The part that depends on the chosen snapshot, updated in place so the list keeps its scroll and focus
+  function snapDetail() {
+    const g = game(SN.appid), s = SN.list.find((x) => x.id === SN.sel);
+    layer.querySelectorAll('.srow').forEach((el) => el.classList.toggle('on', !!s && el.htmlFor === 'sn-' + s.id));
+    const out = $('#snapDetail');
+    const go = layer.querySelector('[data-act="snapGo"]'), del = layer.querySelector('[data-act="snapDel"]');
+    if (go) go.disabled = !s || sameAsLocal(g, s) || g.running || S.busy;
+    if (del) del.disabled = !s || S.busy;
+    if (!out || !s) return;
+    const notes = [];
+    if (sameAsLocal(g, s)) notes.push(h('snap.note_same'));
+    else {
+      notes.push(g.local_hash ? h('snap.note_keep') : h('snap.note_no_local'));
+      if (s.reason) notes.push(h('snap.note_exact'));
+      if (g.cloud) notes.push(h('snap.note_cloud', { status: t('status.local') }));
+    }
+    out.innerHTML = `<div class="cmp">${box(t('common.local_this_pc'), g.local_mtime, g.local_hash ? `${ago(g.local_mtime)} · ${files(g.files)} · ${human(g.bytes)}` : t('restore.no_save'), false)}${box(t('snap.chosen'), snapWhen(s), `${ago(snapWhen(s))} · ${files(s.files)} · ${human(s.bytes)}`, false)}</div>
+      <p class="note">${notes.join(' ')}</p>`;
+  }
+
+  async function restoreSnapshot() {
+    const g = game(SN.appid), s = SN.list.find((x) => x.id === SN.sel);
+    if (!g || !s) return;
+    busyModal(t('snap.going_back', { game: g.name }));
+    S.busy = true;
+    try {
+      const r = await call('restore_snapshot', { appid: g.appid, id: s.id });
+      S.busy = false; close();
+      // The save just replaced is now the newest snapshot: Undo opens the list on it
+      toast(r.message, false, r.outcome === 'restored' && g.local_hash ? { label: t('snap.undo'), run: () => openSnapshots(g.appid, 'newest') } : null);
+    } catch (e) { S.busy = false; fail(t('err.snapshot_restore_failed'), e); }
+    await loadGames();
+  }
+
+  function confirmDeleteSnapshot() {
+    const s = SN.list.find((x) => x.id === SN.sel);
+    if (!s) return;
+    modal(`<h3>${h('snap.delete_title')}</h3>
+      <div class="alert bad"><span>${h('snap.delete_warn', { time: fmt(snapWhen(s)) })}</span></div>
+      <div class="mfoot"><button class="btn" data-act="snapBack" data-autofocus>${h('common.cancel')}</button>
+        <button class="btn danger" data-act="snapDelGo">${ic('trash')}${h('snap.delete_btn')}</button></div>`);
+  }
+
+  async function deleteSnapshot() {
+    const id = SN.sel;
+    try { await call('delete_snapshot', { appid: SN.appid, id }); }
+    catch (e) { return fail(t('err.snapshot_delete_failed'), e); }
+    toast(t('snap.deleted'));
+    const i = SN.list.findIndex((x) => x.id === id);
+    SN.list = SN.list.filter((x) => x.id !== id);
+    const next = SN.list[Math.min(i, SN.list.length - 1)];
+    SN.sel = next ? next.id : null;
+    renderSnapshots();
+    loadGames(); // the count in the game's details
+  }
+
   async function addToSteam() {
     busyModal(t('settings.add_to_steam'));
     try {
@@ -947,6 +1076,12 @@
       }
       else if (a === 'gameMore') openGame(game(id));
       else if (a === 'delCloud') confirmDeleteGame(game(id));
+      else if (a === 'snaps') openSnapshots(id);
+      else if (a === 'snapGo') restoreSnapshot();
+      else if (a === 'snapDel') confirmDeleteSnapshot();
+      else if (a === 'snapDelGo') deleteSnapshot();
+      else if (a === 'snapBack') renderSnapshots();
+      else if (a === 'snapFolder') await call('open_snapshot_folder', { appid: id });
       else if (a === 'delCloudGo') deleteGame(game(id));
       else if (a === 'delAll') confirmDeleteAll();
       else if (a === 'delAllGo') deleteAll();
@@ -1223,7 +1358,7 @@
   // A stable description of a control, to focus it again after the screen re-renders
   function keyOf(el) {
     if (el.id) return '#' + CSS.escape(el.id);
-    const attrs = ['data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for', 'data-pick', 'data-pickall', 'data-plan'].filter((k) => el.hasAttribute(k));
+    const attrs = ['data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for', 'data-pick', 'data-pickall', 'data-plan', 'data-snap'].filter((k) => el.hasAttribute(k));
     return attrs.length ? attrs.map((k) => `[${k}="${CSS.escape(el.getAttribute(k))}"]`).join('') : null;
   }
   function refocus(key) {

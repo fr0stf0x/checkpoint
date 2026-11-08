@@ -6,6 +6,12 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Added
+- Undo a restore. Every restore keeps the save it overwrites on this PC; the message after a restore has an **Undo** button, and a game's **⋯** dialog now has **Earlier saves**, listing each kept save with when it was last played, what replaced it and its size. **Go back to this save** puts it back exactly as it was, and keeps the current save as a new entry so you can change your mind. Earlier saves can also be deleted, or opened in their folder.
+
+### Changed
+- Up to 10 earlier saves are kept per game instead of 5, and the same save is never kept twice.
+
 ## [0.6.0] - 2026-11-08
 
 ### Added

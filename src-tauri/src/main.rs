@@ -316,6 +316,46 @@ async fn list_versions(appid: u32) -> Result<Vec<sync::VersionMeta>, String> {
     blocking_for("list_versions", Some(appid), move || sync::versions(&Config::load(), appid)).await
 }
 
+/// Local snapshots of one game (taken before restores), newest first.
+#[tauri::command]
+async fn list_snapshots(appid: u32) -> Result<Vec<sync::SnapshotMeta>, String> {
+    blocking_for("list_snapshots", Some(appid), move || Ok(sync::snapshots(appid))).await
+}
+
+/// Put a local snapshot back; the save it replaces becomes a snapshot itself.
+#[tauri::command]
+async fn restore_snapshot(appid: u32, id: String) -> Result<sync::OpResult, String> {
+    blocking_for("restore_snapshot", Some(appid), move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("Restore local snapshot appid={appid} id={id}");
+        let r = sync::restore_snapshot(&Config::load(), appid, &id)?;
+        info!("Restore local snapshot appid={appid}: {}", r.outcome);
+        Ok(r)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn delete_snapshot(appid: u32, id: String) -> Result<(), String> {
+    blocking_for("delete_snapshot", Some(appid), move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        sync::delete_snapshot(appid, &id)?;
+        info!("Deleted local snapshot appid={appid} id={id}");
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+fn open_snapshot_folder(app: tauri::AppHandle, appid: u32) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = sync::snapshot_folder(appid);
+    let _ = std::fs::create_dir_all(&dir);
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| crate::tr!("err.open_folder", detail = e.to_string()).to_string())
+}
+
 /// Delete every cloud version of one game. Local saves are not touched.
 #[tauri::command]
 async fn delete_cloud_game(appid: u32) -> Result<sync::DeleteResult, String> {
@@ -620,6 +660,10 @@ fn main() {
             backup_game,
             restore_game,
             list_versions,
+            list_snapshots,
+            restore_snapshot,
+            delete_snapshot,
+            open_snapshot_folder,
             delete_cloud_game,
             delete_cloud_all,
             add_to_steam,
@@ -735,7 +779,7 @@ mod tests {
         assert!(shown.contains("đang chạy"), "UI text should be Vietnamese: {shown}");
         assert_eq!(
             i18n::to_en(&shown),
-            "Could not take a snapshot of the local save before restoring: Hades is running. Close the game first."
+            "Could not keep a copy of the local save before overwriting it: Hades is running. Close the game first."
         );
     }
 
