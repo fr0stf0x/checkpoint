@@ -6,6 +6,8 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-08
+
 ### Added
 - Controller navigation for Gaming Mode on Bazzite / SteamOS (and any gamepad): the D-pad or left stick moves between buttons, **A** presses, **B** closes a dialog or goes back to the sidebar, **LB / RB** switch screens. Arrow keys, Enter and Esc work the same way.
 - **Add Checkpoint to Steam** in Settings: adds the app to your Steam library as a non-Steam game, so you can start it from the library and from Gaming Mode. Quit Steam first; Steam's previous list is kept as `shortcuts.vdf.checkpoint-bak`.
@@ -89,7 +91,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.1...v0.4.0
