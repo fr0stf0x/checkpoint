@@ -12,10 +12,12 @@ Each release's section is also shown at the top of its GitHub Release notes.
 - A **⋯** button on every game opens its details (save folders, local and cloud versions) with **Delete cloud backup** and **Report a problem**. The report prefills the game, its status and save folders, and only that game's log lines plus warnings and errors.
 - **Delete everything in the cloud** in Settings, behind a confirmation. Deleting never touches the saves on your PCs.
 - The app version is shown next to the logo.
+- Automatic sync from Steam's launch options: copy the line from a game's **⋯** dialog into **Properties → Launch options**. Checkpoint restores before the game starts when the cloud is newer and backs up after you quit when this PC is newer; conflicts are left for you, and the game always starts.
 - Once Google Drive is connected, Settings shows the saved client ID and secret, hidden until you press the eye button, so you can copy them to your other PCs.
 
 ### Changed
 - The log keeps three old files instead of one, and errors about a game are logged with its AppID.
+- Google Drive is faster: the app keeps one rclone running in the background instead of starting it for every file (a backup and restore round trip took about 40% less time in testing).
 
 ### Fixed
 - The Folder field no longer shows in Settings while Google Drive is selected as the backup location.

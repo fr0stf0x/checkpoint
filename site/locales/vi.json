@@ -50,7 +50,7 @@
     "safe_title": "Không ghi đè nhầm",
     "safe_body": "So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản cloud, chụp snapshot trước mỗi lần restore, giữ 10 bản gần nhất.",
     "cross_title": "Windows ↔ Bazzite",
-    "cross_body": "Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game). Thêm app vào thư viện Steam và dùng ở Gaming Mode bằng tay cầm.",
+    "cross_body": "Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game). Thêm app vào thư viện Steam và dùng ở Gaming Mode bằng tay cầm, hoặc đặt vào launch options của game để tự đồng bộ trước và sau mỗi lần chơi.",
     "account_title": "Đổi tài khoản Steam",
     "account_body": "Phải chuyển sang tài khoản Steam khác? Copy save của game sang tài khoản mới, thử trong game, rồi Giữ hoặc Hoàn tác bằng 1 click.",
     "update_title": "Tự cập nhật",

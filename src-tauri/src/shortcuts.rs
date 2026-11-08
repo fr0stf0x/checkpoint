@@ -184,7 +184,7 @@ fn upsert(root: &mut Vec<(Vec<u8>, Node)>, exe: &str, start_dir: &str, icon: &st
 
 /// The file Steam should start: the AppImage itself on Linux (not the copy mounted in /tmp),
 /// otherwise this executable.
-fn launcher() -> Result<PathBuf> {
+pub fn launcher() -> Result<PathBuf> {
     if let Some(p) = std::env::var_os("APPIMAGE").filter(|p| !p.is_empty()) {
         return Ok(PathBuf::from(p));
     }

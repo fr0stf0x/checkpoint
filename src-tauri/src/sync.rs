@@ -325,6 +325,40 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
     })
 }
 
+/// One game's status (same rules as `list`), plus the account pair to restore into when the
+/// latest backup belongs to an account that was replaced by a kept move (`account_aliases`).
+pub struct GameStatus {
+    pub name: String,
+    pub status: &'static str,
+    pub remap: Option<(String, String)>,
+}
+
+pub fn game_status(cfg: &Config, appid: u32) -> Result<GameStatus> {
+    let env = Env::load(cfg)?;
+    let g = env.game(appid)?;
+    let ctx = env.ctx(g);
+    let rules = env.rules(appid);
+    let local = hash_scan(&paths::scan(&ctx, rules, cfg.include_config))?;
+    let st = storage::open(&cfg.backend)?;
+    let idx = load_index(&*st)?;
+    let key = appid.to_string();
+    let latest = idx.games.get(&key).and_then(|v| v.first());
+    let status = status(local.as_deref(), latest, State::load().games.get(&key), !rules.is_empty());
+    let remap = latest.and_then(|v| {
+        let ids: Vec<String> = v.steam_ids.iter().filter_map(|i| crate::migrate::Ids::parse(i).ok()).map(|i| i.sid64).collect();
+        let [only] = ids.as_slice() else { return None };
+        idx.account_aliases.get(only).map(|to| (only.clone(), to.clone()))
+    });
+    Ok(GameStatus { name: g.name.clone(), status, remap })
+}
+
+/// Where the game is installed, to tell whether it is still running.
+pub fn game_base(cfg: &Config, appid: u32) -> Result<PathBuf> {
+    let env = Env::load(cfg)?;
+    let g = env.game(appid)?;
+    Ok(env.ctx(g).base)
+}
+
 pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
     let env = Env::load(cfg)?;
     let g = env.game(appid)?;
@@ -714,6 +748,7 @@ mod tests {
 
         let rr = restore(&cfg, g.appid, None, false, None).expect("restore");
         println!("restore of the same version: {} -> {}", rr.outcome, rr.message);
+        crate::rcd::shutdown();
         assert_eq!(rr.outcome, "unchanged");
     }
 

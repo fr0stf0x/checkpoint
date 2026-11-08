@@ -778,6 +778,10 @@
         <span class="l">${h('games.col_cloud')}</span><div>${cloud}</div>
       </div>
       ${g.steamid_bound || g.running ? `<div>${gameFlags(g)}</div>` : ''}
+      ${S.info && S.info.launch_prefix ? `<div class="field"><label class="l" for="launchOpt">${h('game.launch_option')}</label>
+        <div class="secret"><input type="text" id="launchOpt" readonly value="${esc(`${S.info.launch_prefix} ${g.appid} -- %command%`)}">
+        <button class="btn" data-act="copyLaunch">${ic('copy')}${h('game.copy')}</button></div>
+        <span class="note">${h('game.launch_hint')}</span></div>` : ''}
       <div class="mfoot"><button class="btn" data-act="delCloud" data-id="${g.appid}" ${canDelete ? '' : 'disabled'}>${ic('trash')}${h('game.delete_cloud')}</button>
         <button class="btn" data-act="reportGame" data-id="${g.appid}">${ic('bug')}${h('game.report')}</button><span class="spacer"></span>
         <button class="btn primary" data-close="1" data-autofocus>${h('common.close')}</button></div>`);
@@ -875,6 +879,11 @@
       else if (a === 'delAll') confirmDeleteAll();
       else if (a === 'delAllGo') deleteAll();
       else if (a === 'addSteam') addToSteam();
+      else if (a === 'copyLaunch') {
+        const inp = $('#launchOpt');
+        try { await navigator.clipboard.writeText(inp.value); toast(t('game.copied')); }
+        catch (err) { inp.select(); toast(t('rclone.link_copy_failed'), true); }
+      }
       else if (a === 'reportGame') {
         const g = game(id);
         reportIssue('bug', `[Bug] ${g.name}: `, null, { appid: g.appid, gameName: g.name, details: gameReportText(g) });

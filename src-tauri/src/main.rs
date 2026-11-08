@@ -12,7 +12,9 @@ mod manifest;
 mod migrate;
 mod paths;
 mod rclone;
+mod rcd;
 mod report;
+mod run;
 mod shortcuts;
 mod steam;
 mod storage;
@@ -133,6 +135,8 @@ struct Info {
     version: String,
     log_dir: String,
     language: String,
+    /// Steam launch option prefix for the launch wrapper: `"<path>" run --appid`
+    launch_prefix: String,
 }
 
 #[tauri::command]
@@ -149,6 +153,7 @@ async fn get_info() -> Result<Info, String> {
             version: env!("CARGO_PKG_VERSION").into(),
             log_dir: logger::log_dir().to_string_lossy().to_string(),
             language: cfg.effective_language(),
+            launch_prefix: shortcuts::launcher().map(|p| format!("\"{}\" run --appid", p.display())).unwrap_or_default(),
             config: cfg,
         })
     })
@@ -420,6 +425,8 @@ async fn rclone_connect(client_id: String, client_secret: String) -> Result<Stri
         info!("Connecting Google Drive with own client ID");
         let mut cfg = Config::load();
         let bin = configured_bin(&cfg);
+        // The daemon keeps the old sign-in in memory; start a fresh one after the config changes
+        rcd::shutdown();
         rclone::connect(bin.as_deref(), REMOTE_NAME, &client_id, &client_secret)?;
         let remote = format!("{REMOTE_NAME}:Checkpoint");
         cfg.backend = Backend::Rclone { remote: remote.clone(), bin };
@@ -578,6 +585,14 @@ fn report_issue(
 fn main() {
     logger::init();
     let lang = apply_language(&Config::load());
+    let args: Vec<String> = std::env::args().collect();
+    // `checkpoint run --appid N -- %command%` from Steam's launch options: no window (run.rs)
+    if args.get(1).map(String::as_str) == Some("run") {
+        info!("Checkpoint {} launch wrapper · {}", env!("CARGO_PKG_VERSION"), report::system_line());
+        let code = run::main(&args[2..]);
+        log::logger().flush();
+        std::process::exit(code);
+    }
     info!("Checkpoint {} starting · {} · language={lang}", env!("CARGO_PKG_VERSION"), report::system_line());
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |p| {
@@ -630,8 +645,13 @@ fn main() {
             open_log_folder,
             report_issue
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to start Checkpoint");
+        .build(tauri::generate_context!())
+        .expect("failed to start Checkpoint")
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                rcd::shutdown();
+            }
+        });
 }
 
 #[cfg(test)]

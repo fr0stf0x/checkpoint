@@ -32,7 +32,8 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 | `paths.rs` | Manifest rules → real files; logical path ↔ real path (incl. Proton prefix); path safety checks |
 | `sync.rs` | List with status, backup, restore (with optional account remap), cloud `index.json`, snapshots |
 | `migrate.rs` | Moving a save from Steam account A to B: preview, apply, undo, keep |
-| `storage.rs`, `rclone.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect |
+| `storage.rs`, `rclone.rs`, `rcd.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect; one `rclone rcd` per process (localhost, random password, CLI fallback, stopped on exit and before reconnecting) |
+| `run.rs` | Launch wrapper `checkpoint run --appid N -- %command%`: restore if cloud newer, run the game, wait until nothing runs from its folder, back up if local newer; no window |
 | `updater.rs` | In-app updates (tauri-plugin-updater): check `latest.json`, signed download and install, restart |
 | `shortcuts.rs` | "Add to Steam library": binary `shortcuts.vdf` read/write (byte-exact for other shortcuts, Steam must be closed) |
 | `images.rs` | Avatars and game artwork from Steam's local caches, served to the UI by the `steamimg` URI scheme |

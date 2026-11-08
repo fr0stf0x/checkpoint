@@ -15,13 +15,13 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 - [x] Controller navigation (gamepad API: D-pad/stick moves focus, A confirms, B goes back), so the app is usable in Bazzite/SteamOS Gaming Mode.
 
 ### Features
-- [ ] Launch wrapper `checkpoint run -- %command%` for Steam launch options: restore before playing, back up after quitting.
+- [x] Launch wrapper `checkpoint run -- %command%` for Steam launch options: restore before playing, back up after quitting.
 - [ ] "Currently playing on PC X" lock (`lock.json` in the cloud) to prevent conflicts.
 - [ ] Custom game entries (games missing from the manifest, non-Steam games, emulators).
 - [ ] Scheduled background backup and a tray icon.
 - [ ] Saves stored in the Windows Registry (Windows ↔ Proton `user.reg`).
 - [ ] Restore a local snapshot from the UI.
-- [ ] Keep one `rclone rcd` process running instead of starting rclone for every call (~3 s per call today).
+- [x] Keep one `rclone rcd` process running instead of starting rclone for every call (~3 s per call today).
 - [x] "Add to Steam library" button: add Checkpoint as a non-Steam game (`userdata/<id>/config/shortcuts.vdf`, Steam must be closed), so it can be opened from Gaming Mode.
 - [x] "Delete everything in the cloud" button (Settings), behind a warning dialog that names the backup location and needs a tick box before the Delete button works.
 - [x] Per game: "Delete cloud backup" button, behind a warning dialog (cannot be undone; local saves are not touched; other PCs lose this backup).
