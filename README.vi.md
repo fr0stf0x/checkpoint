@@ -3,6 +3,7 @@
 [English](README.md) · **Tiếng Việt**
 
 [![Latest release](https://img.shields.io/github/v/release/fr0stf0x/checkpoint)](https://github.com/fr0stf0x/checkpoint/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/fr0stf0x/checkpoint/total)](https://github.com/fr0stf0x/checkpoint/releases)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-fr0stf0x-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fr0stf0x)
 
@@ -14,7 +15,7 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 
 - Liệt kê game Steam đã cài và các tài khoản Steam trên máy, kèm ảnh game và avatar tài khoản lấy từ bộ nhớ đệm của Steam trên máy (chạy được khi offline). Game hiện dạng lưới ảnh bìa hoặc danh sách chi tiết (nút chuyển cạnh ô tìm kiếm), giao diện tối có icon.
 - Tìm file save bằng [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (dữ liệu PCGamingWiki, khoảng 20.000 game), cộng thêm thư mục `userdata/<account>/<appid>/remote` của Steam Cloud.
-- Backup và restore từng game, hoặc toàn bộ với màn hình xem trước game nào chạy, game nào bỏ qua.
+- Backup và restore từng game, nhiều game hoặc toàn bộ cùng lúc. Rê chuột vào game (hoặc di chuyển tới bằng tay cầm) rồi tick ô để chọn; nút trên đầu đổi thành **Backup N game / Restore N game**. Màn hình xem trước liệt kê game nào chạy, game nào bỏ qua, cho bỏ tick từng game, và hiện dung lượng từng game cùng tổng cộng. Thẻ game và danh sách hiện dung lượng save trên máy và bản backup trên cloud.
 - So sánh bằng hash nội dung, không dựa vào ngày sửa file. Phân biệt "local mới hơn", "cloud mới hơn" và xung đột thật, cảnh báo trước khi nút nào đó ghi đè tiến trình mới hơn.
 - Giữ 10 bản gần nhất mỗi game trên cloud. Chụp snapshot bản local trước mỗi lần restore.
 - Không cho backup hoặc restore khi game đang chạy. Đánh dấu game có save gắn với SteamID.
@@ -123,3 +124,7 @@ Checkpoint miễn phí và mã nguồn mở. Nếu app giữ được tiến tr�
 ## Sắp làm
 
 Xem [TODO.md](TODO.md). Nổi bật: launch wrapper (`checkpoint run -- %command%`), khóa "đang chơi ở máy X", tự khai báo game, ảnh game và ảnh đại diện tài khoản, làm lại trang web.
+
+## Giấy phép
+
+[MIT](LICENSE) © fr0stf0x. Vị trí save lấy từ [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (dữ liệu PCGamingWiki); truy cập Google Drive qua [rclone](https://rclone.org/), được tải về riêng.

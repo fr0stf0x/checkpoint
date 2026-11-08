@@ -24,7 +24,7 @@
     "title": "Your saves, on every PC",
     "lead": "Steam in offline mode has no Steam Cloud. Checkpoint backs up your Steam save games to your own Google Drive and restores them on your other PCs: Windows, Bazzite, SteamOS and other Linux.",
     "eyebrow": "Steam Cloud for offline mode",
-    "platforms": "Free · open source · Windows and Linux (AppImage)"
+    "platforms": "Free · open source (MIT) · Windows and Linux (AppImage)"
   },
   "dl": {
     "latest": "Download latest",
@@ -132,7 +132,7 @@
     "body": "Checkpoint requests the Google Drive scope <code>https://www.googleapis.com/auth/drive.file</code> only to create, read and update the backup files it creates in a folder named <code>Checkpoint</code> in the user's own Google Drive. Data is transferred directly between the user's computer and Google. It is not sent to any server operated by the developer and is not shared with anyone. See the <a href=\"/privacy\">Privacy Policy</a>."
   },
   "footer": {
-    "about": "Checkpoint · open-source personal project, not affiliated with Valve or Google.",
+    "about": "Checkpoint · open-source personal project under the MIT license, not affiliated with Valve or Google.",
     "bug": "Report a bug",
     "privacy": "Privacy",
     "terms": "Terms",

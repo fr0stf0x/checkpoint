@@ -226,11 +226,32 @@
     return g.roots.length ? g.roots.join('\n') : g.has_rules ? t('games.no_save_here') : t('games.not_in_manifest');
   }
 
+  // ---------- selection (several games for Backup / Restore) ----------
+  const sel = () => (S.sel || (S.sel = new Set()));
+  function pickBox(g) {
+    const label = h('games.select', { game: g.name });
+    return `<label class="pick" title="${label}"><input type="checkbox" data-pick="${g.appid}" ${sel().has(g.appid) ? 'checked' : ''} aria-label="${label}"></label>`;
+  }
+  // Only games that are still listed count (a rescan may drop some)
+  function selectedGames() {
+    const games = S.list ? S.list.games : [];
+    const ids = sel();
+    [...ids].forEach((id) => { if (!games.some((g) => g.appid === id)) ids.delete(id); });
+    return games.filter((g) => ids.has(g.appid));
+  }
+  function setPicked(ids, on) {
+    ids.forEach((id) => (on ? sel().add(id) : sel().delete(id)));
+    const top = pane.scrollTop;
+    renderGames();
+    pane.scrollTop = top;
+  }
+
   function gameRow(g) {
     const where = gameWhere(g);
     const local = g.local_hash ? `<span class="time">${fmt(g.local_mtime)}<small>${esc(ago(g.local_mtime))} · ${esc(files(g.files))} · ${human(g.bytes)}</small></span>` : '<span class="note">—</span>';
-    const cloud = g.cloud ? `<span class="time">${fmt(g.cloud.created_utc)}<small>${h('games.cloud_from', { device: g.cloud.device_name, n: g.versions })}</small></span>` : `<span class="note">${h('games.cloud_none')}</span>`;
-    return `<tr>
+    const cloud = g.cloud ? `<span class="time">${fmt(g.cloud.created_utc)}<small>${h('games.cloud_from', { device: g.cloud.device_name, n: g.versions })} · ${human(g.cloud.bytes)}</small></span>` : `<span class="note">${h('games.cloud_none')}</span>`;
+    return `<tr class="${sel().has(g.appid) ? 'picked' : ''}">
+      <td class="pickcell">${pickBox(g)}</td>
       <td><div class="gcell">${art('header', g.appid, g.name, 'hdr')}<div><div class="gname">${esc(g.name)}</div><div class="gsub" title="${esc(where)}">${esc(where.split('\n')[0])}${g.roots.length > 1 ? ` (+${g.roots.length - 1})` : ''}</div>${gameFlags(g)}</div></div></td>
       <td><span class="mono">${g.appid}</span></td>
       <td>${local}</td><td>${cloud}</td>
@@ -240,11 +261,11 @@
 
   function gameCard(g) {
     const where = gameWhere(g);
-    const local = g.local_hash ? esc(ago(g.local_mtime)) : '—';
-    const cloud = g.cloud ? esc(ago(g.cloud.created_utc)) : h('games.cloud_none');
-    return `<article class="gcard st-${g.status}">
-      <div class="cover" title="${esc(g.name + '\n' + where)}">${art('capsule', g.appid, g.name, 'cap')}
-        <div class="badges">${statusPill(g.status)}</div>${g.steamid_bound || g.running ? `<div class="flags">${gameFlags(g)}</div>` : ''}</div>
+    const local = g.local_hash ? `${esc(ago(g.local_mtime))} · ${human(g.bytes)}` : '—';
+    const cloud = g.cloud ? `${esc(ago(g.cloud.created_utc))} · ${human(g.cloud.bytes)}` : h('games.cloud_none');
+    return `<article class="gcard st-${g.status} ${sel().has(g.appid) ? 'picked' : ''}">
+      <div class="cover" data-cover="${g.appid}" title="${esc(g.name + '\n' + where)}">${art('capsule', g.appid, g.name, 'cap')}
+        <div class="badges">${statusPill(g.status)}</div>${pickBox(g)}${g.steamid_bound || g.running ? `<div class="flags">${gameFlags(g)}</div>` : ''}</div>
       <div class="gbody">
         <div class="gname" title="${esc(g.name)}">${esc(g.name)}</div>
         <div class="gmeta"><span title="${h('games.col_local')}">${ic('monitor')}${local}</span><span title="${h('games.col_cloud')}">${ic('cloud')}${cloud}</span></div>
@@ -265,21 +286,29 @@
       .map((k) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}" aria-pressed="${S.filter === k}">${k === 'all' ? '' : ic(STATUS_IC[k])}${h(k === 'all' ? 'games.filter_all' : 'status.' + k)}<span class="n">${counts[k] || 0}</span></button>`).join('');
     const q = S.q.trim().toLowerCase();
     const shown = games.filter((g) => (S.filter === 'all' || g.status === S.filter) && (!q || g.name.toLowerCase().includes(q) || String(g.appid).includes(q)));
+    S.shown = shown;
     const grid = S.layout === 'grid';
+    const nSel = selectedGames().length;
+    const allShown = shown.length && shown.every((g) => sel().has(g.appid));
     const body = !shown.length
       ? `<div class="empty">${h('games.no_match')}</div>`
       : grid
-        ? `<div class="ggrid">${shown.map(gameCard).join('')}</div>`
+        ? `<div class="ggrid ${nSel ? 'selecting' : ''}">${shown.map(gameCard).join('')}</div>`
         : `<div class="tablewrap"><table>
-            <thead><tr><th>${h('games.col_game')}</th><th>AppID</th><th>${h('games.col_local')}</th><th>${h('games.col_cloud')}</th><th>${h('games.col_status')}</th><th style="text-align:right">${h('games.col_actions')}</th></tr></thead>
+            <thead><tr><th class="pickcell"><label class="pick" title="${h('games.select_shown')}"><input type="checkbox" data-pickall="1" ${allShown ? 'checked' : ''} aria-label="${h('games.select_shown')}"></label></th><th>${h('games.col_game')}</th><th>AppID</th><th>${h('games.col_local')}</th><th>${h('games.col_cloud')}</th><th>${h('games.col_status')}</th><th style="text-align:right">${h('games.col_actions')}</th></tr></thead>
             <tbody>${shown.map(gameRow).join('')}</tbody></table></div>`;
     const ready = backendReady() && !S.busy ? '' : 'disabled';
+    const bulk = nSel
+      ? `<button class="btn" data-act="clearSel">${h('games.clear_sel')}</button>
+        <button class="btn" data-act="backupAll" ${ready}>${ic('upload')}${h('games.backup_sel', { n: nSel })}</button>
+        <button class="btn primary" data-act="restoreAll" ${ready}>${ic('download')}${h('games.restore_sel', { n: nSel })}</button>`
+      : `<button class="btn" data-act="backupAll" ${ready}>${ic('upload')}${h('games.backup_all')}</button>
+        <button class="btn primary" data-act="restoreAll" ${ready}>${ic('download')}${h('games.restore_all')}</button>`;
     pane.innerHTML = `
       <div class="panehead"><div><div class="eyebrow">${h('nav.games')}</div><h2>${h('games.title', { device: S.info ? S.info.config.device_name : '' })}</h2></div>
         ${S.loading ? '<span class="spin"></span>' : ''}<span class="spacer"></span>
         <button class="btn" data-act="reload" ${S.loading ? 'disabled' : ''}>${ic('refresh')}${h('games.rescan')}</button>
-        <button class="btn" data-act="backupAll" ${ready}>${ic('upload')}${h('games.backup_all')}</button>
-        <button class="btn primary" data-act="restoreAll" ${ready}>${ic('download')}${h('games.restore_all')}</button></div>
+        ${bulk}</div>
       ${banners()}
       <div class="filters">${chips}<span class="spacer"></span>
         <label class="searchbox">${ic('search')}<input type="text" id="search" placeholder="${h('games.search')}" value="${esc(S.q)}" aria-label="${h('games.search')}"></label>
@@ -711,8 +740,9 @@
     if (rt) { rt.addEventListener('change', syncBtn); syncBtn(); }
   }
 
-  function planFor(kind) {
-    return S.list.games.map((g) => {
+  // What Backup all / Restore all would do with each game. `run`: can run without a decision.
+  function planFor(kind, games) {
+    return games.map((g) => {
       let act, cls, run = false;
       if (g.running) { act = 'all.skip_running'; cls = 's-conflict'; }
       else if (kind === 'backup') {
@@ -726,23 +756,61 @@
         else if (['local', 'conflict', 'diverged'].includes(g.status)) { act = 'all.skip_manual'; cls = 's-conflict'; }
         else { act = 'all.skip_no_cloud'; cls = 's-new'; }
       }
-      return { g, act, cls, run };
+      // Backup uploads the local save; restore downloads the latest cloud version
+      const bytes = kind === 'backup' ? (g.local_hash ? g.bytes : 0) : (g.cloud ? g.cloud.bytes : 0);
+      return { g, act, cls, run, bytes };
     });
   }
 
+  let P = null; // the open Backup / Restore plan
   function openAll(kind) {
     if (!S.list) return;
-    const plan = planFor(kind);
-    const n = plan.filter((p) => p.run).length;
-    modal(`<h3>${h(kind === 'backup' ? 'games.backup_all' : 'games.restore_all')}</h3>
-      <p class="note">${h('all.note')}</p>
-      <div class="plan">${plan.map((p) => `<div><span>${esc(p.g.name)}</span><span class="pill ${p.cls}">${h(p.act)}</span></div>`).join('')}</div>
-      <div class="mfoot"><button class="btn" data-close="1">${h('common.cancel')}</button><button class="btn primary" data-act="runAll" data-kind="${kind}" ${n ? '' : 'disabled'}>${h('all.run', { n })}</button></div>`);
+    const picked = selectedGames();
+    const games = picked.length ? picked : S.list.games;
+    const plan = planFor(kind, games);
+    P = { kind, plan, on: new Set(plan.filter((p) => p.run).map((p) => p.g.appid)), only: picked.length > 0 };
+    renderPlan();
   }
 
-  async function runAll(kind) {
-    const todo = planFor(kind).filter((p) => p.run).map((p) => p.g);
-    busyModal(t(kind === 'backup' ? 'games.backup_all' : 'games.restore_all'));
+  function renderPlan() {
+    const runnable = P.plan.filter((p) => p.run);
+    const chosen = runnable.filter((p) => P.on.has(p.g.appid));
+    const total = chosen.reduce((n, p) => n + p.bytes, 0);
+    const title = P.only ? h(P.kind === 'backup' ? 'games.backup_sel' : 'games.restore_sel', { n: P.plan.length }) : h(P.kind === 'backup' ? 'games.backup_all' : 'games.restore_all');
+    const rows = P.plan.map((p) => {
+      const id = `pl${p.g.appid}`;
+      const box = p.run
+        ? `<input type="checkbox" id="${id}" data-plan="${p.g.appid}" ${P.on.has(p.g.appid) ? 'checked' : ''}>`
+        : '<input type="checkbox" disabled>';
+      return `<label class="prow ${p.run ? '' : 'off'}" for="${id}">${box}<span class="pname">${esc(p.g.name)}</span>
+        <span class="note psize">${p.bytes ? human(p.bytes) : '—'}</span><span class="pill ${p.cls}">${h(p.act)}</span></label>`;
+    }).join('');
+    modal(`<h3>${title}</h3>
+      <p class="note">${h('all.note')}</p>
+      ${runnable.length > 1 ? `<div class="row"><button class="btn sm" data-act="planAll">${h('all.select_all')}</button><button class="btn sm" data-act="planNone">${h('all.select_none')}</button></div>` : ''}
+      <div class="plan">${rows}</div>
+      <div class="mfoot"><button class="btn" data-close="1">${h('common.cancel')}</button><button class="btn primary" data-act="runAll" ${chosen.length ? '' : 'disabled'}>${h('all.run_size', { n: chosen.length, size: human(total) })}</button></div>`);
+    layer.querySelectorAll('[data-plan]').forEach((c) => c.addEventListener('change', () => {
+      const id = +c.dataset.plan;
+      if (c.checked) P.on.add(id); else P.on.delete(id);
+      refreshPlanFoot();
+    }));
+  }
+
+  // Update the Run button without rebuilding the list (keeps focus and scroll)
+  function refreshPlanFoot() {
+    const chosen = P.plan.filter((p) => p.run && P.on.has(p.g.appid));
+    const b = layer.querySelector('[data-act="runAll"]');
+    if (!b) return;
+    b.disabled = !chosen.length;
+    b.textContent = t('all.run_size', { n: chosen.length, size: human(chosen.reduce((n, p) => n + p.bytes, 0)) });
+  }
+
+  async function runAll() {
+    const kind = P.kind;
+    const todo = P.plan.filter((p) => p.run && P.on.has(p.g.appid)).map((p) => p.g);
+    const label = t(kind === 'backup' ? 'games.backup_all' : 'games.restore_all');
+    busyModal(label);
     S.busy = true;
     let ok = 0; const errs = [];
     for (let i = 0; i < todo.length; i++) {
@@ -756,7 +824,9 @@
     }
     S.busy = false; close();
     toast(t('all.done', { ok, n: todo.length }));
-    if (errs.length) fail(t('err.all_failed', { op: t(kind === 'backup' ? 'games.backup_all' : 'games.restore_all'), n: errs.length }), errs.join('\n'));
+    if (errs.length) fail(t('err.all_failed', { op: label, n: errs.length }), errs.join('\n'));
+    if (P.only && !errs.length) sel().clear();
+    P = null;
     await loadGames();
   }
 
@@ -851,6 +921,8 @@
   // ---------- events ----------
   document.addEventListener('click', async (e) => {
     if (e.target.dataset && e.target.dataset.scrim) { close(); return; }
+    const cover = e.target.closest('[data-cover]');
+    if (cover && sel().size && !e.target.closest('.pick')) { const id = +cover.dataset.cover; setPicked([id], !sel().has(id)); return; }
     const n = e.target.closest('[data-view],[data-f],[data-act],[data-close]');
     if (!n || n.disabled) return;
     if (n.dataset.close) return close();
@@ -904,7 +976,13 @@
       else if (a === 'migKeep' || a === 'migUndo') migDecide(a === 'migKeep' ? 'keep' : 'undo', n.dataset.mid);
       else if (a === 'backupAll') openAll('backup');
       else if (a === 'restoreAll') openAll('restore');
-      else if (a === 'runAll') runAll(n.dataset.kind);
+      else if (a === 'runAll') runAll();
+      else if (a === 'planAll' || a === 'planNone') {
+        P.plan.filter((p) => p.run).forEach((p) => (a === 'planAll' ? P.on.add(p.g.appid) : P.on.delete(p.g.appid)));
+        layer.querySelectorAll('[data-plan]').forEach((c) => { c.checked = a === 'planAll'; });
+        refreshPlanFoot();
+      }
+      else if (a === 'clearSel') { sel().clear(); renderGames(); }
       else if (a === 'manifest') {
         busyModal(t('settings.manifest_update'));
         try { const c = await call('update_manifest'); close(); toast(t('settings.manifest_done', { n: c.toLocaleString(locale()) })); await loadInfo(); await loadGames(); }
@@ -961,6 +1039,12 @@
       else if (a === 'openLogs') await call('open_log_folder');
       else if (a === 'copyLog') copyLog();
     } catch (err) { fail(t('err.generic'), err); }
+  });
+
+  document.addEventListener('change', (e) => {
+    const c = e.target;
+    if (c.dataset && c.dataset.pick) setPicked([+c.dataset.pick], c.checked);
+    else if (c.dataset && c.dataset.pickall) setPicked((S.shown || []).map((g) => g.appid), c.checked);
   });
 
   // ---------- error reporting ----------
@@ -1139,7 +1223,7 @@
   // A stable description of a control, to focus it again after the screen re-renders
   function keyOf(el) {
     if (el.id) return '#' + CSS.escape(el.id);
-    const attrs = ['data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for'].filter((k) => el.hasAttribute(k));
+    const attrs = ['data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for', 'data-pick', 'data-pickall', 'data-plan'].filter((k) => el.hasAttribute(k));
     return attrs.length ? attrs.map((k) => `[${k}="${CSS.escape(el.getAttribute(k))}"]`).join('') : null;
   }
   function refocus(key) {

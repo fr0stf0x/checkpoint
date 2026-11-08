@@ -3,6 +3,7 @@
 **English** · [Tiếng Việt](README.vi.md)
 
 [![Latest release](https://img.shields.io/github/v/release/fr0stf0x/checkpoint)](https://github.com/fr0stf0x/checkpoint/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/fr0stf0x/checkpoint/total)](https://github.com/fr0stf0x/checkpoint/releases)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-fr0stf0x-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fr0stf0x)
 
@@ -14,7 +15,7 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 
 - Lists installed Steam games and the Steam accounts on the machine, with game artwork and account avatars taken from Steam's local cache (works offline). Games show as a cover-art grid or a detailed list (toggle next to the search box), in a dark theme with icons.
 - Finds save files using the [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (PCGamingWiki data, about 20,000 games), plus Steam Cloud's local `userdata/<account>/<appid>/remote` folder.
-- Backup and restore per game, or for all games at once with a preview of what will run and what will be skipped.
+- Backup and restore per game, for several games or for all at once. Hover a game (or focus it with the controller) and tick its box to select it; the header buttons then read **Back up N games / Restore N games**. The preview lists what will run and what will be skipped, lets you untick games, and shows each game's size and the total. Cards and the list show the size of the local save and of the cloud backup.
 - Compares by content hash, not file dates. Tells apart "local is newer", "cloud is newer" and real conflicts, and warns before either button would overwrite newer progress.
 - Keeps the last 10 versions per game in the cloud. Takes a local snapshot before every restore.
 - Refuses to back up or restore while the game is running. Flags games whose saves are tied to a SteamID.
@@ -123,3 +124,7 @@ Checkpoint is free and open source. If it saved your progress, you can [buy me a
 ## Roadmap
 
 See [TODO.md](TODO.md). Highlights: a launch wrapper (`checkpoint run -- %command%`), a "playing on PC X" lock, custom game entries, game and account artwork, and a redesigned website.
+
+## License
+
+[MIT](LICENSE) © fr0stf0x. Save locations come from [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (PCGamingWiki data); Google Drive access goes through [rclone](https://rclone.org/), downloaded separately.

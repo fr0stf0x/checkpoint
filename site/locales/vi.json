@@ -24,7 +24,7 @@
     "title": "Save game của bạn, trên mọi máy",
     "lead": "Steam chạy offline mode thì không có Steam Cloud. Checkpoint backup save game Steam vào chính Google Drive của bạn rồi restore trên các máy khác: Windows, Bazzite, SteamOS và Linux khác.",
     "eyebrow": "Steam Cloud cho offline mode",
-    "platforms": "Miễn phí · mã nguồn mở · Windows và Linux (AppImage)"
+    "platforms": "Miễn phí · mã nguồn mở (MIT) · Windows và Linux (AppImage)"
   },
   "dl": {
     "latest": "Tải bản mới nhất",
@@ -132,7 +132,7 @@
     "body": "Checkpoint requests the Google Drive scope <code>https://www.googleapis.com/auth/drive.file</code> only to create, read and update the backup files it creates in a folder named <code>Checkpoint</code> in the user's own Google Drive. Data is transferred directly between the user's computer and Google. It is not sent to any server operated by the developer and is not shared with anyone. See the <a href=\"/privacy\">Privacy Policy</a>."
   },
   "footer": {
-    "about": "Checkpoint · dự án cá nhân mã nguồn mở, không liên kết với Valve hay Google.",
+    "about": "Checkpoint · dự án cá nhân mã nguồn mở, giấy phép MIT, không liên kết với Valve hay Google.",
     "bug": "Báo lỗi",
     "privacy": "Privacy",
     "terms": "Terms",

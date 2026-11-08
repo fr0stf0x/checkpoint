@@ -9,6 +9,10 @@ Each release's section is also shown at the top of its GitHub Release notes.
 ## [0.6.0] - 2026-11-08
 
 ### Added
+- Select several games for backup or restore: hover a game and tick its box (or click covers once something is selected; the list view has a select-all box). The header buttons become **Back up N games / Restore N games**.
+- The Back up all / Restore all preview lets you untick games, has Select all / Select none, and shows each game's size and the total to upload or download.
+- Game cards and the list show the size of the local save and of the latest cloud backup.
+- Released under the MIT license (`LICENSE`).
 - Controller navigation for Gaming Mode on Bazzite / SteamOS (and any gamepad): the D-pad or left stick moves between buttons, **A** presses, **B** closes a dialog or goes back to the sidebar, **LB / RB** switch screens. Arrow keys, Enter and Esc work the same way.
 - **Add Checkpoint to Steam** in Settings: adds the app to your Steam library as a non-Steam game, so you can start it from the library and from Gaming Mode. Quit Steam first; Steam's previous list is kept as `shortcuts.vdf.checkpoint-bak`.
 - A **⋯** button on every game opens its details (save folders, local and cloud versions) with **Delete cloud backup** and **Report a problem**. The report prefills the game, its status and save folders, and only that game's log lines plus warnings and errors.

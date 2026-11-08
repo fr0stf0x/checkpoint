@@ -3,6 +3,8 @@ name = "checkpoint"
 version = "0.1.0"
 description = "Backup/restore save game Steam qua Google Drive"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/fr0stf0x/checkpoint"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
