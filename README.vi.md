@@ -20,7 +20,11 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Không cho backup hoặc restore khi game đang chạy. Đánh dấu game có save gắn với SteamID.
 - Save tạo trên Windows restore được vào Proton prefix trên Linux và ngược lại.
 - Chuyển save của một game từ tài khoản Steam này sang tài khoản khác (ví dụ khi phải đổi tài khoản): copy thư mục save sang tài khoản mới, sửa `steam_autocloud.vdf`, tùy chọn thay SteamID bên trong file save, rồi để bạn thử trong game và **Giữ** hoặc **Hoàn tác** bằng 1 click. File của tài khoản cũ không bao giờ bị đụng tới. Restore cũng ghi được bản backup vào tài khoản khác.
-- Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn.
+- Nút **⋯** của mỗi game mở chi tiết game (thư mục save, bản trên máy và trên cloud) kèm **Xóa bản trên cloud** và **Báo lỗi game này**. **Cài đặt → Nơi lưu backup → Xóa toàn bộ dữ liệu trên cloud** xóa mọi bản backup một lần. Cả hai đều hỏi xác nhận và không bao giờ đụng tới save trên các máy của bạn.
+- **Thêm Checkpoint vào Steam** (Cài đặt → Máy này) thêm app vào thư viện Steam dưới dạng game ngoài Steam, để mở được từ thư viện và từ Gaming Mode trên Bazzite / SteamOS. Thoát Steam trước; danh sách cũ của Steam được giữ lại thành `shortcuts.vdf.checkpoint-bak`.
+- Điều khiển bằng tay cầm: D-pad hoặc cần trái để di chuyển giữa các nút, **A** để bấm, **B** để đóng hộp thoại hoặc quay về thanh bên, **LB / RB** để chuyển màn hình. Phím mũi tên, Enter và Esc cũng làm được y như vậy, cho layout Steam Input gửi phím.
+- Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn. Sau khi kết nối, Cài đặt hiện client ID và secret đang lưu, ẩn cho tới khi bạn bấm nút con mắt, để copy sang các máy khác.
+- Phiên bản app hiện ngay cạnh logo.
 - Cập nhật ngay trong app: khi mở, app hỏi GitHub bản phát hành mới nhất và cho xem có gì mới. Bấm **Cập nhật và khởi động lại** thì app tải bản mới, kiểm tra chữ ký rồi cài (chạy bộ cài trên Windows, hoặc thay luôn file AppImage). Không cài gì cho tới khi bạn bấm. Tắt kiểm tra ở **Cài đặt → Cập nhật**. Bản Linux không chạy từ file AppImage thì chỉ có link tới trang tải.
 
 ## Ngôn ngữ
@@ -31,9 +35,10 @@ Trang web (`site/`) dùng [i18next](https://www.i18next.com/) với `site/locale
 
 ## Báo lỗi
 
-- App ghi log vào `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`), quá 2 MB thì xoay vòng. Đường dẫn thư mục người dùng được thay bằng `~`; không bao giờ ghi token, client secret hay tên tài khoản Steam.
+- App ghi log vào `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`). Quá 2 MB thì chuyển thành `checkpoint.1.log`; giữ 3 file cũ gần nhất. Đường dẫn thư mục người dùng được thay bằng `~`; không bao giờ ghi token, client secret hay tên tài khoản Steam.
 - Khi có lỗi, app hiện popup có nút **Tạo issue trên GitHub**. Nút này mở trang tạo issue trong trình duyệt với phiên bản, hệ điều hành, thông báo lỗi và phần cuối của log điền sẵn (SteamID được che). App không chứa thông tin đăng nhập GitHub nào: bạn đăng nhập GitHub trên trình duyệt rồi bấm Submit.
 - Nút **Báo lỗi / Góp ý** ở thanh bên mở form báo lỗi hoặc đề xuất tính năng, và có nút copy log hoặc mở thư mục log.
+- **Báo lỗi game này** trong hộp thoại **⋯** của mỗi game điền sẵn tên game, trạng thái, thư mục save, và chỉ những dòng log của game đó cộng các cảnh báo, lỗi, để phần quan trọng vừa trong issue. Cần cả file log thì bấm **Mở thư mục log** rồi kéo file vào issue.
 
 ## Cách hoạt động
 

@@ -42,6 +42,11 @@
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
     external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M10.6 5.1A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.9 3.8M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/>',
+    trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+    more: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
+    library: '<rect x="3" y="4" width="4" height="16" rx="1"/><rect x="9" y="4" width="4" height="16" rx="1"/><path d="m15.5 5.5 3.8-1 3 14.6-3.8 1z"/>',
   };
   const ic = (name) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name] || ''}</svg>`;
   const STATUS_IC = { sync: 'check', local: 'monitor', cloud: 'cloud', conflict: 'alert', diverged: 'alert', new: 'plus', empty: 'minus', unknown: 'help' };
@@ -119,7 +124,8 @@
   function close() { layer.innerHTML = ''; }
   function modal(html) {
     layer.innerHTML = `<div class="scrim" data-scrim="1"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
-    const b = layer.querySelector('.modal .primary, .modal .danger, .modal button');
+    // data-autofocus wins, so a dialog that deletes something starts on Cancel (safe for A / Enter)
+    const b = layer.querySelector('.modal [data-autofocus]') || layer.querySelector('.modal .primary, .modal .danger, .modal button');
     if (b) b.focus();
   }
   function busyModal(title) {
@@ -150,6 +156,8 @@
     const i = S.info; if (!i) return;
     const b = i.config.backend;
     const where = b.kind === 'folder' ? b.path : b.kind === 'rclone' ? b.remote : t('side.not_connected');
+    const ver = $('#appVer');
+    if (ver) { ver.textContent = 'v' + i.version; ver.title = t('side.version', { version: i.version }); }
     $('#sideMeta').innerHTML = `
       <div>${h('side.this_pc')}<br><span class="mono">${esc(i.config.device_name)}</span></div>
       <div>${h('side.storage')}<br><span class="mono">${esc(where)}</span></div>
@@ -207,7 +215,8 @@
       : `<button class="btn sm" data-act="${act}" data-id="${g.appid}" ${hint ? `title="${esc(hint)}"` : ''} ${state}>${ic(icon)}${esc(label)}</button>`;
     return b('backup', 'upload', t('common.backup'), g.local_hash ? dis : 'disabled')
       + b('restore', 'download', t('common.restore'), g.cloud ? dis : 'disabled')
-      + (g.steam_ids && g.steam_ids.length ? b('migrate', 'swap', t('games.move_btn'), g.running || S.busy ? 'disabled' : '', t('games.move_title')) : '');
+      + (g.steam_ids && g.steam_ids.length ? b('migrate', 'swap', t('games.move_btn'), g.running || S.busy ? 'disabled' : '', t('games.move_title')) : '')
+      + b('gameMore', 'more', t('game.more'), '', t('game.more_title'));
   }
   function gameFlags(g) {
     return (g.steamid_bound ? `<span class="flag">${ic('key')}${h('games.flag_steamid')}</span>` : '')
@@ -329,6 +338,9 @@
           <input type="text" id="devName" value="${esc(c.device_name)}"><span class="note">${h('settings.device_name_hint', { id: c.device_id })}</span></div>
         <div class="field"><label class="l" for="steamRoot">${h('settings.steam_folder')}</label>
           <input type="text" id="steamRoot" value="${esc(c.steam_root_override || '')}" placeholder="${esc(S.info.steam_root || t('settings.steam_not_found'))}"><span class="note">${h('settings.steam_folder_hint')}</span></div>
+        <div class="field"><span class="l">${h('settings.steam_library')}</span>
+          <div class="row"><button class="btn" data-act="addSteam" ${S.info.steam_root ? '' : 'disabled'}>${ic('library')}${h('settings.add_to_steam')}</button></div>
+          <span class="note">${h('settings.add_to_steam_hint')}</span></div>
       </div>
       <div class="group"><h3>${h('settings.storage')}</h3>
         <div class="field"><label class="l" for="bk">${h('settings.storage_kind')}</label>
@@ -350,6 +362,9 @@
           <label class="l" for="fPath">${h('settings.folder')}</label>
           <div class="row"><input type="text" id="fPath" value="${esc(b.kind === 'folder' ? b.path : '')}" placeholder="G:\\My Drive\\Checkpoint"><button class="btn" data-act="pick">${ic('folder')}${h('settings.choose')}</button></div>
         </div>
+        ${backendReady() ? `<div class="field danger-zone"><span class="l">${h('settings.delete_all')}</span>
+          <span class="note">${h('settings.delete_all_hint')}</span>
+          <div class="row"><button class="btn" data-act="delAll" ${S.busy ? 'disabled' : ''}>${ic('trash')}${h('settings.delete_all_btn')}</button></div></div>` : ''}
       </div>
       <div class="group"><h3>${h('settings.backup')}</h3>
         <label class="check" for="incCfg"><input type="checkbox" id="incCfg" ${c.include_config ? 'checked' : ''}> <span>${h('settings.include_config')}<br><span class="note">${h('settings.include_config_hint')}</span></span></label>
@@ -557,9 +572,17 @@
     else if (r.custom_client) remoteLine = h('rclone.connected', { name: r.name, scope: r.scope || '?' });
     else remoteLine = h('rclone.shared_client', { name: r.name });
     const ok = r && r.custom_client;
+    // The saved values, so it is clear which client this PC uses. Hidden until the eye button is pressed.
+    let cred = null;
+    if (ok) { try { cred = await call('rclone_client'); } catch (e) { cred = null; } }
+    if (!$('#rcPanel') || S.view !== 'settings') return;
+    const secretField = (id, label, ph, val) => `<div class="field"><label class="l" for="${id}">${label}</label>
+        <div class="secret"><input type="password" id="${id}" placeholder="${ph}" value="${esc(val || '')}" autocomplete="off" spellcheck="false" ${st.found ? '' : 'disabled'}>
+        <button class="btn icon" type="button" data-act="reveal" data-for="${id}" title="${h('rclone.show')}" aria-label="${h('rclone.show')}" aria-pressed="false" ${st.found ? '' : 'disabled'}>${ic('eye')}</button></div></div>`;
     const step2 = `<div class="step ${ok ? 'done' : 'todo'}"><b>2. Google Drive</b><span>${remoteLine}</span>
-        <div class="field"><label class="l" for="cid">Client ID</label><input type="text" id="cid" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false" ${st.found ? '' : 'disabled'}></div>
-        <div class="field"><label class="l" for="csec">Client secret</label><input type="password" id="csec" placeholder="GOCSPX-…" autocomplete="off" ${st.found ? '' : 'disabled'}></div>
+        ${secretField('cid', 'Client ID', 'xxxx.apps.googleusercontent.com', cred && cred.client_id)}
+        ${secretField('csec', 'Client secret', 'GOCSPX-…', cred && cred.client_secret)}
+        ${cred ? `<span class="note">${h('rclone.saved_values')}</span>` : ''}
         <div class="row"><button class="btn ${ok ? '' : 'primary'}" data-act="rconnect" ${st.found ? '' : 'disabled'}>${ic('cloud')}${h(r ? 'rclone.reconnect' : 'rclone.connect')}</button>
         <span class="note">${h('rclone.connect_hint')}</span></div></div>`;
     panel.innerHTML = `<p class="note">${h('rclone.this_pc', { os: OS_NAME[st.os] || st.os, arch: st.arch })}</p>${step1}${step2}`;
@@ -737,6 +760,90 @@
     await loadGames();
   }
 
+  // ---------- one game: details, delete cloud backup, report ----------
+  const storageName = () => {
+    const b = S.info && S.info.config.backend;
+    return !b ? '' : b.kind === 'folder' ? b.path : b.kind === 'rclone' ? b.remote : '';
+  };
+
+  function openGame(g) {
+    const where = g.roots.length ? g.roots.map((r) => `<div class="mono">${esc(r)}</div>`).join('') : `<span class="note">${esc(gameWhere(g))}</span>`;
+    const local = g.local_hash ? `${fmt(g.local_mtime)} · ${esc(files(g.files))} · ${human(g.bytes)}` : h('game.no_local');
+    const cloud = g.cloud ? h('game.cloud_info', { n: g.versions, time: fmt(g.cloud.created_utc), device: g.cloud.device_name }) : h('games.cloud_none');
+    const canDelete = g.cloud && backendReady() && !S.busy;
+    modal(`<div class="ghead">${art('header', g.appid, g.name, 'hdr')}<div><h3>${esc(g.name)}</h3><div class="note">AppID <span class="mono">${g.appid}</span> · ${statusPill(g.status)}</div></div></div>
+      <div class="kv">
+        <span class="l">${h('game.save_folders')}</span><div>${where}</div>
+        <span class="l">${h('games.col_local')}</span><div>${local}</div>
+        <span class="l">${h('games.col_cloud')}</span><div>${cloud}</div>
+      </div>
+      ${g.steamid_bound || g.running ? `<div>${gameFlags(g)}</div>` : ''}
+      <div class="mfoot"><button class="btn" data-act="delCloud" data-id="${g.appid}" ${canDelete ? '' : 'disabled'}>${ic('trash')}${h('game.delete_cloud')}</button>
+        <button class="btn" data-act="reportGame" data-id="${g.appid}">${ic('bug')}${h('game.report')}</button><span class="spacer"></span>
+        <button class="btn primary" data-close="1" data-autofocus>${h('common.close')}</button></div>`);
+  }
+
+  /** What the bug report says about the game: English and plain, it goes to the public tracker. */
+  function gameReportText(g) {
+    const iso = (ms) => (ms ? new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '-');
+    return [
+      `Name: ${g.name}`,
+      `AppID: ${g.appid}`,
+      `Status: ${g.status}${g.running ? ' (running)' : ''}`,
+      `In manifest: ${g.has_rules ? 'yes' : 'no'}`,
+      `Save folders: ${g.roots.length ? '\n  ' + g.roots.join('\n  ') : 'none found'}`,
+      `Local: ${g.local_hash ? `${g.files} files, ${human(g.bytes)}, modified ${iso(g.local_mtime)}` : 'no save'}`,
+      `Cloud: ${g.cloud ? `${g.versions} version${g.versions === 1 ? '' : 's'}, latest ${iso(g.cloud.created_utc)} from a ${g.cloud.os} PC` : 'none'}`,
+      `Tied to a SteamID: ${g.steamid_bound ? 'yes' : 'no'}`,
+      `Storage: ${S.info ? S.info.config.backend.kind : '?'}`,
+    ].join('\n');
+  }
+
+  function confirmDeleteGame(g) {
+    modal(`<h3>${h('game.delete_title', { game: g.name })}</h3>
+      <div class="alert bad"><b>${h('game.delete_warn', { n: g.versions, game: g.name, where: storageName() })}</b><span>${h('game.delete_tail')}</span></div>
+      <div class="mfoot"><button class="btn" data-close="1" data-autofocus>${h('common.cancel')}</button>
+        <button class="btn danger" data-act="delCloudGo" data-id="${g.appid}">${ic('trash')}${h('game.delete_btn', { n: g.versions })}</button></div>`);
+  }
+
+  async function deleteGame(g) {
+    busyModal(t('game.delete_title', { game: g.name }));
+    S.busy = true;
+    try {
+      const r = await call('delete_cloud_game', { appid: g.appid });
+      S.busy = false; close(); toast(r.message);
+    } catch (e) { S.busy = false; fail(t('err.delete_failed'), e); }
+    await loadGames();
+  }
+
+  function confirmDeleteAll() {
+    modal(`<h3>${h('settings.delete_all')}</h3>
+      <div class="alert bad"><b>${h('settings.delete_all_warn', { where: storageName() })}</b><span>${h('settings.delete_all_tail')}</span></div>
+      <label class="check" for="delSure"><input type="checkbox" id="delSure"> <span>${h('settings.delete_all_confirm')}</span></label>
+      <div class="mfoot"><button class="btn" data-close="1" data-autofocus>${h('common.cancel')}</button>
+        <button class="btn danger" data-act="delAllGo" disabled>${ic('trash')}${h('settings.delete_all_btn')}</button></div>`);
+    $('#delSure').addEventListener('change', (e) => { layer.querySelector('[data-act="delAllGo"]').disabled = !e.target.checked; });
+  }
+
+  async function deleteAll() {
+    busyModal(t('settings.delete_all'));
+    S.busy = true;
+    try {
+      const r = await call('delete_cloud_all');
+      S.busy = false; close(); toast(r.message);
+    } catch (e) { S.busy = false; fail(t('err.delete_failed'), e); }
+    S.list = null; loadGames();
+    if (S.view === 'settings') render();
+  }
+
+  async function addToSteam() {
+    busyModal(t('settings.add_to_steam'));
+    try {
+      const r = await call('add_to_steam');
+      close(); toast(t(r.added ? 'settings.added_to_steam' : 'settings.updated_in_steam', { account: r.account }));
+    } catch (e) { fail(t('err.add_to_steam_failed'), e); }
+  }
+
   // ---------- events ----------
   document.addEventListener('click', async (e) => {
     if (e.target.dataset && e.target.dataset.scrim) { close(); return; }
@@ -761,6 +868,24 @@
         const sel = $('#remapTo');
         const remap = sel && sel.value !== sel.dataset.from ? { remapFrom: sel.dataset.from, remapTo: sel.value } : {};
         doOp('restore', game(id), { versionId: n.dataset.ver, force: true, ...remap });
+      }
+      else if (a === 'gameMore') openGame(game(id));
+      else if (a === 'delCloud') confirmDeleteGame(game(id));
+      else if (a === 'delCloudGo') deleteGame(game(id));
+      else if (a === 'delAll') confirmDeleteAll();
+      else if (a === 'delAllGo') deleteAll();
+      else if (a === 'addSteam') addToSteam();
+      else if (a === 'reportGame') {
+        const g = game(id);
+        reportIssue('bug', `[Bug] ${g.name}: `, null, { appid: g.appid, gameName: g.name, details: gameReportText(g) });
+      }
+      else if (a === 'reveal') {
+        const inp = $('#' + n.dataset.for); if (!inp) return;
+        const show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        n.setAttribute('aria-pressed', String(show));
+        n.title = t(show ? 'rclone.hide' : 'rclone.show'); n.setAttribute('aria-label', n.title);
+        n.innerHTML = ic(show ? 'eyeOff' : 'eye');
       }
       else if (a === 'migrate') openMigrate({ appid: id });
       else if (a === 'migrateAcct') openMigrate({ from: n.dataset.sid });
@@ -863,9 +988,9 @@
       <div class="mfoot"><button class="btn" data-act="openLogs">${ic('folder')}${h('report.open_logs')}</button><button class="btn" data-act="copyLog">${ic('copy')}${h('report.copy_log')}</button><span class="spacer"></span><button class="btn" data-close="1">${h('common.close')}</button></div>`);
   }
 
-  async function reportIssue(kind, title, error) {
+  async function reportIssue(kind, title, error, gameInfo) {
     try {
-      const r = await call('report_issue', { kind, title, error });
+      const r = await call('report_issue', { kind, title, error, appid: null, gameName: null, details: null, ...(gameInfo || {}) });
       toast(t('report.opened'));
       if (r.log_truncated) toast(t('report.truncated'));
     } catch (e) { toast(String(e), true); }
@@ -955,7 +1080,141 @@
     if (g.status === 'local' || g.status === 'new') doOp('backup', g, {});
     else confirmBackup(g);
   }
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !S.busy) close(); });
+  // ---------- controller and arrow-key navigation ----------
+  // For Gaming Mode on Bazzite / SteamOS (and any gamepad): D-pad or left stick moves the focus to
+  // the nearest control in that direction, A presses it, B closes the dialog or goes back to the
+  // sidebar, LB / RB switch screens. Arrow keys do the same, for Steam Input layouts that send keys.
+  const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disabled]),summary,a[href]';
+  const VIEWS = ['games', 'accounts', 'history', 'settings'];
+
+  function focusables() {
+    const scope = layer.querySelector('.modal') || document;
+    return [...scope.querySelectorAll(FOCUSABLE)].filter((el) => {
+      if (el.closest('[hidden]') || (el.closest('details:not([open])') && el.tagName !== 'SUMMARY')) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+  }
+
+  function focusEl(el) {
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  /** Nearest control whose centre lies in direction `dir`, preferring ones in line with the current one. */
+  function moveFocus(dir) {
+    const items = focusables();
+    if (!items.length) return;
+    const cur = document.activeElement;
+    if (!cur || !items.includes(cur)) {
+      // Nothing focused yet: start in the dialog, or on the current screen's sidebar button
+      return focusEl(layer.querySelector('.modal') ? items[0] : document.querySelector(`#nav button[data-view="${S.view}"]`) || items[0]);
+    }
+    const a = cur.getBoundingClientRect();
+    const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+    let best = null, bestScore = Infinity;
+    for (const el of items) {
+      if (el === cur) continue;
+      const b = el.getBoundingClientRect();
+      const dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+      const main = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy;
+      const cross = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
+      if (main <= 4) continue;
+      const score = main + cross * 2.5;
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    if (best) focusEl(best);
+  }
+
+  // A stable description of a control, to focus it again after the screen re-renders
+  function keyOf(el) {
+    if (el.id) return '#' + CSS.escape(el.id);
+    const attrs = ['data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for'].filter((k) => el.hasAttribute(k));
+    return attrs.length ? attrs.map((k) => `[${k}="${CSS.escape(el.getAttribute(k))}"]`).join('') : null;
+  }
+  function refocus(key) {
+    setTimeout(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const items = focusables();
+      focusEl((key && items.find((el) => el.matches(key))) || items[0]);
+    }, 80);
+  }
+
+  function press() {
+    const el = document.activeElement;
+    if (!el || el === document.body) return moveFocus('down');
+    if (el.tagName === 'SELECT') {
+      // A native drop-down cannot be opened from script: A picks the next option instead
+      el.selectedIndex = (el.selectedIndex + 1) % el.options.length;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    if (el.tagName === 'INPUT' && !['checkbox', 'radio'].includes(el.type)) return; // typing: Steam keyboard (Steam + X)
+    const key = keyOf(el);
+    el.click();
+    refocus(key);
+  }
+
+  function back() {
+    if (S.busy) return;
+    if (layer.querySelector('.modal')) { close(); return refocus(null); }
+    focusEl(document.querySelector(`#nav button[data-view="${S.view}"]`));
+  }
+
+  function switchView(step) {
+    if (layer.querySelector('.modal') || S.busy) return;
+    const i = VIEWS.indexOf(S.view);
+    const next = document.querySelector(`#nav button[data-view="${VIEWS[(i + step + VIEWS.length) % VIEWS.length]}"]`);
+    if (next) { next.click(); focusEl(next); }
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (layer.querySelector('.modal')) { if (!S.busy) close(); } else back(); return; }
+    const dir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+    if (!dir || e.altKey || e.ctrlKey || e.metaKey) return;
+    const el = document.activeElement;
+    // Leave arrows to drop-downs, number fields and the text cursor
+    if (el && (el.tagName === 'SELECT' || el.type === 'number' || (el.tagName === 'INPUT' && ['text', 'password', 'search'].includes(el.type) && (dir === 'left' || dir === 'right')))) return;
+    e.preventDefault();
+    moveFocus(dir);
+  });
+
+  // Gamepad API (standard mapping): 0 A, 1 B, 4 LB, 5 RB, 12–15 D-pad, axes 0/1 left stick
+  const pad = { held: {}, next: {}, raf: 0 };
+  function padLoop(now) {
+    const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((g) => g && g.connected);
+    if (!gp) { pad.raf = 0; return; }
+    const btn = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const ax = (i) => gp.axes[i] || 0;
+    const inputs = {
+      up: btn(12) || ax(1) < -0.6, down: btn(13) || ax(1) > 0.6, left: btn(14) || ax(0) < -0.6, right: btn(15) || ax(0) > 0.6,
+      a: btn(0), b: btn(1), lb: btn(4), rb: btn(5),
+    };
+    for (const [k, on] of Object.entries(inputs)) {
+      if (!on) { pad.held[k] = false; continue; }
+      const first = !pad.held[k];
+      // Directions repeat while held (first after 400 ms, then every 130 ms); buttons fire once
+      if (first || (['up', 'down', 'left', 'right'].includes(k) && now >= pad.next[k])) {
+        pad.next[k] = now + (first ? 400 : 130);
+        pad.held[k] = true;
+        document.body.classList.add('pad');
+        if (k === 'a') press();
+        else if (k === 'b') back();
+        else if (k === 'lb') switchView(-1);
+        else if (k === 'rb') switchView(1);
+        else moveFocus(k);
+      }
+    }
+    pad.raf = requestAnimationFrame(padLoop);
+  }
+  function startPad() { if (!pad.raf) pad.raf = requestAnimationFrame(padLoop); }
+  window.addEventListener('gamepadconnected', startPad);
+  // Some WebViews only report a pad that was already connected after a button press
+  if (navigator.getGamepads && [...navigator.getGamepads()].some((g) => g)) startPad();
+  // Show focus rings while a controller or the keyboard is used; hide them again for the mouse
+  document.addEventListener('keydown', (e) => { if (e.key.startsWith('Arrow')) document.body.classList.add('pad'); });
+  document.addEventListener('mousemove', () => document.body.classList.remove('pad'));
 
   // ---------- boot ----------
   (async function boot() {

@@ -574,6 +574,54 @@ pub fn history(cfg: &Config) -> Result<Vec<VersionMeta>> {
     Ok(all)
 }
 
+#[derive(Debug, Serialize)]
+pub struct DeleteResult {
+    pub games: usize,
+    pub versions: usize,
+    pub message: String,
+}
+
+/// Remove every cloud version of one game. The index is updated first, so other PCs never see
+/// versions whose zip is gone; then the game's folder is removed. Local saves are not touched;
+/// this PC forgets its last-sync record so the game shows as "not backed up".
+pub fn delete_cloud_game(cfg: &Config, appid: u32) -> Result<DeleteResult> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    let key = appid.to_string();
+    let removed = idx.games.remove(&key).unwrap_or_default();
+    let name = removed.first().map(|v| v.game_name.clone()).unwrap_or_else(|| key.clone());
+    if !removed.is_empty() {
+        save_index(&*st, &idx)?;
+    }
+    st.delete_dir(&format!("games/{appid}"))?;
+    let mut state = State::load();
+    if state.games.remove(&key).is_some() {
+        state.save()?;
+    }
+    Ok(DeleteResult {
+        games: usize::from(!removed.is_empty()),
+        versions: removed.len(),
+        message: t!("msg.cloud_game_deleted", game = name, n = removed.len()).to_string(),
+    })
+}
+
+/// Remove every backup of every game, and the index with the remembered account pairs.
+pub fn delete_cloud_all(cfg: &Config) -> Result<DeleteResult> {
+    let st = storage::open(&cfg.backend)?;
+    let idx = load_index(&*st)?;
+    let games = idx.games.values().filter(|v| !v.is_empty()).count();
+    let versions = idx.games.values().map(Vec::len).sum();
+    // Index first: a half-done delete then leaves orphan zips, never an index pointing at nothing
+    st.delete(INDEX)?;
+    st.delete_dir("games")?;
+    let mut state = State::load();
+    if !state.games.is_empty() {
+        state.games.clear();
+        state.save()?;
+    }
+    Ok(DeleteResult { games, versions, message: t!("msg.cloud_all_deleted", games = games, n = versions).to_string() })
+}
+
 fn human(b: u64) -> String {
     let b = b as f64;
     if b >= 1e9 { format!("{:.2} GB", b / 1e9) }

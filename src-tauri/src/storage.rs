@@ -14,6 +14,8 @@ pub trait Storage: Send {
     fn upload(&self, local: &Path, rel: &str) -> Result<()>;
     fn download(&self, rel: &str, local: &Path) -> Result<()>;
     fn delete(&self, rel: &str) -> Result<()>;
+    /// Remove a folder and everything in it. A missing folder is not an error.
+    fn delete_dir(&self, rel: &str) -> Result<()>;
 }
 
 pub fn open(backend: &Backend) -> Result<Box<dyn Storage>> {
@@ -114,6 +116,13 @@ impl Storage for FolderStorage {
         }
         Ok(())
     }
+    fn delete_dir(&self, rel: &str) -> Result<()> {
+        let p = self.full(rel);
+        if p.exists() {
+            fs::remove_dir_all(&p).with_context(|| tr!("err.delete_path", path = p.display()).to_string())?;
+        }
+        Ok(())
+    }
 }
 
 pub struct RcloneStorage {
@@ -130,6 +139,12 @@ pub fn rclone_command(bin: &str) -> Command {
         c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     c
+}
+
+/// rclone failed because the file or folder is not there (fine when deleting).
+fn is_not_found(out: &std::process::Output) -> bool {
+    let err = String::from_utf8_lossy(&out.stderr).to_lowercase();
+    !out.status.success() && (err.contains("not found") || err.contains("doesn't exist") || err.contains("does not exist"))
 }
 
 impl RcloneStorage {
@@ -183,6 +198,16 @@ impl Storage for RcloneStorage {
     }
     fn delete(&self, rel: &str) -> Result<()> {
         let out = self.run(&["deletefile", &self.target(rel)])?;
+        if is_not_found(&out) {
+            return Ok(());
+        }
         Self::check(out, "delete")
+    }
+    fn delete_dir(&self, rel: &str) -> Result<()> {
+        let out = self.run(&["purge", &self.target(rel)])?;
+        if is_not_found(&out) {
+            return Ok(());
+        }
+        Self::check(out, "purge")
     }
 }

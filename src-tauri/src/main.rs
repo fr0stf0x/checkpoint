@@ -13,6 +13,7 @@ mod migrate;
 mod paths;
 mod rclone;
 mod report;
+mod shortcuts;
 mod steam;
 mod storage;
 mod sync;
@@ -35,15 +36,26 @@ where
     T: Send + 'static,
     F: FnOnce() -> anyhow::Result<T> + Send + 'static,
 {
+    blocking_for(label, None, f).await
+}
+
+/// Same as `blocking`, for work on one game: its errors are logged with `appid=<n>` so a
+/// per-game bug report includes them (see logger::tail_for_app).
+async fn blocking_for<T, F>(label: &'static str, appid: Option<u32>, f: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> anyhow::Result<T> + Send + 'static,
+{
+    let tag = appid.map(|a| format!(" appid={a}")).unwrap_or_default();
     tauri::async_runtime::spawn_blocking(move || {
         i18n::clear();
         let r = f().map_err(|e| format!("{e:#}"));
         if let Err(e) = &r {
             let en = i18n::to_en(e);
             if e.starts_with("NEEDS_CONFIRM") {
-                info!("{label}: needs user confirmation ({en})");
+                info!("{label}{tag}: needs user confirmation ({en})");
             } else {
-                error!("{label} failed: {en}");
+                error!("{label}{tag} failed: {en}");
             }
         }
         r
@@ -204,7 +216,7 @@ async fn list_accounts() -> Result<Vec<steam::Account>, String> {
 
 #[tauri::command]
 async fn backup_game(appid: u32, force: bool) -> Result<sync::OpResult, String> {
-    blocking("backup_game", move || {
+    blocking_for("backup_game", Some(appid), move || {
         let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
         info!("Backup appid={appid} force={force}");
         let r = sync::backup(&Config::load(), appid, force)?;
@@ -222,7 +234,7 @@ async fn restore_game(
     remap_from: Option<String>,
     remap_to: Option<String>,
 ) -> Result<sync::OpResult, String> {
-    blocking("restore_game", move || {
+    blocking_for("restore_game", Some(appid), move || {
         let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
         info!(
             "Restore appid={appid} version={} force={force}{}",
@@ -242,7 +254,7 @@ async fn restore_game(
 
 #[tauri::command]
 async fn migrate_preview(appid: u32, from: String, to: String) -> Result<migrate::Preview, String> {
-    blocking("migrate_preview", move || {
+    blocking_for("migrate_preview", Some(appid), move || {
         let p = migrate::preview(&Config::load(), appid, &from, &to)?;
         info!("Move preview appid={appid} {from} -> {to}: class={}, files={}, overwrite={}", p.class, p.files.len(), p.overwrite);
         Ok(p)
@@ -252,7 +264,7 @@ async fn migrate_preview(appid: u32, from: String, to: String) -> Result<migrate
 
 #[tauri::command]
 async fn migrate_apply(appid: u32, from: String, to: String, patch_in_file: bool) -> Result<migrate::Migration, String> {
-    blocking("migrate_apply", move || {
+    blocking_for("migrate_apply", Some(appid), move || {
         let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
         info!("Move save appid={appid} {from} -> {to} patch_in_file={patch_in_file}");
         let m = migrate::apply(&Config::load(), appid, &from, &to, patch_in_file)?;
@@ -296,7 +308,46 @@ async fn migrate_pending() -> Result<Vec<migrate::Migration>, String> {
 
 #[tauri::command]
 async fn list_versions(appid: u32) -> Result<Vec<sync::VersionMeta>, String> {
-    blocking("list_versions", move || sync::versions(&Config::load(), appid)).await
+    blocking_for("list_versions", Some(appid), move || sync::versions(&Config::load(), appid)).await
+}
+
+/// Delete every cloud version of one game. Local saves are not touched.
+#[tauri::command]
+async fn delete_cloud_game(appid: u32) -> Result<sync::DeleteResult, String> {
+    blocking_for("delete_cloud_game", Some(appid), move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("Deleting cloud backups of appid={appid}");
+        let r = sync::delete_cloud_game(&Config::load(), appid)?;
+        info!("Deleted {} cloud versions of appid={appid}", r.versions);
+        Ok(r)
+    })
+    .await
+}
+
+/// Delete every backup in the cloud (all games, the index and remembered account pairs).
+#[tauri::command]
+async fn delete_cloud_all() -> Result<sync::DeleteResult, String> {
+    blocking("delete_cloud_all", || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("Deleting every backup in the cloud");
+        let r = sync::delete_cloud_all(&Config::load())?;
+        info!("Deleted {} versions of {} games from the cloud", r.versions, r.games);
+        Ok(r)
+    })
+    .await
+}
+
+/// Add Checkpoint to the Steam library as a non-Steam game (Steam must be closed).
+#[tauri::command]
+async fn add_to_steam() -> Result<shortcuts::AddResult, String> {
+    blocking("add_to_steam", || {
+        let cfg = Config::load();
+        let root = steam::find_root(cfg.steam_root_override.as_deref()).ok_or_else(|| anyhow::anyhow!("{}", crate::tr!("err.no_steam")))?;
+        let r = shortcuts::add_to_steam(&root)?;
+        info!("Steam library: Checkpoint {}", if r.added { "added" } else { "already there, entry updated" });
+        Ok(r)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -377,6 +428,13 @@ async fn rclone_connect(client_id: String, client_secret: String) -> Result<Stri
         Ok(remote)
     })
     .await
+}
+
+/// Client ID and secret saved in rclone's config, so Settings can show them (masked).
+/// Never logged.
+#[tauri::command]
+async fn rclone_client() -> Result<Option<rclone::ClientCreds>, String> {
+    blocking("rclone_client", || Ok(rclone::client_creds(configured_bin(&Config::load()).as_deref(), REMOTE_NAME))).await
 }
 
 /// Look for a newer version. `manual` is false for the check at startup, which is skipped when
@@ -492,11 +550,25 @@ struct ReportResult {
 }
 
 /// Open GitHub's new-issue page with prefilled content. kind: "bug" | "feature".
+/// With `appid`, the report is about that game: its details and only its log lines are attached.
 #[tauri::command]
-fn report_issue(app: tauri::AppHandle, kind: String, title: String, error: Option<String>) -> Result<ReportResult, String> {
+fn report_issue(
+    app: tauri::AppHandle,
+    kind: String,
+    title: String,
+    error: Option<String>,
+    appid: Option<u32>,
+    game_name: Option<String>,
+    details: Option<String>,
+) -> Result<ReportResult, String> {
     use tauri_plugin_opener::OpenerExt;
-    info!("Opening GitHub issue form: {kind}");
-    let link = report::issue_url(&kind, &title, error.as_deref());
+    let game = appid.map(|appid| report::GameContext {
+        appid,
+        name: game_name.unwrap_or_default(),
+        details: details.unwrap_or_default(),
+    });
+    info!("Opening GitHub issue form: {kind}{}", game.as_ref().map(|g| format!(" for appid={}", g.appid)).unwrap_or_default());
+    let link = report::issue_url(&kind, &title, error.as_deref(), game.as_ref());
     app.opener()
         .open_url(link.url.clone(), None::<&str>)
         .map_err(|e| crate::tr!("err.open_browser", detail = e.to_string()).to_string())?;
@@ -533,6 +605,9 @@ fn main() {
             backup_game,
             restore_game,
             list_versions,
+            delete_cloud_game,
+            delete_cloud_all,
+            add_to_steam,
             history,
             pick_folder,
             migrate_preview,
@@ -543,6 +618,7 @@ fn main() {
             rclone_status,
             rclone_install,
             rclone_connect,
+            rclone_client,
             rclone_auth_url,
             open_auth_url,
             check_update,

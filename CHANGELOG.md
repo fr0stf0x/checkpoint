@@ -6,6 +6,20 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Added
+- Controller navigation for Gaming Mode on Bazzite / SteamOS (and any gamepad): the D-pad or left stick moves between buttons, **A** presses, **B** closes a dialog or goes back to the sidebar, **LB / RB** switch screens. Arrow keys, Enter and Esc work the same way.
+- **Add Checkpoint to Steam** in Settings: adds the app to your Steam library as a non-Steam game, so you can start it from the library and from Gaming Mode. Quit Steam first; Steam's previous list is kept as `shortcuts.vdf.checkpoint-bak`.
+- A **⋯** button on every game opens its details (save folders, local and cloud versions) with **Delete cloud backup** and **Report a problem**. The report prefills the game, its status and save folders, and only that game's log lines plus warnings and errors.
+- **Delete everything in the cloud** in Settings, behind a confirmation. Deleting never touches the saves on your PCs.
+- The app version is shown next to the logo.
+- Once Google Drive is connected, Settings shows the saved client ID and secret, hidden until you press the eye button, so you can copy them to your other PCs.
+
+### Changed
+- The log keeps three old files instead of one, and errors about a game are logged with its AppID.
+
+### Fixed
+- The Folder field no longer shows in Settings while Google Drive is selected as the backup location.
+
 ## [0.5.1] - 2026-11-08
 
 ### Fixed

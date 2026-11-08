@@ -20,7 +20,11 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Refuses to back up or restore while the game is running. Flags games whose saves are tied to a SteamID.
 - Saves made on Windows restore into the Proton prefix on Linux, and the other way round.
 - Move a game's save from one Steam account to another (for example when you have to switch accounts): copies the account's save folder to the new account, fixes `steam_autocloud.vdf`, optionally replaces the SteamID inside save files, then lets you test in game and **keep** or **undo** in one click. The original account's files are never touched. Restore can also write a backup into a different account.
-- Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID.
+- Each game's **⋯** button opens its details (save folders, local and cloud versions) with **Delete cloud backup** and **Report a problem**. **Settings → Backup location → Delete everything in the cloud** removes every backup at once. Both ask for confirmation and never touch the saves on your PCs.
+- **Add Checkpoint to Steam** (Settings → This PC) adds the app to your Steam library as a non-Steam game, so it opens from the library and from Gaming Mode on Bazzite / SteamOS. Quit Steam first; a copy of Steam's previous list is kept as `shortcuts.vdf.checkpoint-bak`.
+- Controller navigation: D-pad or left stick moves between buttons, **A** presses, **B** closes a dialog or goes back to the sidebar, **LB / RB** switch screens. Arrow keys, Enter and Esc do the same, for Steam Input layouts that send keys.
+- Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID. Once connected, Settings shows the saved client ID and secret, hidden until you press the eye button, so you can copy them to your other PCs.
+- The app version is shown next to the logo.
 - In-app updates: at startup the app asks GitHub for the latest release and shows what's new. **Update and restart** downloads it, checks its signature and installs it (Windows installer, or replaces the AppImage file in place). Nothing is installed until you click. Turn the check off in **Settings → Updates**. A Linux binary not started from the AppImage only gets a link to the download page.
 
 ## Languages
@@ -31,9 +35,10 @@ The website (`site/`) uses [i18next](https://www.i18next.com/) with `site/locale
 
 ## Reporting bugs
 
-- The app writes a log to `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`), rotated at 2 MB. Home folder paths are replaced with `~`; tokens, client secrets and Steam account names are never logged.
+- The app writes a log to `%LOCALAPPDATA%\Checkpoint\logs\checkpoint.log` (Linux: `~/.local/share/Checkpoint/logs/checkpoint.log`). Past 2 MB it moves to `checkpoint.1.log`; the last three old files are kept. Home folder paths are replaced with `~`; tokens, client secrets and Steam account names are never logged.
 - When something fails, the app shows an error dialog with **Create issue on GitHub**. It opens a new issue in your browser with version, OS, the error and the end of the log prefilled (SteamIDs masked). No GitHub credentials are stored in the app: you sign in to GitHub in the browser and press Submit.
 - The **Report bug / Feedback** button in the sidebar opens the bug report or feature request form, and can copy the log or open the log folder.
+- **Report a problem** in a game's **⋯** dialog prefills the game, its status and save folders, and only that game's log lines plus warnings and errors, so the part that matters fits in the issue. If you need the full log, click **Open log folder** and drag the file into the issue.
 
 ## How it works
 

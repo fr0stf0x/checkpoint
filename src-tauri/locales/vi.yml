@@ -61,6 +61,10 @@ err:
   update_install: "Không cài được bản cập nhật: %{detail}"
   update_busy: "Đang có backup, restore hoặc chuyển save chạy dở. Đợi xong rồi hãy cập nhật."
   no_auth_url: "Chưa có link đăng nhập. Đợi vài giây hoặc bấm Kết nối lại."
+  steam_running: "Steam đang chạy. Bạn thoát Steam (menu Steam → Exit; trên Bazzite / SteamOS thì chuyển sang Desktop Mode trước) rồi thử lại: Steam ghi đè file thư viện khi thoát."
+  no_steam_account: "Chưa có tài khoản Steam nào đăng nhập trên máy này. Bạn đăng nhập Steam một lần, thoát ra rồi thử lại."
+  shortcuts_format: "Danh sách game ngoài Steam (shortcuts.vdf) có định dạng app không đọc được. Chưa có gì bị thay đổi; bạn thêm Checkpoint bằng tay qua Steam → Games → Add a Non-Steam Game."
+  exe_path: "Không tìm được nơi cài Checkpoint"
 
 # Thông báo thành công từ backend (rust: t!("msg.*"))
 msg:
@@ -70,6 +74,8 @@ msg:
   restore_done: "%{game}: đã restore %{files} file từ %{device} (%{time})."
   restore_skipped_linux: "Bỏ qua %{files} file của bản Linux native (không dùng được trên Windows)."
   restore_into_account: "Đã ghi vào tài khoản %{account}."
+  cloud_game_deleted: "%{game}: đã xóa bản backup trên cloud (%{n} phiên bản). Save trên máy này vẫn giữ nguyên."
+  cloud_all_deleted: "Đã xóa sạch cloud: %{n} phiên bản của %{games} game. Save trên máy này vẫn giữ nguyên."
 
 # Chuỗi trên giao diện (ui/app.js: t("...") không có tiền tố "ui.").
 # Khóa _one / _other chọn theo số %{n}; tiếng Việt dùng cùng một câu.
@@ -113,6 +119,7 @@ ui:
     manifest: "Manifest"
     manifest_games: "%{n} game"
     manifest_missing: "chưa tải"
+    version: "Checkpoint %{version}"
 
   status:
     sync: "Đã đồng bộ"
@@ -138,6 +145,8 @@ ui:
     update_failed: "Không cập nhật được Checkpoint"
     connect_failed: "Không kết nối được Google Drive"
     generic: "Có lỗi xảy ra"
+    delete_failed: "Không xóa được bản backup trên cloud"
+    add_to_steam_failed: "Không thêm được Checkpoint vào Steam"
 
   games:
     title: "Game trên %{device}"
@@ -172,6 +181,22 @@ ui:
     open_settings: "Mở Cài đặt"
     cloud_error: "<b>Không đọc được cloud.</b> %{detail}"
 
+  game:
+    more: "Thêm"
+    more_title: "Chi tiết, xóa bản trên cloud, báo lỗi"
+    save_folders: "Thư mục save"
+    no_local: "Máy này không có save"
+    cloud_info_one: "%{n} phiên bản · mới nhất %{time} từ %{device}"
+    cloud_info_other: "%{n} phiên bản · mới nhất %{time} từ %{device}"
+    delete_cloud: "Xóa bản trên cloud"
+    report: "Báo lỗi game này"
+    delete_title: "Xóa bản trên cloud · %{game}"
+    delete_warn_one: "Thao tác này xóa phiên bản duy nhất của %{game} khỏi %{where}."
+    delete_warn_other: "Thao tác này xóa cả %{n} phiên bản của %{game} khỏi %{where}."
+    delete_tail: "Không hoàn tác được. Các máy khác của bạn sẽ không restore game này từ cloud được nữa. Save trên máy này vẫn giữ nguyên; bạn có thể backup lại bất cứ lúc nào."
+    delete_btn_one: "Xóa %{n} phiên bản"
+    delete_btn_other: "Xóa %{n} phiên bản"
+
   accounts:
     most_recent: "Đăng nhập gần nhất"
     apps_one: "%{n} app"
@@ -202,6 +227,11 @@ ui:
     steam_folder: "Thư mục Steam"
     steam_not_found: "Không tự tìm thấy"
     steam_folder_hint: "Để trống để tự tìm."
+    steam_library: "Thư viện Steam"
+    add_to_steam: "Thêm Checkpoint vào Steam"
+    add_to_steam_hint: "Thêm Checkpoint thành game ngoài Steam, để mở được từ thư viện Steam và từ Gaming Mode trên Bazzite / SteamOS. Bạn thoát Steam trước. App giữ một bản sao danh sách cũ của Steam ngay cạnh đó (<span class=\"mono\">shortcuts.vdf.checkpoint-bak</span>)."
+    added_to_steam: "Đã thêm vào thư viện Steam của %{account}. Bạn mở Steam và tìm trong mục Non-Steam."
+    updated_in_steam: "Checkpoint đã có sẵn trong thư viện Steam của %{account}; giờ nó trỏ tới bản này."
     storage: "Nơi lưu backup"
     storage_kind: "Kiểu"
     storage_none: "Chưa chọn"
@@ -213,6 +243,12 @@ ui:
     rclone_path_hint: "Để trống để app tự tìm"
     folder: "Thư mục"
     choose: "Chọn…"
+    delete_all: "Xóa toàn bộ dữ liệu trên cloud"
+    delete_all_hint: "Xóa mọi bản backup của mọi game khỏi nơi backup, kể cả game không cài trên máy này. Save trên các máy của bạn vẫn giữ nguyên."
+    delete_all_btn: "Xóa toàn bộ backup trên cloud"
+    delete_all_warn: "Mọi bản backup của mọi game trong %{where} sẽ bị xóa."
+    delete_all_tail: "Không hoàn tác được. Các máy khác của bạn cũng mất các bản backup này, và các lần chuyển tài khoản đã ghi nhớ sẽ bị quên. Save trên các máy của bạn vẫn giữ nguyên."
+    delete_all_confirm: "Mình hiểu là toàn bộ backup trên cloud sẽ mất hẳn."
     backup: "Backup"
     include_config: "Backup cả file cài đặt (đồ họa, phím)"
     include_config_hint: "Tắt nếu các máy khác GPU hoặc màn hình, để không bị đè độ phân giải."
@@ -273,6 +309,9 @@ ui:
     open_link: "Mở trong trình duyệt"
     link_copied: "Đã copy link đăng nhập. Dán vào thanh địa chỉ của trình duyệt."
     link_copy_failed: "Không copy được. Bạn chọn link rồi copy bằng tay nhé."
+    show: "Hiện"
+    hide: "Ẩn"
+    saved_values: "Đây là giá trị đang lưu trên máy này. Mọi máy phải dùng cùng giá trị này."
 
   move:
     title: "Chuyển save sang tài khoản khác"

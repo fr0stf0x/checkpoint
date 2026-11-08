@@ -50,7 +50,7 @@
     "safe_title": "No accidental overwrites",
     "safe_body": "Compares content hashes, warns when the copy on this PC is newer than the cloud, snapshots before every restore and keeps the last 10 versions.",
     "cross_title": "Windows ↔ Bazzite",
-    "cross_body": "Saves from Windows go into the right Proton prefix on Linux and back. Save locations come from Ludusavi's PCGamingWiki data (about 20,000 games).",
+    "cross_body": "Saves from Windows go into the right Proton prefix on Linux and back. Save locations come from Ludusavi's PCGamingWiki data (about 20,000 games). Add the app to your Steam library and use it in Gaming Mode with a controller.",
     "account_title": "Switch Steam accounts",
     "account_body": "Moving to another Steam account? Copy a game's save to the new account, test it in game, then keep or undo in one click.",
     "update_title": "Updates itself",
@@ -60,7 +60,7 @@
   "guide": {
     "title": "How to use",
     "install_title": "Install the app",
-    "install_list": "<li><b>Windows:</b> download <code>Checkpoint_x.y.z_x64-setup.exe</code> and run it. Windows SmartScreen may warn because the app is not code-signed: click <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> download the <code>.AppImage</code>, right-click → <i>Properties → Permissions</i> → allow executing (or <code>chmod +x Checkpoint_*.AppImage</code>), then open it in Desktop Mode.</li><li>On first launch, click <b>Download manifest</b> so the app knows where games keep their saves. The app follows your system language; change it in <b>Settings → Language</b>.</li>",
+    "install_list": "<li><b>Windows:</b> download <code>Checkpoint_x.y.z_x64-setup.exe</code> and run it. Windows SmartScreen may warn because the app is not code-signed: click <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> download the <code>.AppImage</code>, right-click → <i>Properties → Permissions</i> → allow executing (or <code>chmod +x Checkpoint_*.AppImage</code>), then open it in Desktop Mode. To open it from Gaming Mode later, quit Steam and click <b>Settings → Add Checkpoint to Steam</b>; the D-pad, A, B, LB and RB then work in the app.</li><li>On first launch, click <b>Download manifest</b> so the app knows where games keep their saves. The app follows your system language; change it in <b>Settings → Language</b>.</li>",
     "client_title": "Create a Google client ID (once, reused on every PC)",
     "client_body": "Follow <a href=\"/guide/google-drive\">Connect Google Drive</a>. It takes about 5–10 minutes and you only do it once.",
     "connect_title": "Connect in the app",

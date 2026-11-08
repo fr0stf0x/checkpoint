@@ -50,7 +50,7 @@
     "safe_title": "Không ghi đè nhầm",
     "safe_body": "So sánh bằng hash nội dung, cảnh báo khi bản trên máy mới hơn bản cloud, chụp snapshot trước mỗi lần restore, giữ 10 bản gần nhất.",
     "cross_title": "Windows ↔ Bazzite",
-    "cross_body": "Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game).",
+    "cross_body": "Save từ Windows được ghi đúng vào Proton prefix trên Linux và ngược lại. Vị trí save lấy từ dữ liệu PCGamingWiki của Ludusavi (gần 20.000 game). Thêm app vào thư viện Steam và dùng ở Gaming Mode bằng tay cầm.",
     "account_title": "Đổi tài khoản Steam",
     "account_body": "Phải chuyển sang tài khoản Steam khác? Copy save của game sang tài khoản mới, thử trong game, rồi Giữ hoặc Hoàn tác bằng 1 click.",
     "update_title": "Tự cập nhật",
@@ -60,7 +60,7 @@
   "guide": {
     "title": "Hướng dẫn sử dụng",
     "install_title": "Cài app",
-    "install_list": "<li><b>Windows:</b> tải <code>Checkpoint_x.y.z_x64-setup.exe</code> và chạy. Windows SmartScreen có thể cảnh báo vì app chưa ký số: bấm <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> tải file <code>.AppImage</code>, chuột phải → <i>Properties → Permissions</i> → cho phép chạy (hoặc <code>chmod +x Checkpoint_*.AppImage</code>), rồi mở ở Desktop Mode.</li><li>Mở app lần đầu: bấm <b>Tải manifest</b> để app biết vị trí save của các game. App dùng ngôn ngữ của hệ thống; đổi trong <b>Cài đặt → Ngôn ngữ</b>.</li>",
+    "install_list": "<li><b>Windows:</b> tải <code>Checkpoint_x.y.z_x64-setup.exe</code> và chạy. Windows SmartScreen có thể cảnh báo vì app chưa ký số: bấm <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> tải file <code>.AppImage</code>, chuột phải → <i>Properties → Permissions</i> → cho phép chạy (hoặc <code>chmod +x Checkpoint_*.AppImage</code>), rồi mở ở Desktop Mode. Muốn mở từ Gaming Mode về sau thì thoát Steam và bấm <b>Cài đặt → Thêm Checkpoint vào Steam</b>; D-pad, A, B, LB và RB dùng được trong app.</li><li>Mở app lần đầu: bấm <b>Tải manifest</b> để app biết vị trí save của các game. App dùng ngôn ngữ của hệ thống; đổi trong <b>Cài đặt → Ngôn ngữ</b>.</li>",
     "client_title": "Tạo Google Client ID (làm 1 lần, dùng cho mọi máy)",
     "client_body": "Làm theo <a href=\"/guide/google-drive\">Kết nối Google Drive</a>. Mất khoảng 5–10 phút và chỉ làm một lần.",
     "connect_title": "Kết nối trong app",

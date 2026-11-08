@@ -15,7 +15,7 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 ## Feasibility and design decisions
 
 - **Not possible:** using Steam Cloud itself while offline; guaranteeing a save works on another Steam account (many games embed the SteamID); finding saves for 100% of games; syncing while a game is running; merging two saves.
-- **Limited:** saves in the Windows Registry (Windows ↔ Proton `user.reg`) are not supported; native-Linux builds of a game may use other paths and formats than the Windows build, so on Bazzite prefer running games through Proton; the UI is hard to use in Bazzite's Gaming Mode with a controller.
+- **Limited:** saves in the Windows Registry (Windows ↔ Proton `user.reg`) are not supported; native-Linux builds of a game may use other paths and formats than the Windows build, so on Bazzite prefer running games through Proton; in Gaming Mode the controller drives the UI through the Gamepad API (or arrow keys from Steam Input), but typing needs Steam's on-screen keyboard.
 - **Status by content hash, not file dates.** Clocks drift and unzipping changes dates. Each game's status compares the SHA-256 of its save files with the hashes recorded at the last sync on this PC (`state.json`), which distinguishes local newer / cloud newer / conflict / never synced. Warnings go both ways: restoring over newer local progress and backing up over newer cloud progress.
 - **`steam_autocloud.vdf` owner on restore.** Steam clears save folders whose `steam_autocloud.vdf` names another account when a game starts. Restore therefore sets the owner of shared folders (no account ID in the path) to the account signed in on this PC (most recent in `loginusers.vdf`, or the remap target); folders named after an account keep their owner (`sync::fix_autocloud_owners`, issue #2).
 - **Portable logical paths.** Backups store files as `<flavor>/<token>/<rest>` (e.g. `win/winAppData/...`), so a Windows backup restores into the Proton prefix on Linux and back.
@@ -34,9 +34,10 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 | `migrate.rs` | Moving a save from Steam account A to B: preview, apply, undo, keep |
 | `storage.rs`, `rclone.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect |
 | `updater.rs` | In-app updates (tauri-plugin-updater): check `latest.json`, signed download and install, restart |
+| `shortcuts.rs` | "Add to Steam library": binary `shortcuts.vdf` read/write (byte-exact for other shortcuts, Steam must be closed) |
 | `images.rs` | Avatars and game artwork from Steam's local caches, served to the UI by the `steamimg` URI scheme |
 | `config.rs` | `config.json` (device, backend, language…) and `state.json` (last sync hashes) |
-| `logger.rs`, `report.rs`, `i18n.rs` | File log, prefilled GitHub issue URL, `tr!` macro (translated errors with English for logs) |
+| `logger.rs`, `report.rs`, `i18n.rs` | File log (3 rotated files; game lines carry `appid=<n>`, see `blocking_for`), prefilled GitHub issue URL (per-game reports only take that game's lines), `tr!` macro (translated errors with English for logs) |
 | `src-tauri/locales/{en,vi}.yml` | All user-facing text for the backend (`err.*`, `msg.*`) and the UI (`ui.*`) |
 | `ui/` | Plain HTML/JS frontend (no Node, no bundler) |
 | `site/` | Website (Vercel, clean URLs): landing page, `/guide`, `/guide/google-drive`, `/guide/switch-account`, `/privacy`, `/terms`; shared header/footer and i18next in `main.js`; screenshots in `shots/` |

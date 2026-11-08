@@ -10,6 +10,9 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 - [x] Use icons throughout so screens are less text-heavy (status pills, buttons, sidebar, dialogs). Pick one icon set and bundle it locally (the app works offline).
 - [x] Modern UI with a gaming vibe (cover-art game grid, darker theme, stronger visual hierarchy), keeping both languages and keyboard focus states.
 - [x] Installer and app have no proper logo: use the Checkpoint logo from the website (`site/icon.png`, `site/logo-120.png`) to generate every icon size (`cargo tauri icon`), and check the NSIS installer, the window/taskbar icon and the AppImage icon.
+- [x] Show the app version next to the logo in the sidebar, so it is clear which version is running.
+- [x] Google client ID/secret fields: once configured, show the saved values (not only the green border), masked by default with a show/hide toggle like a password field. Never write them to the log.
+- [x] Controller navigation (gamepad API: D-pad/stick moves focus, A confirms, B goes back), so the app is usable in Bazzite/SteamOS Gaming Mode.
 
 ### Features
 - [ ] Launch wrapper `checkpoint run -- %command%` for Steam launch options: restore before playing, back up after quitting.
@@ -19,9 +22,16 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 - [ ] Saves stored in the Windows Registry (Windows ↔ Proton `user.reg`).
 - [ ] Restore a local snapshot from the UI.
 - [ ] Keep one `rclone rcd` process running instead of starting rclone for every call (~3 s per call today).
+- [x] "Add to Steam library" button: add Checkpoint as a non-Steam game (`userdata/<id>/config/shortcuts.vdf`, Steam must be closed), so it can be opened from Gaming Mode.
+- [x] "Delete everything in the cloud" button (Settings), behind a warning dialog that names the backup location and needs a tick box before the Delete button works.
+- [x] Per game: "Delete cloud backup" button, behind a warning dialog (cannot be undone; local saves are not touched; other PCs lose this backup).
+- [x] Per game: "Report a problem" button that opens a prefilled GitHub issue with the game name, appid, status, save paths and the log lines for that game.
+- [x] Logs: keep ~3 rotated files instead of 1 (size-based rotation stays; per-run or per-day files are not worth it, the `starting` line already separates runs).
+- [x] Logs: tag game-related log lines with the appid, so a per-game report only includes that game's lines (plus recent errors) and fits GitHub's ~8 KB URL limit.
+- [x] "Open log folder" button next to "Report a bug", so users can attach the full log file to the issue when the prefilled excerpt is not enough. (Already in the Report dialog and every error dialog.)
 
 ### Release / housekeeping
-- [ ] Update the notes of the v0.1.0–v0.3.0 GitHub Releases with their `CHANGELOG.md` sections (newer releases get them automatically).
+- [x] Update the notes of the v0.1.0–v0.3.0 GitHub Releases with their `CHANGELOG.md` sections (newer releases get them automatically).
 - [ ] Test the AppImage and the Proton-prefix restore on a real Bazzite machine.
 
 ## Website

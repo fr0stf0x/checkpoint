@@ -77,6 +77,26 @@ fn remote_info(bin: &str, name: &str) -> Option<RemoteInfo> {
     })
 }
 
+/// Client ID and secret of a remote, to show them (masked) in Settings. Never log or Debug-print this.
+#[derive(Serialize)]
+pub struct ClientCreds {
+    pub client_id: String,
+    pub client_secret: String,
+}
+
+pub fn client_creds(configured_bin: Option<&str>, name: &str) -> Option<ClientCreds> {
+    let bin = resolve_rclone(configured_bin);
+    let out = rclone_command(&bin).args(["config", "dump"]).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+    let r = v.get(name)?;
+    let s = |k: &str| r.get(k).and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
+    let c = ClientCreds { client_id: s("client_id"), client_secret: s("client_secret") };
+    (!c.client_id.is_empty()).then_some(c)
+}
+
 pub fn status(configured_bin: Option<&str>, remote: &str) -> RcloneStatus {
     let bin = resolve_rclone(configured_bin);
     let version = version_of(&bin);

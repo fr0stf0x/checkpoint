@@ -61,6 +61,10 @@ err:
   update_install: "Could not install the update: %{detail}"
   update_busy: "A backup, restore or move is still running. Update when it is done."
   no_auth_url: "There is no sign-in link yet. Wait a few seconds or click Connect again."
+  steam_running: "Steam is running. Quit Steam (Steam menu → Exit; on Bazzite / SteamOS switch to Desktop Mode first), then try again: Steam overwrites its library file when it exits."
+  no_steam_account: "No Steam account has signed in on this PC yet. Sign in to Steam once, quit it, then try again."
+  shortcuts_format: "Steam's list of non-Steam games (shortcuts.vdf) has a format the app does not know. Nothing was changed; add Checkpoint by hand with Steam → Games → Add a Non-Steam Game."
+  exe_path: "Could not find where Checkpoint is installed"
 
 # Backend success messages (rust: t!("msg.*"))
 msg:
@@ -70,6 +74,8 @@ msg:
   restore_done: "%{game}: restored %{files} files from %{device} (%{time})."
   restore_skipped_linux: "Skipped %{files} native-Linux files (not usable on Windows)."
   restore_into_account: "Written into account %{account}."
+  cloud_game_deleted: "%{game}: removed from the cloud (versions deleted: %{n}). The save on this PC was not touched."
+  cloud_all_deleted: "Cloud emptied (games: %{games}, versions: %{n}). Saves on this PC were not touched."
 
 # Everything the UI shows (ui/app.js: t("...") without the "ui." prefix).
 # Keys ending in _one / _other are picked by the number %{n}.
@@ -113,6 +119,7 @@ ui:
     manifest: "Manifest"
     manifest_games: "%{n} games"
     manifest_missing: "not downloaded"
+    version: "Checkpoint %{version}"
 
   status:
     sync: "In sync"
@@ -138,6 +145,8 @@ ui:
     connect_failed: "Could not connect Google Drive"
     update_failed: "Could not update Checkpoint"
     generic: "Something went wrong"
+    delete_failed: "Could not delete the cloud backup"
+    add_to_steam_failed: "Could not add Checkpoint to Steam"
 
   games:
     title: "Games on %{device}"
@@ -172,6 +181,22 @@ ui:
     open_settings: "Open Settings"
     cloud_error: "<b>Could not read the cloud.</b> %{detail}"
 
+  game:
+    more: "More"
+    more_title: "Details, delete cloud backup, report a problem"
+    save_folders: "Save folders"
+    no_local: "No save on this PC"
+    cloud_info_one: "%{n} version · latest %{time} from %{device}"
+    cloud_info_other: "%{n} versions · latest %{time} from %{device}"
+    delete_cloud: "Delete cloud backup"
+    report: "Report a problem"
+    delete_title: "Delete cloud backup · %{game}"
+    delete_warn_one: "This deletes the only version of %{game} from %{where}."
+    delete_warn_other: "This deletes all %{n} versions of %{game} from %{where}."
+    delete_tail: "It cannot be undone. Your other PCs can no longer restore this game from the cloud. The save on this PC is not touched; back it up again whenever you like."
+    delete_btn_one: "Delete %{n} version"
+    delete_btn_other: "Delete %{n} versions"
+
   accounts:
     most_recent: "Last signed in"
     apps_one: "%{n} app"
@@ -202,6 +227,11 @@ ui:
     steam_folder: "Steam folder"
     steam_not_found: "Not found automatically"
     steam_folder_hint: "Leave empty to detect it."
+    steam_library: "Steam library"
+    add_to_steam: "Add Checkpoint to Steam"
+    add_to_steam_hint: "Adds Checkpoint as a non-Steam game, so you can open it from your Steam library and from Gaming Mode on Bazzite / SteamOS. Quit Steam first. A copy of Steam's old list is kept next to it (<span class=\"mono\">shortcuts.vdf.checkpoint-bak</span>)."
+    added_to_steam: "Added to the Steam library of %{account}. Start Steam and look under Non-Steam games."
+    updated_in_steam: "Checkpoint was already in the Steam library of %{account}; its entry now points to this copy."
     storage: "Backup location"
     storage_kind: "Type"
     storage_none: "Not set"
@@ -213,6 +243,12 @@ ui:
     rclone_path_hint: "Leave empty to detect it"
     folder: "Folder"
     choose: "Choose…"
+    delete_all: "Delete everything in the cloud"
+    delete_all_hint: "Removes every backup of every game from the backup location, including games not installed on this PC. Saves on your PCs are not touched."
+    delete_all_btn: "Delete all cloud backups"
+    delete_all_warn: "Every backup of every game in %{where} will be deleted."
+    delete_all_tail: "This cannot be undone. Your other PCs lose these backups too, and remembered account switches are forgotten. Saves on your PCs are not touched."
+    delete_all_confirm: "I understand that all cloud backups are gone for good."
     backup: "Backup"
     include_config: "Also back up settings files (graphics, controls)"
     include_config_hint: "Leave off if your PCs have different GPUs or screens, so resolutions don't get overwritten."
@@ -273,6 +309,9 @@ ui:
     open_link: "Open in browser"
     link_copied: "Sign-in link copied. Paste it into the browser's address bar."
     link_copy_failed: "Could not copy. Select the link and copy it by hand."
+    show: "Show"
+    hide: "Hide"
+    saved_values: "These are the values saved on this PC. Use the same ones on every PC."
 
   move:
     title: "Move saves to another account"

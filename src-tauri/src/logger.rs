@@ -1,6 +1,8 @@
 //! File logging on the user's machine, to make bug reports useful.
 //!
-//! - File: `<data>/logs/checkpoint.log`, renamed to `checkpoint.1.log` past 2 MB (one old file kept).
+//! - File: `<data>/logs/checkpoint.log`. Past 2 MB it becomes `checkpoint.1.log` and older files
+//!   shift to `.2` and `.3` (three old files kept, at most ~8 MB in all).
+//! - Lines about one game carry `appid=<n>`, so a per-game bug report can pick them out.
 //! - The home folder path is replaced with `~` when writing.
 //! - When the log is exported for a report, SteamID64s are masked as well.
 //! - Tokens, client secrets and Steam account names are never logged.
@@ -14,6 +16,8 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 const MAX_BYTES: u64 = 2 * 1024 * 1024;
+/// Rotated files kept next to the current one.
+const KEEP_OLD: usize = 3;
 
 pub fn log_dir() -> PathBuf {
     data_dir().join("logs")
@@ -23,8 +27,46 @@ pub fn log_path() -> PathBuf {
     log_dir().join("checkpoint.log")
 }
 
-fn old_log_path() -> PathBuf {
-    log_dir().join("checkpoint.1.log")
+/// `checkpoint.<n>.log`, 1 = most recent rotated file.
+fn old_log_path(n: usize) -> PathBuf {
+    log_dir().join(format!("checkpoint.{n}.log"))
+}
+
+/// checkpoint.log → .1 → .2 → .3, dropping the oldest.
+fn rotate() {
+    let _ = fs::remove_file(old_log_path(KEEP_OLD));
+    for n in (1..KEEP_OLD).rev() {
+        let _ = fs::rename(old_log_path(n), old_log_path(n + 1));
+    }
+    let _ = fs::rename(log_path(), old_log_path(1));
+}
+
+/// Every log file, newest first.
+fn files_newest_first() -> Vec<PathBuf> {
+    let mut v = vec![log_path()];
+    v.extend((1..=KEEP_OLD).map(old_log_path));
+    v
+}
+
+/// Replace the home folder with `~` (also for text that did not go through the log, like save paths).
+pub fn redact_home(s: &str) -> String {
+    let mut out = s.to_string();
+    for h in homes() {
+        out = out.replace(h.as_str(), "~");
+    }
+    out
+}
+
+fn homes() -> Vec<String> {
+    let mut homes = Vec::new();
+    if let Some(h) = dirs::home_dir() {
+        let s = h.to_string_lossy().to_string();
+        if s.len() > 3 {
+            homes.push(s.replace('\\', "/"));
+            homes.push(s);
+        }
+    }
+    homes
 }
 
 struct FileLogger {
@@ -71,7 +113,7 @@ impl Log for FileLogger {
         let too_big = fs::metadata(log_path()).map(|m| m.len() > MAX_BYTES).unwrap_or(false);
         if too_big {
             *g = None;
-            let _ = fs::rename(log_path(), old_log_path());
+            rotate();
         }
         if g.is_none() {
             *g = Self::open();
@@ -89,15 +131,7 @@ impl Log for FileLogger {
 }
 
 pub fn init() {
-    let mut homes = Vec::new();
-    if let Some(h) = dirs::home_dir() {
-        let s = h.to_string_lossy().to_string();
-        if s.len() > 3 {
-            homes.push(s.replace('\\', "/"));
-            homes.push(s);
-        }
-    }
-    let logger = FileLogger { file: Mutex::new(FileLogger::open()), homes };
+    let logger = FileLogger { file: Mutex::new(FileLogger::open()), homes: homes() };
     if log::set_boxed_logger(Box::new(logger)).is_ok() {
         log::set_max_level(LevelFilter::Info);
     }
@@ -127,16 +161,48 @@ pub fn redact_ids(s: &str) -> String {
     out
 }
 
-/// The last `n` log lines (including the rotated file if needed), with SteamIDs masked.
+/// The last `n` log lines (reading rotated files only when needed), with SteamIDs masked.
 pub fn tail(n: usize) -> String {
-    let mut lines: Vec<String> = Vec::new();
-    for p in [old_log_path(), log_path()] {
+    let mut chunks: Vec<Vec<String>> = Vec::new();
+    let mut have = 0;
+    for p in files_newest_first() {
+        if have >= n {
+            break;
+        }
         if let Ok(t) = fs::read_to_string(&p) {
-            lines.extend(t.lines().map(str::to_string));
+            let lines: Vec<String> = t.lines().map(str::to_string).collect();
+            have += lines.len();
+            chunks.push(lines);
+        }
+    }
+    let lines: Vec<String> = chunks.into_iter().rev().flatten().collect();
+    let start = lines.len().saturating_sub(n);
+    redact_ids(&lines[start..].join("\n"))
+}
+
+/// True when the line is about this game (`appid=<n>` not followed by another digit).
+fn mentions_app(line: &str, appid: u32) -> bool {
+    let tag = format!("appid={appid}");
+    line.match_indices(&tag).any(|(i, _)| !line[i + tag.len()..].starts_with(|c: char| c.is_ascii_digit()))
+}
+
+/// What matters for a report about one game: its own lines, warnings and errors, and the
+/// "starting" lines that separate app runs. The last `n` of those, SteamIDs masked.
+pub fn tail_for_app(appid: u32, n: usize) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for p in files_newest_first().into_iter().rev() {
+        if let Ok(t) = fs::read_to_string(&p) {
+            lines.extend(t.lines().filter(|l| keep_for_app(l, appid)).map(str::to_string));
         }
     }
     let start = lines.len().saturating_sub(n);
     redact_ids(&lines[start..].join("\n"))
+}
+
+fn keep_for_app(l: &str, appid: u32) -> bool {
+    // "<date> <time> <LEVEL> [target] message"
+    let level = l.split_whitespace().nth(2).unwrap_or("");
+    mentions_app(l, appid) || level == "ERROR" || level == "WARN" || (l.contains("] Checkpoint ") && l.contains(" starting "))
 }
 
 #[cfg(test)]
@@ -150,5 +216,17 @@ mod tests {
         assert_eq!(redact_ids("176561199698261377"), "176561199698261377");
         // multi-byte text around the ID must survive
         assert_eq!(redact_ids("café backup 76561198000000101."), "café backup 7656…101.");
+    }
+
+    #[test]
+    fn picks_lines_of_one_game() {
+        let l = |lvl: &str, msg: &str| format!("2026-11-08 10:00:00.000+07:00 {lvl:<5} [main] {msg}");
+        assert!(keep_for_app(&l("INFO", "Backup appid=4115450 force=false"), 4115450));
+        assert!(!keep_for_app(&l("INFO", "Backup appid=41154501 force=false"), 4115450));
+        assert!(!keep_for_app(&l("INFO", "Backup appid=646570 force=false"), 4115450));
+        assert!(keep_for_app(&l("ERROR", "list_games failed: x"), 4115450));
+        assert!(keep_for_app(&l("WARN", "[ui] something"), 4115450));
+        assert!(keep_for_app(&l("INFO", "Checkpoint 0.6.0 starting · Windows 11 · language=vi"), 4115450));
+        assert!(!keep_for_app(&l("INFO", "Scanned 12 games"), 4115450));
     }
 }

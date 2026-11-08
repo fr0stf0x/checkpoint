@@ -4,6 +4,8 @@
 //! and presses Submit. Issue form fields (.github/ISSUE_TEMPLATE/*.yml) are prefilled through
 //! URL parameters named after each field's `id`. URLs are limited to about 8 KB, so the log
 //! is trimmed from the start to fit. The prefilled text is English for the public tracker.
+//! A report about one game only takes that game's log lines (plus warnings and errors), so the
+//! part that matters fits in the URL.
 
 use crate::logger;
 
@@ -33,7 +35,15 @@ pub struct IssueLink {
     pub log_truncated: bool,
 }
 
-pub fn issue_url(kind: &str, title: &str, error: Option<&str>) -> IssueLink {
+/// What the UI knows about the game a report is about (English, no user-facing translation).
+pub struct GameContext {
+    pub appid: u32,
+    pub name: String,
+    /// e.g. status, save folders, cloud versions; home folder and SteamIDs are masked here
+    pub details: String,
+}
+
+pub fn issue_url(kind: &str, title: &str, error: Option<&str>, game: Option<&GameContext>) -> IssueLink {
     let base = format!("https://github.com/{REPO}/issues/new");
     if kind == "feature" {
         return IssueLink {
@@ -41,19 +51,30 @@ pub fn issue_url(kind: &str, title: &str, error: Option<&str>) -> IssueLink {
             log_truncated: false,
         };
     }
-    let what = match error {
+    let mut what = match error {
         Some(e) if !e.trim().is_empty() => format!("Error shown in the app:\n\n```\n{}\n```\n\n", logger::redact_ids(e.trim())),
         _ => String::new(),
     };
-    let head = format!(
+    if let Some(g) = game {
+        // Capped so the log still gets most of the URL
+        let details: String = logger::redact_ids(&logger::redact_home(g.details.trim())).chars().take(1500).collect();
+        what.push_str(&format!("Game as Checkpoint sees it:\n\n```\n{details}\n```\n\nWhat went wrong: \n"));
+    }
+    let mut head = format!(
         "{base}?template=bug_report.yml&title={}&version={}&os={}&what-happened={}",
         enc(title),
         enc(env!("CARGO_PKG_VERSION")),
         enc(&system_line()),
         enc(&what)
     );
+    if let Some(g) = game {
+        head.push_str(&format!("&game={}", enc(&format!("{} (AppID {})", g.name, g.appid))));
+    }
     let budget = MAX_URL.saturating_sub(head.len() + "&logs=".len());
-    let all = logger::tail(300);
+    let all = match game {
+        Some(g) => logger::tail_for_app(g.appid, 300),
+        None => logger::tail(300),
+    };
     let mut lines: Vec<&str> = all.lines().collect();
     let total = lines.len();
     let mut encoded = enc(&lines.join("\n"));
@@ -72,11 +93,16 @@ mod tests {
     #[test]
     fn encodes_and_fits() {
         assert_eq!(enc("a b&c=é"), "a%20b%26c%3D%C3%A9");
-        let l = issue_url("bug", "[Bug] Backup failed", Some("rclone failed: 76561199698261377"));
+        let l = issue_url("bug", "[Bug] Backup failed", Some("rclone failed: 76561199698261377"), None);
         assert!(l.url.len() <= MAX_URL + 10, "url too long: {}", l.url.len());
         assert!(l.url.contains("template=bug_report.yml"));
         assert!(!l.url.contains("76561199698261377"), "SteamID must be masked");
-        let f = issue_url("feature", "Idea", None);
+        let f = issue_url("feature", "Idea", None, None);
         assert!(f.url.contains("template=feature_request.yml") && !f.url.contains("logs="));
+        let g = GameContext { appid: 4115450, name: "Phantom Blade Zero".into(), details: "Saved/76561199698261377/x.sav".into() };
+        let l = issue_url("bug", "[Bug] Phantom Blade Zero: ", None, Some(&g));
+        assert!(l.url.contains("&game=Phantom%20Blade%20Zero%20%28AppID%204115450%29"));
+        assert!(!l.url.contains("76561199698261377"), "SteamID in details must be masked");
+        assert!(l.url.len() <= MAX_URL + 10);
     }
 }
