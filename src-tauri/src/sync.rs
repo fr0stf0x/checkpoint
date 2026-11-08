@@ -213,7 +213,8 @@ impl Procs {
         }
         let mut v = Vec::new();
         for (pid, p) in sys.processes() {
-            if skip.contains(pid) {
+            // On Linux, sysinfo also lists every thread as a task: the process itself is enough
+            if skip.contains(pid) || p.thread_kind().is_some() {
                 continue;
             }
             let exe = p.exe().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
