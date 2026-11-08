@@ -162,15 +162,16 @@ fn start(bin: &str) -> Result<Daemon> {
     let pass: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(32).map(char::from).collect();
     let user = "checkpoint";
     let t = Instant::now();
-    let child = rclone_command(bin)
-        .args(["rcd", "--rc-addr", &format!("127.0.0.1:{port}")])
+    let mut cmd = rclone_command(bin);
+    cmd.args(["rcd", "--rc-addr", &format!("127.0.0.1:{port}")])
         .env("RCLONE_RC_USER", user)
         .env("RCLONE_RC_PASS", &pass)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .context("spawn rclone rcd")?;
+        .stderr(Stdio::null());
+    die_with_parent::before_spawn(&mut cmd);
+    let child = cmd.spawn().context("spawn rclone rcd")?;
+    die_with_parent::after_spawn(&child);
     let mut d = Daemon {
         child,
         bin: bin.to_string(),
@@ -203,6 +204,81 @@ fn start(bin: &str) -> Result<Daemon> {
     }
     info!("rclone rcd started on 127.0.0.1:{port} in {} ms", t.elapsed().as_millis());
     Ok(d)
+}
+
+/// Make the daemon end when this process ends, even when it is killed. Steam waits for every
+/// process a game's launch options started, so a daemon left behind by a killed launch wrapper
+/// kept the game "running" (Stopping…) in Steam. `kill_orphans` stays as the fallback.
+mod die_with_parent {
+    use std::process::{Child, Command};
+
+    /// Windows: a job object that kills its processes when its last handle closes, i.e. when
+    /// this process ends. The handle is not inheritable, so rclone does not keep it open.
+    #[cfg(windows)]
+    pub fn before_spawn(_: &mut Command) {}
+
+    #[cfg(windows)]
+    pub fn after_spawn(child: &Child) {
+        use std::os::windows::io::AsRawHandle;
+        use std::sync::OnceLock;
+        use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+        use windows_sys::Win32::System::JobObjects::{
+            AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation, SetInformationJobObject,
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        };
+        static JOB: OnceLock<usize> = OnceLock::new();
+        let job = *JOB.get_or_init(|| unsafe {
+            let h = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            if h.is_null() {
+                return 0;
+            }
+            let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let size = std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
+            if SetInformationJobObject(h, JobObjectExtendedLimitInformation, &info as *const _ as *const _, size) == 0 {
+                CloseHandle(h);
+                return 0;
+            }
+            h as usize
+        });
+        if job == 0 || unsafe { AssignProcessToJobObject(job as HANDLE, child.as_raw_handle() as HANDLE) } == 0 {
+            log::warn!("rclone rcd is not tied to this process: {}", std::io::Error::last_os_error());
+        }
+    }
+
+    /// Linux: the kernel sends SIGTERM to rclone when its parent dies. PR_SET_PDEATHSIG fires
+    /// when the spawning *thread* ends, so it is only set from the main thread (the launch
+    /// wrapper); the app spawns from worker threads that come and go, and relies on
+    /// `kill_orphans` instead.
+    #[cfg(target_os = "linux")]
+    pub fn before_spawn(cmd: &mut Command) {
+        use std::os::unix::process::CommandExt;
+        if unsafe { libc::gettid() != libc::getpid() } {
+            return;
+        }
+        let parent = std::process::id() as libc::pid_t;
+        unsafe {
+            cmd.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                // The parent may have died before prctl took effect
+                if libc::getppid() != parent {
+                    libc::_exit(0);
+                }
+                Ok(())
+            });
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn after_spawn(_: &Child) {}
+
+    #[cfg(not(any(windows, target_os = "linux")))]
+    pub fn before_spawn(_: &mut Command) {}
+
+    #[cfg(not(any(windows, target_os = "linux")))]
+    pub fn after_spawn(_: &Child) {}
 }
 
 /// Kill daemons left behind by Checkpoint processes that are gone (crash, killed).

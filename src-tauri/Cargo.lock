@@ -509,6 +509,7 @@ dependencies = [
  "dirs 5.0.1",
  "glob",
  "hex",
+ "libc",
  "log",
  "rand",
  "rust-i18n",
@@ -525,6 +526,7 @@ dependencies = [
  "tauri-plugin-updater",
  "ureq",
  "walkdir",
+ "windows-sys 0.61.2",
  "winreg 0.52.0",
  "zip 2.6.1",
 ]

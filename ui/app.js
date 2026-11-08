@@ -159,6 +159,24 @@
     $('#cGames').textContent = S.list ? S.list.games.length : '';
     render();
   }
+  // Games are started and closed while the app sits in the background, so the "running" flags and
+  // local saves go stale: rescan quietly (no loading state) when the window comes back, at most
+  // every 5 s, and not while a dialog is open or something is in progress.
+  let focusScanAt = 0;
+  async function rescanOnReturn() {
+    const idle = () => S.view === 'games' && S.list && !S.loading && !S.busy && !layer.querySelector('.modal');
+    if (document.hidden || !idle() || Date.now() - focusScanAt < 5000) return;
+    focusScanAt = Date.now();
+    let list, pending;
+    try { list = await call('list_games'); pending = await call('migrate_pending'); } catch (e) { return; }
+    if (!idle()) return;
+    S.list = list; S.pending = pending;
+    $('#cGames').textContent = list.games.length;
+    render();
+  }
+  window.addEventListener('focus', rescanOnReturn);
+  document.addEventListener('visibilitychange', rescanOnReturn);
+
   async function loadAccounts() {
     try { S.accounts = await call('list_accounts'); $('#cAcc').textContent = S.accounts.length; }
     catch (e) { S.accounts = []; }

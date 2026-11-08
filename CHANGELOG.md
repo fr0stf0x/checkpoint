@@ -6,6 +6,13 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-08
+
+### Fixed
+- Launch option (`checkpoint run …`): after you quit the game, Checkpoint no longer keeps waiting for it. The wrapper counted itself as the game still running, so the automatic backup never happened, Steam kept showing the game as running and the app showed it as **Running**.
+- If the launch wrapper is stopped abruptly, the rclone process it started now stops with it, so Steam no longer stays on **Stopping** for the game.
+- The game list refreshes by itself when you come back to the app, so a game you just closed no longer shows as **Running** and its new save shows up without pressing reload.
+
 ## [0.7.0] - 2026-11-08
 
 ### Added
@@ -104,7 +111,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.0...v0.5.1

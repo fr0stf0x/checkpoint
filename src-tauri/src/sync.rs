@@ -199,12 +199,32 @@ impl Procs {
             true,
             ProcessRefreshKind::nothing().with_exe(UpdateKind::Always).with_cmd(UpdateKind::Always),
         );
+        // Some processes name the game folder on their command line without being the game:
+        // this process and the ones that started it (the launch wrapper itself, Steam's reaper
+        // on Linux), and any other Checkpoint launch wrapper. Counting them would make the
+        // wrapper wait for itself and show the game as running until the wrapper ends.
+        let mut skip = std::collections::HashSet::new();
+        let mut cur = Some(sysinfo::Pid::from_u32(std::process::id()));
+        while let Some(pid) = cur {
+            if !skip.insert(pid) {
+                break;
+            }
+            cur = sys.process(pid).and_then(|p| p.parent());
+        }
         let mut v = Vec::new();
-        for p in sys.processes().values() {
-            let mut s = p.exe().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
-            for a in p.cmd() {
+        for (pid, p) in sys.processes() {
+            if skip.contains(pid) {
+                continue;
+            }
+            let exe = p.exe().map(|e| e.to_string_lossy().to_string()).unwrap_or_default();
+            let args: Vec<String> = p.cmd().iter().map(|a| a.to_string_lossy().to_string()).collect();
+            if is_launch_wrapper(&exe, &args) {
+                continue;
+            }
+            let mut s = exe;
+            for a in &args {
                 s.push(' ');
-                s.push_str(&a.to_string_lossy());
+                s.push_str(a);
             }
             v.push(norm(&s));
         }
@@ -214,6 +234,13 @@ impl Procs {
         let b = norm(&base.to_string_lossy());
         b.len() > 10 && self.0.iter().any(|s| s.contains(&b))
     }
+}
+
+/// `checkpoint run …` (also from an AppImage, e.g. `Checkpoint_0.7.0_amd64.AppImage run …`).
+fn is_launch_wrapper(exe: &str, args: &[String]) -> bool {
+    let stem = |p: &str| Path::new(&p.replace('\\', "/")).file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let named = stem(exe).starts_with("checkpoint") || args.first().is_some_and(|a| stem(a).starts_with("checkpoint"));
+    named && args.get(1).is_some_and(|a| a == "run")
 }
 
 fn norm(s: &str) -> String {
@@ -908,6 +935,20 @@ fn human(b: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn launch_wrappers_are_not_the_game() {
+        let v = |s: &[&str]| s.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        let game = "D:\\SteamLibrary\\steamapps\\common\\PBZ\\steam\\PBZ.exe";
+        let exe = "C:\\Users\\A\\AppData\\Local\\Checkpoint\\checkpoint.exe";
+        assert!(is_launch_wrapper(exe, &v(&[exe, "run", "--appid", "4115450", "--", game])));
+        assert!(is_launch_wrapper("/tmp/.mount_Chk/usr/bin/checkpoint", &v(&["/home/u/Apps/Checkpoint_0.7.0_amd64.AppImage", "run", "--", "reaper"])));
+        assert!(!is_launch_wrapper(exe, &v(&[exe])));
+        assert!(!is_launch_wrapper(game, &v(&[game, "run"])));
+        // The current process is skipped: the test binary's own folder does not count as running
+        let me = std::env::current_exe().unwrap();
+        assert!(!Procs::snapshot().running(me.parent().unwrap()));
+    }
 
     fn meta(h: &str) -> VersionMeta {
         VersionMeta {
