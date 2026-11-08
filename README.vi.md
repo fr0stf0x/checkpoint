@@ -12,7 +12,7 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 
 ## Tính năng
 
-- Liệt kê game Steam đã cài và các tài khoản Steam trên máy.
+- Liệt kê game Steam đã cài và các tài khoản Steam trên máy, kèm ảnh game và avatar tài khoản lấy từ bộ nhớ đệm của Steam trên máy (chạy được khi offline). Game hiện dạng lưới ảnh bìa hoặc danh sách chi tiết (nút chuyển cạnh ô tìm kiếm), giao diện tối có icon.
 - Tìm file save bằng [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (dữ liệu PCGamingWiki, khoảng 20.000 game), cộng thêm thư mục `userdata/<account>/<appid>/remote` của Steam Cloud.
 - Backup và restore từng game, hoặc toàn bộ với màn hình xem trước game nào chạy, game nào bỏ qua.
 - So sánh bằng hash nội dung, không dựa vào ngày sửa file. Phân biệt "local mới hơn", "cloud mới hơn" và xung đột thật, cảnh báo trước khi nút nào đó ghi đè tiến trình mới hơn.
@@ -57,7 +57,7 @@ Checkpoint/
 
 ### Vì sao cần client ID riêng
 
-Client ID dùng chung của rclone bị giới hạn rất nặng và đang bị Google ngừng. Với client ID riêng, mỗi thao tác mất khoảng 3 giây thay vì hơn 30 giây. Tạo miễn phí, mất 5–10 phút. Hướng dẫn từng bước có trên trang web (`site/index.html`, mục *Kết nối Google Drive*). Tóm tắt:
+Client ID dùng chung của rclone bị giới hạn rất nặng và đang bị Google ngừng. Với client ID riêng, mỗi thao tác mất khoảng 3 giây thay vì hơn 30 giây. Tạo miễn phí, mất 5–10 phút. Hướng dẫn từng bước có trên trang web (`/guide/google-drive`, file `site/guide/google-drive.html`). Tóm tắt:
 
 1. Tạo project trong Google Cloud Console, bật Google Drive API.
 2. Google Auth Platform: chọn External, rồi bấm **Publish app** để trạng thái là **In production**. Để ở Testing thì đăng nhập hết hạn sau 7 ngày.
@@ -99,7 +99,7 @@ Nhớ backup khóa private. Mất khóa thì các bản đã cài không kiểm 
 
 ## Trang web
 
-`site/` là trang tĩnh (trang chủ kèm hướng dẫn, Privacy Policy, Terms of Service). Trang chủ là 1 trang dịch bằng i18next (tiếng Anh và tiếng Việt, chọn theo `?lng=`, lựa chọn lần trước, hoặc ngôn ngữ trình duyệt; `/en` và `/vi` chuyển hướng về đó). Deploy lên Vercel với Root Directory là `site`. Số sao, lượt tải và nút tải lấy trực tiếp từ GitHub API.
+`site/` là trang tĩnh: trang chủ (`index.html`), các trang hướng dẫn (`guide/index.html` → `/guide`, `guide/google-drive.html`, `guide/switch-account.html`), cùng Privacy Policy và Terms of Service dùng cho màn hình xin quyền Google. Mọi trang dịch bằng i18next (tiếng Anh và tiếng Việt, chọn theo `?lng=`, lựa chọn lần trước, hoặc ngôn ngữ trình duyệt; `/en` và `/vi` chuyển hướng về trang chủ). `main.js` chèn header và footer dùng chung, và chuyển các anchor cũ `#guide`, `#google` của trang chủ sang trang hướng dẫn. Ảnh chụp app nằm trong `site/shots/` (mỗi ngôn ngữ một bản). Deploy lên Vercel với Root Directory là `site`. Số sao, lượt tải và nút tải lấy trực tiếp từ GitHub API.
 
 ## Ủng hộ
 

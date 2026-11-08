@@ -147,6 +147,8 @@ ui:
     restore_all: "Restore all"
     search: "Search game or AppID"
     filter_all: "All"
+    view_grid: "Cover grid"
+    view_list: "Detailed list"
     col_game: "Game · save location"
     col_local: "Local"
     col_cloud: "Latest in cloud"

@@ -5,143 +5,109 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Checkpoint · Save game sync</title>
 <meta name="description" content="Checkpoint backs up and restores Steam save games between your own PCs using your own Google Drive." data-i18n-attr="content:meta.description">
-<link rel="icon" href="icon.png">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="/icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 <!-- i18n: i18next + language detector + JSON loader. Translations live in locales/<lang>.json -->
 <script src="https://cdn.jsdelivr.net/npm/i18next@23.11.5/dist/umd/i18next.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/i18next-browser-languagedetector@8.0.0/dist/umd/i18nextBrowserLanguageDetector.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/i18next-http-backend@2.5.2/i18nextHttpBackend.min.js"></script>
 </head>
-<body>
-<div class="wrap">
-  <header>
-    <a class="logo" href="/"><img src="icon.png" alt="">Checkpoint</a>
-    <nav>
-      <a href="#guide" data-i18n="nav.guide"></a>
-      <a href="#google" data-i18n="nav.google"></a>
-      <a href="https://github.com/fr0stf0x/checkpoint">GitHub</a>
-      <a href="https://buymeacoffee.com/fr0stf0x" data-i18n="nav.coffee"></a>
-      <a href="#" id="langSwitch" class="lang" data-i18n="nav.switch"></a>
-    </nav>
-  </header>
+<body data-page="home">
+<header id="top"></header>
+<div class="wrap site">
 
-  <section class="hero">
+  <section class="hero" id="top-download">
+    <span class="eyebrow" data-i18n="hero.eyebrow"></span>
     <h1 data-i18n="hero.title"></h1>
     <p class="lead" data-i18n="hero.lead"></p>
     <div class="dl">
       <a class="btn primary" id="dlMain" href="https://github.com/fr0stf0x/checkpoint/releases/latest" data-i18n="dl.latest"></a>
       <a class="btn" id="dlAlt" href="https://github.com/fr0stf0x/checkpoint/releases" data-i18n="dl.all"></a>
     </div>
+    <span class="platforms" data-i18n="hero.platforms"></span>
     <div class="stats" id="stats">
       <a class="stat" href="https://github.com/fr0stf0x/checkpoint/stargazers"><span class="num" id="stStars">–</span><span class="lbl" data-i18n="stats.stars"></span></a>
       <a class="stat" href="https://github.com/fr0stf0x/checkpoint/releases"><span class="num" id="stDl">–</span><span class="lbl" data-i18n="stats.downloads"></span></a>
       <a class="stat" href="https://github.com/fr0stf0x/checkpoint/releases/latest"><span class="num" id="stVer">–</span><span class="lbl" id="stVerDate" data-i18n="stats.version"></span></a>
     </div>
+    <figure class="shot"><img src="/shots/app-grid-en.webp" width="1360" height="860" alt="" data-i18n-attr="src:shots.grid_src;alt:shots.grid_alt"></figure>
   </section>
 
-  <div class="grid">
-    <div class="card"><h3 data-i18n="features.local_title"></h3><p data-i18n="features.local_body"></p></div>
-    <div class="card"><h3 data-i18n="features.scope_title"></h3><p data-i18n="features.scope_body"></p></div>
-    <div class="card"><h3 data-i18n="features.safe_title"></h3><p data-i18n="features.safe_body"></p></div>
-    <div class="card"><h3 data-i18n="features.cross_title"></h3><p data-i18n="features.cross_body"></p></div>
-    <div class="card"><h3 data-i18n="features.account_title"></h3><p data-i18n="features.account_body"></p></div>
-    <div class="card"><h3 data-i18n="features.update_title"></h3><p data-i18n="features.update_body"></p></div>
-  </div>
-
-  <section id="guide" class="guide">
-    <h2 data-i18n="guide.title"></h2>
-    <ol class="steps">
-      <li><h3 data-i18n="guide.install_title"></h3><ul data-i18n="guide.install_list"></ul></li>
-      <li><h3 data-i18n="guide.client_title"></h3><p data-i18n="guide.client_body"></p></li>
-      <li><h3 data-i18n="guide.connect_title"></h3><ul data-i18n="guide.connect_list"></ul></li>
-      <li>
-        <h3 data-i18n="guide.daily_title"></h3>
-        <ul data-i18n="guide.daily_list"></ul>
-        <div class="tablewrap"><table>
-          <thead><tr><th data-i18n="guide.th_status"></th><th data-i18n="guide.th_meaning"></th><th data-i18n="guide.th_todo"></th></tr></thead>
-          <tbody>
-            <tr><td><span class="pill ok" data-i18n="guide.st_sync"></span></td><td data-i18n="guide.st_sync_m"></td><td data-i18n="guide.st_sync_t"></td></tr>
-            <tr><td><span class="pill warn" data-i18n="guide.st_local"></span></td><td data-i18n="guide.st_local_m"></td><td data-i18n="guide.st_local_t"></td></tr>
-            <tr><td><span class="pill info" data-i18n="guide.st_cloud"></span></td><td data-i18n="guide.st_cloud_m"></td><td data-i18n="guide.st_cloud_t"></td></tr>
-            <tr><td><span class="pill bad" data-i18n="guide.st_conflict"></span></td><td data-i18n="guide.st_conflict_m"></td><td data-i18n="guide.st_conflict_t"></td></tr>
-            <tr><td><span class="pill warn" data-i18n="guide.st_diverged"></span></td><td data-i18n="guide.st_diverged_m"></td><td data-i18n="guide.st_diverged_t"></td></tr>
-            <tr><td><span class="pill" data-i18n="guide.st_unknown"></span></td><td data-i18n="guide.st_unknown_m"></td><td data-i18n="guide.st_unknown_t"></td></tr>
-          </tbody>
-        </table></div>
-      </li>
-    </ol>
+  <section id="why">
+    <div class="sechead">
+      <span class="eyebrow" data-i18n="problem.eyebrow"></span>
+      <h2 data-i18n="problem.title"></h2>
+    </div>
+    <div class="cards3">
+      <div class="card bad"><span class="badge"><span data-ic="offline"></span></span><h3 data-i18n="problem.p1_title"></h3><p data-i18n="problem.p1_body"></p></div>
+      <div class="card good"><span class="badge"><span data-ic="cloud"></span></span><h3 data-i18n="problem.p2_title"></h3><p data-i18n="problem.p2_body"></p></div>
+      <div class="card info"><span class="badge"><span data-ic="swap"></span></span><h3 data-i18n="problem.p3_title"></h3><p data-i18n="problem.p3_body"></p></div>
+    </div>
+    <div class="flow" role="img" aria-label="PC A → Google Drive → PC B">
+      <div class="node"><span data-ic="pc"></span><b data-i18n="problem.flow_a"></b><span data-i18n="problem.flow_a_sub"></span></div>
+      <div class="arrow"><span data-ic="arrow"></span></div>
+      <div class="node cloud"><span data-ic="cloud"></span><b data-i18n="problem.flow_cloud"></b><span data-i18n="problem.flow_cloud_sub"></span></div>
+      <div class="arrow"><span data-ic="arrow"></span></div>
+      <div class="node"><span data-ic="handheld"></span><b data-i18n="problem.flow_b"></b><span data-i18n="problem.flow_b_sub"></span></div>
+    </div>
   </section>
 
-  <section id="google" class="guide">
-    <h2 data-i18n="google.title"></h2>
-    <p data-i18n="google.intro"></p>
-    <ol class="steps">
-      <li><h3 data-i18n="google.project_title"></h3><ul data-i18n="google.project_list"></ul></li>
-      <li><h3 data-i18n="google.api_title"></h3><ul data-i18n="google.api_list"></ul></li>
-      <li>
-        <h3 data-i18n="google.consent_title"></h3>
-        <ul>
-          <li data-i18n="google.consent_1"></li>
-          <li data-i18n="google.consent_2"></li>
-          <li><span data-i18n="google.consent_3"></span>
-            <div class="kv">
-              <span data-i18n="google.kv_home"></span><code class="copy" data-copy-origin="/">https://checkpoint.vercel.app/</code>
-              <span data-i18n="google.kv_privacy"></span><code class="copy" data-copy-origin="/privacy">https://checkpoint.vercel.app/privacy</code>
-              <span data-i18n="google.kv_terms"></span><code class="copy" data-copy-origin="/terms">https://checkpoint.vercel.app/terms</code>
-              <span data-i18n="google.kv_domains"></span><code class="copy" data-copy-host="1">checkpoint.vercel.app</code>
-            </div>
-            <span class="note" data-i18n="google.kv_hint"></span>
-          </li>
-          <li><span data-i18n="google.consent_4"></span>
-            <div class="callout warn" data-i18n="google.testing_warn"></div>
-            <span class="note" data-i18n="google.no_verify"></span>
-          </li>
-        </ul>
-      </li>
-      <li><h3 data-i18n="google.client_title"></h3><ul data-i18n="google.client_list"></ul></li>
-      <li>
-        <h3 data-i18n="google.paste_title"></h3>
-        <ul>
-          <li data-i18n="google.paste_1"></li>
-          <li><span data-i18n="google.paste_2"></span><div class="callout" data-i18n="google.unverified"></div></li>
-          <li data-i18n="google.paste_3"></li>
-          <li><div class="callout" data-i18n="google.refused"></div></li>
-        </ul>
-      </li>
-    </ol>
-    <h3 data-i18n="google.faq_title"></h3>
-    <dl class="faq" data-i18n="google.faq"></dl>
+  <section id="features">
+    <div class="sechead"><h2 data-i18n="features.title"></h2></div>
+    <div class="grid">
+      <div class="card"><span class="badge"><span data-ic="pc"></span></span><h3 data-i18n="features.local_title"></h3><p data-i18n="features.local_body"></p></div>
+      <div class="card"><span class="badge"><span data-ic="lock"></span></span><h3 data-i18n="features.scope_title"></h3><p data-i18n="features.scope_body"></p></div>
+      <div class="card"><span class="badge"><span data-ic="shield"></span></span><h3 data-i18n="features.safe_title"></h3><p data-i18n="features.safe_body"></p></div>
+      <div class="card"><span class="badge"><span data-ic="handheld"></span></span><h3 data-i18n="features.cross_title"></h3><p data-i18n="features.cross_body"></p></div>
+      <div class="card"><span class="badge"><span data-ic="users"></span></span><h3 data-i18n="features.account_title"></h3><p data-i18n="features.account_body"></p></div>
+      <div class="card"><span class="badge"><span data-ic="sparkle"></span></span><h3 data-i18n="features.update_title"></h3><p data-i18n="features.update_body"></p></div>
+    </div>
   </section>
 
-  <section class="guide">
-    <h2 data-i18n="notes.title"></h2>
-    <ul data-i18n="notes.list"></ul>
+  <section class="split">
+    <div class="sechead">
+      <h2 data-i18n="shots.list_title"></h2>
+      <p class="lead" data-i18n="shots.list_body"></p>
+    </div>
+    <figure class="shot flat"><img src="/shots/app-list-en.webp" width="1360" height="860" alt="" loading="lazy" data-i18n-attr="src:shots.list_src;alt:shots.list_alt"></figure>
   </section>
 
+  <section id="start">
+    <div class="sechead">
+      <span class="eyebrow" data-i18n="start.eyebrow"></span>
+      <h2 data-i18n="start.title"></h2>
+    </div>
+    <div class="steps3">
+      <div class="card"><h3 data-i18n="start.s1_title"></h3><p data-i18n="start.s1_body"></p><a class="more" href="/guide#install"><span data-i18n="start.s1_link"></span><span data-ic="chevron"></span></a></div>
+      <div class="card"><h3 data-i18n="start.s2_title"></h3><p data-i18n="start.s2_body"></p><a class="more" href="/guide/google-drive"><span data-i18n="start.s2_link"></span><span data-ic="chevron"></span></a></div>
+      <div class="card"><h3 data-i18n="start.s3_title"></h3><p data-i18n="start.s3_body"></p><a class="more" href="/guide#daily"><span data-i18n="start.s3_link"></span><span data-ic="chevron"></span></a></div>
+    </div>
+    <div class="wide">
+      <div><h3 data-i18n="start.account_title"></h3><p class="muted" data-i18n="start.account_body"></p></div>
+      <a class="btn" href="/guide/switch-account"><span data-ic="swap"></span><span data-i18n="start.account_link"></span></a>
+    </div>
+  </section>
+
+  <div class="tail">
   <section id="support" class="support">
     <div>
       <h2 data-i18n="support.title"></h2>
-      <p data-i18n="support.body"></p>
+      <p class="muted" data-i18n="support.body"></p>
     </div>
     <a class="btn coffee" href="https://buymeacoffee.com/fr0stf0x" data-i18n="support.button"></a>
   </section>
 
-  <section class="card">
+  <section class="card gdata">
     <h2 data-i18n="gdata.title"></h2>
     <p lang="en" data-i18n="gdata.body"></p>
   </section>
 
-  <footer>
-    <span data-i18n="footer.about"></span>
-    <a href="https://github.com/fr0stf0x/checkpoint">GitHub</a>
-    <a href="https://github.com/fr0stf0x/checkpoint/issues" data-i18n="footer.bug"></a>
-    <a href="https://buymeacoffee.com/fr0stf0x">Buy Me a Coffee</a>
-    <a href="/privacy" data-i18n="footer.privacy"></a>
-    <a href="/terms" data-i18n="footer.terms"></a>
-  </footer>
+  <footer id="foot"></footer>
+  </div>
 </div>
-<noscript><p class="wrap">Checkpoint: Steam save sync for Windows and Linux. <a href="https://github.com/fr0stf0x/checkpoint">GitHub</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p></noscript>
-<script src="main.js"></script>
+<noscript><p class="wrap">Checkpoint: Steam save sync for Windows and Linux. <a href="https://github.com/fr0stf0x/checkpoint">GitHub</a> · <a href="/guide">Guide</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p></noscript>
+<script src="/main.js"></script>
 </body>
 </html>

@@ -5,7 +5,46 @@
   const pane = $('#pane'), layer = $('#layer');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  const S = { info: null, list: null, accounts: null, view: 'games', filter: 'all', q: '', loading: false, busy: false, lang: 'en', T: {}, update: null, updateHidden: false };
+  // Game list layout ('grid' | 'list'): a per-PC convenience, so browser storage is enough.
+  const store = {
+    get(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: keep in memory */ } },
+  };
+  const S = { info: null, list: null, accounts: null, view: 'games', filter: 'all', q: '', loading: false, busy: false, lang: 'en', T: {}, update: null, updateHidden: false, layout: store.get('cp.layout', 'grid') === 'list' ? 'list' : 'grid' };
+
+  // ---------- icons ----------
+  // Own 24×24 line icons (stroke = currentColor), bundled here so the app works offline.
+  const CLOUD = '<path d="M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8"/>';
+  const ICONS = {
+    gamepad: '<path d="M6 11h4M8 9v4M15 12h.01M18 10h.01"/><path d="M17.3 5H6.7a4 4 0 0 0-3.96 3.4l-1.1 7.6A2.6 2.6 0 0 0 4.2 19c.9 0 1.7-.5 2.1-1.3L7.5 15h9l1.2 2.7c.4.8 1.2 1.3 2.1 1.3a2.6 2.6 0 0 0 2.56-3l-1.1-7.6A4 4 0 0 0 17.3 5z"/>',
+    users: '<circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 4.1a4 4 0 0 1 0 7.8M22 21v-1a6 6 0 0 0-4-5.6"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 3"/>',
+    sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+    bug: '<rect x="7" y="7" width="10" height="13" rx="5"/><path d="M12 11v9M9 4l1.5 2M15 4l-1.5 2M3 13h4M17 13h4M4 8l3 2M20 8l-3 2M4 20l3-2M20 20l-3-2"/>',
+    upload: CLOUD + '<path d="M12 12v9M9 15l3-3 3 3"/>',
+    download: CLOUD + '<path d="M12 12v9M9 18l3 3 3-3"/>',
+    cloud: '<path d="M7 19a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 11a4 4 0 0 1-1 8z"/>',
+    refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2L3 16M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5"/>',
+    swap: '<path d="M4 8h15l-4-4M20 16H5l4 4"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+    check: '<path d="m5 12 5 5L20 7"/>',
+    alert: '<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+    monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    minus: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M15 8l2 2"/>',
+    play: '<path d="M7 4v16l13-8z"/>',
+    sparkle: '<path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2-2.2-.8 2.2-.8z"/>',
+    save: '<path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 3v5h7M8 21v-7h8v7"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
+    external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  };
+  const ic = (name) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name] || ''}</svg>`;
+  const STATUS_IC = { sync: 'check', local: 'monitor', cloud: 'cloud', conflict: 'alert', diverged: 'alert', new: 'plus', empty: 'minus', unknown: 'help' };
 
   // ---------- i18n ----------
   // Strings come from src-tauri/locales/<lang>.yml (the "ui" subtree), loaded through get_strings.
@@ -31,6 +70,11 @@
     S.lang = r.lang; S.T = r.strings;
     document.documentElement.lang = S.lang;
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+    // On narrow windows the sidebar shows icons only: keep each button's name for tooltips and screen readers.
+    document.querySelectorAll('#nav button').forEach((b) => {
+      const l = b.querySelector('.navlbl');
+      if (l) { b.title = l.textContent; b.setAttribute('aria-label', l.textContent); }
+    });
   }
 
   // ---------- helpers ----------
@@ -118,30 +162,86 @@
     ({ games: renderGames, accounts: renderAccounts, history: renderHistory, settings: renderSettings })[S.view]();
   }
 
+  function banner(kind, icon, text, buttons) {
+    return `<div class="banner ${kind}">${ic(icon)}<p>${text}</p>${buttons}</div>`;
+  }
   function banners() {
     const out = [];
     if (S.update && !S.updateHidden) {
       const u = S.update;
-      out.push(`<div class="banner"><p>${h('update.available', { version: u.version, current: u.current })}</p>
-        <button class="btn" data-act="updLater">${h('update.later')}</button><button class="btn primary" data-act="updShow">${h('update.whats_new')}</button></div>`);
+      out.push(banner('accent', 'sparkle', h('update.available', { version: u.version, current: u.current }),
+        `<button class="btn" data-act="updLater">${h('update.later')}</button><button class="btn primary" data-act="updShow">${h('update.whats_new')}</button>`));
     }
     (S.pending || []).forEach((m) => {
       const v = { game: m.game_name, from: acctName(m.from), to: acctName(m.to) };
-      out.push(`<div class="banner warn"><p>${h('games.pending_move', v)}</p>
-        <button class="btn" data-act="migUndo" data-mid="${esc(m.id)}">${h('move.undo_btn')}</button><button class="btn primary" data-act="migKeep" data-mid="${esc(m.id)}">${h('move.keep_btn')}</button></div>`);
+      out.push(banner('warn', 'swap', h('games.pending_move', v),
+        `<button class="btn" data-act="migUndo" data-mid="${esc(m.id)}">${h('move.undo_btn')}</button><button class="btn primary" data-act="migKeep" data-mid="${esc(m.id)}">${h('move.keep_btn')}</button>`));
     });
     if (S.info && !S.info.manifest_games) {
-      out.push(`<div class="banner warn"><p>${h('games.no_manifest')}</p><button class="btn primary" data-act="manifest">${h('games.download_manifest')}</button></div>`);
+      out.push(banner('warn', 'alert', h('games.no_manifest'), `<button class="btn primary" data-act="manifest">${ic('download')}${h('games.download_manifest')}</button>`));
     }
     if (!backendReady()) {
-      out.push(`<div class="banner warn"><p>${h('games.no_backend')}</p><button class="btn" data-view="settings">${h('games.open_settings')}</button></div>`);
+      out.push(banner('warn', 'cloud', h('games.no_backend'), `<button class="btn" data-view="settings">${ic('sliders')}${h('games.open_settings')}</button>`));
     } else if (S.list && S.list.cloud_error) {
-      out.push(`<div class="banner bad"><p>${h('games.cloud_error', { detail: S.list.cloud_error })}</p><button class="btn" data-act="reload">${h('common.retry')}</button></div>`);
+      out.push(banner('bad', 'alert', h('games.cloud_error', { detail: S.list.cloud_error }), `<button class="btn" data-act="reload">${ic('refresh')}${h('common.retry')}</button>`));
     }
     return out.join('');
   }
 
-  function statusPill(k, label) { return `<span class="pill s-${k}">${esc(label || t('status.' + k))}</span>`; }
+  // Steam's cached avatars / artwork (served by the backend's steamimg protocol). The first letter
+  // stays underneath as a placeholder; a missing image (404) removes the <img> and shows it.
+  function art(kind, id, name, cls) {
+    const conv = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.convertFileSrc;
+    const src = conv ? conv(`${kind}/${id}`, 'steamimg') : '';
+    const first = ([...String(name || '?').trim()][0] || '?').toUpperCase();
+    return `<span class="art ${cls}" aria-hidden="true"><b>${esc(first)}</b>${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>`;
+  }
+
+  function statusPill(k, label) { return `<span class="pill s-${k}">${ic(STATUS_IC[k] || 'help')}${esc(label || t('status.' + k))}</span>`; }
+
+  // Backup / Restore / Move buttons of one game. iconOnly for the grid cards (label in title + aria-label).
+  function gameActions(g, iconOnly) {
+    const dis = !backendReady() || g.running || S.busy ? 'disabled' : '';
+    const b = (act, icon, label, state, hint) => iconOnly
+      ? `<button class="btn icon" data-act="${act}" data-id="${g.appid}" title="${esc(hint || label)}" aria-label="${esc(label)}" ${state}>${ic(icon)}</button>`
+      : `<button class="btn sm" data-act="${act}" data-id="${g.appid}" ${hint ? `title="${esc(hint)}"` : ''} ${state}>${ic(icon)}${esc(label)}</button>`;
+    return b('backup', 'upload', t('common.backup'), g.local_hash ? dis : 'disabled')
+      + b('restore', 'download', t('common.restore'), g.cloud ? dis : 'disabled')
+      + (g.steam_ids && g.steam_ids.length ? b('migrate', 'swap', t('games.move_btn'), g.running || S.busy ? 'disabled' : '', t('games.move_title')) : '');
+  }
+  function gameFlags(g) {
+    return (g.steamid_bound ? `<span class="flag">${ic('key')}${h('games.flag_steamid')}</span>` : '')
+      + (g.running ? `<span class="flag run">${ic('play')}${h('games.flag_running')}</span>` : '');
+  }
+  function gameWhere(g) {
+    return g.roots.length ? g.roots.join('\n') : g.has_rules ? t('games.no_save_here') : t('games.not_in_manifest');
+  }
+
+  function gameRow(g) {
+    const where = gameWhere(g);
+    const local = g.local_hash ? `<span class="time">${fmt(g.local_mtime)}<small>${esc(ago(g.local_mtime))} · ${esc(files(g.files))} · ${human(g.bytes)}</small></span>` : '<span class="note">—</span>';
+    const cloud = g.cloud ? `<span class="time">${fmt(g.cloud.created_utc)}<small>${h('games.cloud_from', { device: g.cloud.device_name, n: g.versions })}</small></span>` : `<span class="note">${h('games.cloud_none')}</span>`;
+    return `<tr>
+      <td><div class="gcell">${art('header', g.appid, g.name, 'hdr')}<div><div class="gname">${esc(g.name)}</div><div class="gsub" title="${esc(where)}">${esc(where.split('\n')[0])}${g.roots.length > 1 ? ` (+${g.roots.length - 1})` : ''}</div>${gameFlags(g)}</div></div></td>
+      <td><span class="mono">${g.appid}</span></td>
+      <td>${local}</td><td>${cloud}</td>
+      <td>${statusPill(g.status)}</td>
+      <td><div class="acts">${gameActions(g, false)}</div></td></tr>`;
+  }
+
+  function gameCard(g) {
+    const where = gameWhere(g);
+    const local = g.local_hash ? esc(ago(g.local_mtime)) : '—';
+    const cloud = g.cloud ? esc(ago(g.cloud.created_utc)) : h('games.cloud_none');
+    return `<article class="gcard st-${g.status}">
+      <div class="cover" title="${esc(g.name + '\n' + where)}">${art('capsule', g.appid, g.name, 'cap')}
+        <div class="badges">${statusPill(g.status)}</div>${g.steamid_bound || g.running ? `<div class="flags">${gameFlags(g)}</div>` : ''}</div>
+      <div class="gbody">
+        <div class="gname" title="${esc(g.name)}">${esc(g.name)}</div>
+        <div class="gmeta"><span title="${h('games.col_local')}">${ic('monitor')}${local}</span><span title="${h('games.col_cloud')}">${ic('cloud')}${cloud}</span></div>
+        <div class="acts">${gameActions(g, true)}</div>
+      </div></article>`;
+  }
 
   function renderGames() {
     if (S.loading && !S.list) {
@@ -153,38 +253,32 @@
     games.forEach((g) => { counts[g.status] = (counts[g.status] || 0) + 1; });
     const chips = ['all', 'local', 'cloud', 'conflict', 'diverged', 'new', 'sync', 'empty', 'unknown']
       .filter((k) => k === 'all' || counts[k])
-      .map((k) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}">${h(k === 'all' ? 'games.filter_all' : 'status.' + k)} · ${counts[k] || 0}</button>`).join('');
+      .map((k) => `<button class="chip ${S.filter === k ? 'on' : ''}" data-f="${k}" aria-pressed="${S.filter === k}">${k === 'all' ? '' : ic(STATUS_IC[k])}${h(k === 'all' ? 'games.filter_all' : 'status.' + k)}<span class="n">${counts[k] || 0}</span></button>`).join('');
     const q = S.q.trim().toLowerCase();
-    const rows = games
-      .filter((g) => (S.filter === 'all' || g.status === S.filter) && (!q || g.name.toLowerCase().includes(q) || String(g.appid).includes(q)))
-      .map((g) => {
-        const where = g.roots.length ? g.roots.join('\n') : g.has_rules ? t('games.no_save_here') : t('games.not_in_manifest');
-        const local = g.local_hash ? `<span class="time">${fmt(g.local_mtime)}<small>${esc(ago(g.local_mtime))} · ${esc(files(g.files))} · ${human(g.bytes)}</small></span>` : '<span class="note">—</span>';
-        const cloud = g.cloud ? `<span class="time">${fmt(g.cloud.created_utc)}<small>${h('games.cloud_from', { device: g.cloud.device_name, n: g.versions })}</small></span>` : `<span class="note">${h('games.cloud_none')}</span>`;
-        const flags = (g.steamid_bound ? `<span class="flag">${h('games.flag_steamid')}</span>` : '') + (g.running ? `<span class="flag run">${h('games.flag_running')}</span>` : '');
-        const dis = !backendReady() || g.running || S.busy ? 'disabled' : '';
-        return `<tr>
-          <td><div class="gname">${esc(g.name)}</div><div class="gsub" title="${esc(where)}">${esc(where.split('\n')[0])}${g.roots.length > 1 ? ` (+${g.roots.length - 1})` : ''}</div>${flags}</td>
-          <td><span class="mono">${g.appid}</span></td>
-          <td>${local}</td><td>${cloud}</td>
-          <td>${statusPill(g.status)}</td>
-          <td><div class="acts">
-            <button class="btn sm" data-act="backup" data-id="${g.appid}" ${g.local_hash ? dis : 'disabled'}>${h('common.backup')}</button>
-            <button class="btn sm" data-act="restore" data-id="${g.appid}" ${g.cloud ? dis : 'disabled'}>${h('common.restore')}</button>
-            ${g.steam_ids && g.steam_ids.length ? `<button class="btn sm" data-act="migrate" data-id="${g.appid}" title="${h('games.move_title')}" ${g.running || S.busy ? 'disabled' : ''}>${h('games.move_btn')}</button>` : ''}
-          </div></td></tr>`;
-      }).join('');
+    const shown = games.filter((g) => (S.filter === 'all' || g.status === S.filter) && (!q || g.name.toLowerCase().includes(q) || String(g.appid).includes(q)));
+    const grid = S.layout === 'grid';
+    const body = !shown.length
+      ? `<div class="empty">${h('games.no_match')}</div>`
+      : grid
+        ? `<div class="ggrid">${shown.map(gameCard).join('')}</div>`
+        : `<div class="tablewrap"><table>
+            <thead><tr><th>${h('games.col_game')}</th><th>AppID</th><th>${h('games.col_local')}</th><th>${h('games.col_cloud')}</th><th>${h('games.col_status')}</th><th style="text-align:right">${h('games.col_actions')}</th></tr></thead>
+            <tbody>${shown.map(gameRow).join('')}</tbody></table></div>`;
+    const ready = backendReady() && !S.busy ? '' : 'disabled';
     pane.innerHTML = `
-      <div class="panehead"><h2>${h('games.title', { device: S.info ? S.info.config.device_name : '' })}</h2>
+      <div class="panehead"><div><div class="eyebrow">${h('nav.games')}</div><h2>${h('games.title', { device: S.info ? S.info.config.device_name : '' })}</h2></div>
         ${S.loading ? '<span class="spin"></span>' : ''}<span class="spacer"></span>
-        <button class="btn" data-act="reload" ${S.loading ? 'disabled' : ''}>${h('games.rescan')}</button>
-        <button class="btn" data-act="backupAll" ${backendReady() && !S.busy ? '' : 'disabled'}>${h('games.backup_all')}</button>
-        <button class="btn primary" data-act="restoreAll" ${backendReady() && !S.busy ? '' : 'disabled'}>${h('games.restore_all')}</button></div>
+        <button class="btn" data-act="reload" ${S.loading ? 'disabled' : ''}>${ic('refresh')}${h('games.rescan')}</button>
+        <button class="btn" data-act="backupAll" ${ready}>${ic('upload')}${h('games.backup_all')}</button>
+        <button class="btn primary" data-act="restoreAll" ${ready}>${ic('download')}${h('games.restore_all')}</button></div>
       ${banners()}
-      <div class="filters">${chips}<span class="spacer"></span><input type="text" id="search" class="search" placeholder="${h('games.search')}" value="${esc(S.q)}"></div>
-      <div class="tablewrap"><table>
-        <thead><tr><th>${h('games.col_game')}</th><th>AppID</th><th>${h('games.col_local')}</th><th>${h('games.col_cloud')}</th><th>${h('games.col_status')}</th><th style="text-align:right">${h('games.col_actions')}</th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="6" class="empty">${h('games.no_match')}</td></tr>`}</tbody></table></div>
+      <div class="filters">${chips}<span class="spacer"></span>
+        <label class="searchbox">${ic('search')}<input type="text" id="search" placeholder="${h('games.search')}" value="${esc(S.q)}" aria-label="${h('games.search')}"></label>
+        <div class="seg" role="group">
+          <button class="btn icon ${grid ? 'on' : ''}" data-act="layout" data-layout="grid" title="${h('games.view_grid')}" aria-label="${h('games.view_grid')}" aria-pressed="${grid}">${ic('grid')}</button>
+          <button class="btn icon ${grid ? '' : 'on'}" data-act="layout" data-layout="list" title="${h('games.view_list')}" aria-label="${h('games.view_list')}" aria-pressed="${!grid}">${ic('list')}</button>
+        </div></div>
+      ${body}
       <p class="note">${h('games.footer', { root: S.list ? S.list.steam_root : '' })}</p>`;
     const s = $('#search');
     if (s) s.addEventListener('input', (e) => {
@@ -200,13 +294,13 @@
     const cards = (S.accounts || []).map((a) => {
       const games = gamesOfAccount(a.steamid64);
       return `
-      <div class="card"><div class="gname">${esc(a.persona_name || a.account_name)} ${a.most_recent ? statusPill('sync', t('accounts.most_recent')) : ''}</div>
+      <div class="card"><div class="acchead">${art('avatar', a.steamid64, a.persona_name || a.account_name, 'av')}<div class="gname">${esc(a.persona_name || a.account_name)} ${a.most_recent ? statusPill('sync', t('accounts.most_recent')) : ''}</div></div>
         <div class="k">login: ${esc(a.account_name)}</div>
         <div class="k">SteamID64: ${esc(a.steamid64)}</div>
         <div class="k">userdata/${a.account_id} · ${a.has_userdata ? h('accounts.apps', { n: a.userdata_apps }) : h('accounts.no_userdata')}</div>
         <div class="note">${a.offline_mode ? h('accounts.offline') + ' · ' : ''}${h('accounts.last_login', { time: fmt(a.timestamp * 1000) })}</div>
         <div class="note">${S.list ? (games.length ? h('accounts.bound_games', { n: games.length, games: games.map((g) => g.name).join(', ') }) : h('accounts.no_bound_games')) : ''}</div>
-        ${games.length ? `<div><button class="btn sm" data-act="migrateAcct" data-sid="${esc(a.steamid64)}">${h('accounts.move_btn')}</button></div>` : ''}</div>`;
+        ${games.length ? `<div><button class="btn sm" data-act="migrateAcct" data-sid="${esc(a.steamid64)}">${ic('swap')}${h('accounts.move_btn')}</button></div>` : ''}</div>`;
     }).join('');
     pane.innerHTML = `<div class="panehead"><h2>${h('nav.accounts')}</h2></div>
       <div class="cards">${cards || `<div class="empty">${h('accounts.none')}</div>`}</div>
@@ -254,7 +348,7 @@
         </div>
         <div id="bkFolder" ${b.kind === 'folder' ? '' : 'hidden'} class="field">
           <label class="l" for="fPath">${h('settings.folder')}</label>
-          <div class="row"><input type="text" id="fPath" value="${esc(b.kind === 'folder' ? b.path : '')}" placeholder="G:\\My Drive\\Checkpoint"><button class="btn" data-act="pick">${h('settings.choose')}</button></div>
+          <div class="row"><input type="text" id="fPath" value="${esc(b.kind === 'folder' ? b.path : '')}" placeholder="G:\\My Drive\\Checkpoint"><button class="btn" data-act="pick">${ic('folder')}${h('settings.choose')}</button></div>
         </div>
       </div>
       <div class="group"><h3>${h('settings.backup')}</h3>
@@ -263,14 +357,14 @@
       </div>
       <div class="group"><h3>${h('settings.manifest')}</h3>
         <p class="note">${S.info.manifest_games ? h('settings.manifest_info', { n: S.info.manifest_games.toLocaleString(locale()), time: fmt(S.info.manifest_updated) }) : h('settings.manifest_missing')} ${h('settings.manifest_source')}</p>
-        <div class="row"><button class="btn" data-act="manifest">${h('settings.manifest_update')}</button></div>
+        <div class="row"><button class="btn" data-act="manifest">${ic('download')}${h('settings.manifest_update')}</button></div>
       </div>
       <div class="group"><h3>${h('settings.updates')}</h3>
         <p class="note">${h('settings.version', { version: S.info.version })}</p>
         <label class="check" for="chkUpd"><input type="checkbox" id="chkUpd" ${c.check_updates !== false ? 'checked' : ''}> <span>${h('settings.check_updates')}<br><span class="note">${h('settings.check_updates_hint')}</span></span></label>
-        <div class="row"><button class="btn" data-act="checkUpd">${h('settings.check_now')}</button></div>
+        <div class="row"><button class="btn" data-act="checkUpd">${ic('refresh')}${h('settings.check_now')}</button></div>
       </div>
-      <div class="row"><button class="btn primary" data-act="saveCfg">${h('settings.save')}</button><span class="note">${h('settings.saved_in', { path: S.info.config_dir })}</span></div>
+      <div class="row"><button class="btn primary" data-act="saveCfg">${ic('save')}${h('settings.save')}</button><span class="note">${h('settings.saved_in', { path: S.info.config_dir })}</span></div>
     </div>`;
     $('#bk').addEventListener('change', (e) => {
       $('#bkRclone').hidden = e.target.value === 'folder';
@@ -456,7 +550,7 @@
     const step1 = st.found
       ? `<div class="step done"><b>1. rclone</b><span>${h(st.managed ? 'rclone.found_managed' : 'rclone.found', { version: st.version })}</span><span class="note mono">${esc(st.bin)}</span></div>`
       : `<div class="step todo"><b>1. rclone</b><span>${h('rclone.missing')}</span>
-           <div class="row"><button class="btn primary" data-act="rinstall" ${st.platform ? '' : 'disabled'}>${h('rclone.install')}</button>
+           <div class="row"><button class="btn primary" data-act="rinstall" ${st.platform ? '' : 'disabled'}>${ic('download')}${h('rclone.install')}</button>
            <span class="note">${h('rclone.install_hint', { platform: st.platform || '' })}</span></div></div>`;
     let remoteLine;
     if (!r) remoteLine = h('rclone.not_connected');
@@ -466,7 +560,7 @@
     const step2 = `<div class="step ${ok ? 'done' : 'todo'}"><b>2. Google Drive</b><span>${remoteLine}</span>
         <div class="field"><label class="l" for="cid">Client ID</label><input type="text" id="cid" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false" ${st.found ? '' : 'disabled'}></div>
         <div class="field"><label class="l" for="csec">Client secret</label><input type="password" id="csec" placeholder="GOCSPX-…" autocomplete="off" ${st.found ? '' : 'disabled'}></div>
-        <div class="row"><button class="btn ${ok ? '' : 'primary'}" data-act="rconnect" ${st.found ? '' : 'disabled'}>${h(r ? 'rclone.reconnect' : 'rclone.connect')}</button>
+        <div class="row"><button class="btn ${ok ? '' : 'primary'}" data-act="rconnect" ${st.found ? '' : 'disabled'}>${ic('cloud')}${h(r ? 'rclone.reconnect' : 'rclone.connect')}</button>
         <span class="note">${h('rclone.connect_hint')}</span></div></div>`;
     panel.innerHTML = `<p class="note">${h('rclone.this_pc', { os: OS_NAME[st.os] || st.os, arch: st.arch })}</p>${step1}${step2}`;
   }
@@ -706,6 +800,7 @@
           await loadInfo(); S.list = null; render(); loadGames();
         } catch (err) { clearInterval(poll); S.busy = false; fail(t('err.connect_failed'), err); loadRclone(); }
       }
+      else if (a === 'layout') { S.layout = n.dataset.layout === 'list' ? 'list' : 'grid'; store.set('cp.layout', S.layout); renderGames(); }
       else if (a === 'updLater') { S.updateHidden = true; render(); }
       else if (a === 'updShow') { if (S.update) updateModal(S.update); }
       else if (a === 'checkUpd') { await checkUpdate(true); }
@@ -752,7 +847,7 @@
     modal(`<h3>${esc(title)}</h3>
       <div class="alert bad"><span class="errmsg">${esc(msg)}</span></div>
       <p class="note">${h('report.error_hint')}</p>
-      <div class="mfoot"><button class="btn" data-act="openLogs">${h('report.open_logs')}</button><button class="btn" data-act="copyLog">${h('report.copy_log')}</button><span class="spacer"></span>
+      <div class="mfoot"><button class="btn" data-act="openLogs">${ic('folder')}${h('report.open_logs')}</button><button class="btn" data-act="copyLog">${ic('copy')}${h('report.copy_log')}</button><span class="spacer"></span>
         <button class="btn" data-close="1">${h('common.close')}</button><button class="btn primary" data-act="issueFromError">${h('report.create_issue')}</button></div>`);
   }
 
@@ -761,11 +856,11 @@
     modal(`<h3>${h('nav.report')}</h3>
       <p>${h('report.intro')}</p>
       <div class="cards">
-        <div class="card"><b>${h('report.bug')}</b><span class="note">${h('report.bug_hint')}</span><div><button class="btn primary" data-act="reportBug">${h('report.bug')}</button></div></div>
-        <div class="card"><b>${h('report.feature')}</b><span class="note">${h('report.feature_hint')}</span><div><button class="btn" data-act="reportFeature">${h('report.feature_btn')}</button></div></div>
+        <div class="card"><b>${h('report.bug')}</b><span class="note">${h('report.bug_hint')}</span><div><button class="btn primary" data-act="reportBug">${ic('bug')}${h('report.bug')}</button></div></div>
+        <div class="card"><b>${h('report.feature')}</b><span class="note">${h('report.feature_hint')}</span><div><button class="btn" data-act="reportFeature">${ic('sparkle')}${h('report.feature_btn')}</button></div></div>
       </div>
       <p class="note">${h('report.log_location', { path: S.info ? S.info.log_dir : '', version: v })}</p>
-      <div class="mfoot"><button class="btn" data-act="openLogs">${h('report.open_logs')}</button><button class="btn" data-act="copyLog">${h('report.copy_log')}</button><span class="spacer"></span><button class="btn" data-close="1">${h('common.close')}</button></div>`);
+      <div class="mfoot"><button class="btn" data-act="openLogs">${ic('folder')}${h('report.open_logs')}</button><button class="btn" data-act="copyLog">${ic('copy')}${h('report.copy_log')}</button><span class="spacer"></span><button class="btn" data-close="1">${h('common.close')}</button></div>`);
   }
 
   async function reportIssue(kind, title, error) {
@@ -807,8 +902,8 @@
       ? `<p class="note">${h('update.confirm')}${S.info && S.info.os === 'windows' ? ' ' + h('update.confirm_win') : ''}</p>`
       : `<div class="alert warn">${h('update.manual_hint')}</div>`;
     const go = u.can_install
-      ? `<button class="btn primary" data-act="updInstall" ${S.busy ? 'disabled' : ''}>${h('update.install')}</button>`
-      : `<button class="btn primary" data-act="updPage">${h('update.download')}</button>`;
+      ? `<button class="btn primary" data-act="updInstall" ${S.busy ? 'disabled' : ''}>${ic('sparkle')}${h('update.install')}</button>`
+      : `<button class="btn primary" data-act="updPage">${ic('external')}${h('update.download')}</button>`;
     modal(`<h3>${h('update.title', { version: u.version })}</h3>
       <p>${h('update.available', { version: u.version, current: u.current })}</p>${notes}${how}
       <div class="mfoot"><button class="btn" data-close="1">${h('update.later')}</button>${go}</div>`);
@@ -846,8 +941,8 @@
     if (!url || !$('#authLink') || !box.hidden) return;
     box.innerHTML = `<p class="note">${h('rclone.link_hint')}</p>
       <input id="authUrl" class="mono" readonly value="${esc(url)}" style="width:100%">
-      <div class="row"><button class="btn primary" data-act="copyAuth">${h('rclone.copy_link')}</button>
-      <button class="btn" data-act="openAuth">${h('rclone.open_link')}</button></div>`;
+      <div class="row"><button class="btn primary" data-act="copyAuth">${ic('copy')}${h('rclone.copy_link')}</button>
+      <button class="btn" data-act="openAuth">${ic('external')}${h('rclone.open_link')}</button></div>`;
     box.hidden = false;
   }
 
@@ -864,6 +959,7 @@
 
   // ---------- boot ----------
   (async function boot() {
+    document.querySelectorAll('[data-ic]').forEach((el) => { el.innerHTML = ic(el.dataset.ic); });
     try {
       await loadStrings();
       await loadInfo();

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Connect Google Drive · Checkpoint</title>
+<meta name="description" content="Create your own Google client ID and connect Checkpoint to Google Drive.">
+<meta name="theme-color" content="#07090f">
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Be+Vietnam+Pro:wght@400;500;600&family=JetBrains+Mono&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.jsdelivr.net/npm/i18next@23.11.5/dist/umd/i18next.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/i18next-browser-languagedetector@8.0.0/dist/umd/i18nextBrowserLanguageDetector.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/i18next-http-backend@2.5.2/i18nextHttpBackend.min.js"></script>
+</head>
+<body data-page="google" data-title="meta.google_title">
+<header id="top"></header>
+<div class="wrap site narrow">
+
+  <div class="page-head">
+    <span class="eyebrow" data-i18n="google.eyebrow"></span>
+    <h1 data-i18n="google.title"></h1>
+    <p class="lead" data-i18n="google.intro"></p>
+  </div>
+
+  <section class="guide">
+    <ol class="steps">
+      <li><h3 data-i18n="google.project_title"></h3><ul data-i18n="google.project_list"></ul></li>
+      <li><h3 data-i18n="google.api_title"></h3><ul data-i18n="google.api_list"></ul></li>
+      <li>
+        <h3 data-i18n="google.consent_title"></h3>
+        <ul>
+          <li data-i18n="google.consent_1"></li>
+          <li data-i18n="google.consent_2"></li>
+          <li><span data-i18n="google.consent_3"></span>
+            <div class="kv">
+              <span data-i18n="google.kv_home"></span><code class="copy" data-copy-origin="/">https://checkpoint.vercel.app/</code>
+              <span data-i18n="google.kv_privacy"></span><code class="copy" data-copy-origin="/privacy">https://checkpoint.vercel.app/privacy</code>
+              <span data-i18n="google.kv_terms"></span><code class="copy" data-copy-origin="/terms">https://checkpoint.vercel.app/terms</code>
+              <span data-i18n="google.kv_domains"></span><code class="copy" data-copy-host="1">checkpoint.vercel.app</code>
+            </div>
+            <span class="note" data-i18n="google.kv_hint"></span>
+          </li>
+          <li><span data-i18n="google.consent_4"></span>
+            <div class="callout warn" data-i18n="google.testing_warn"></div>
+            <span class="note" data-i18n="google.no_verify"></span>
+          </li>
+        </ul>
+      </li>
+      <li><h3 data-i18n="google.client_title"></h3><ul data-i18n="google.client_list"></ul></li>
+      <li>
+        <h3 data-i18n="google.paste_title"></h3>
+        <ul>
+          <li data-i18n="google.paste_1"></li>
+          <li><span data-i18n="google.paste_2"></span><div class="callout" data-i18n="google.unverified"></div></li>
+          <li data-i18n="google.paste_3"></li>
+          <li><div class="callout" data-i18n="google.refused"></div></li>
+        </ul>
+      </li>
+    </ol>
+  </section>
+
+  <section class="guide" id="faq">
+    <h2 data-i18n="google.faq_title"></h2>
+    <dl class="faq" data-i18n="google.faq"></dl>
+  </section>
+
+  <p><a class="more" href="/guide"><span data-i18n="account.back"></span></a></p>
+  <footer id="foot"></footer>
+</div>
+<noscript><p class="wrap">Checkpoint guide. <a href="https://github.com/fr0stf0x/checkpoint#readme">Read the README on GitHub</a>.</p></noscript>
+<script src="/main.js"></script>
+</body>
+</html>

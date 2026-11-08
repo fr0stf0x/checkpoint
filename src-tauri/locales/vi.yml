@@ -147,6 +147,8 @@ ui:
     restore_all: "Restore toàn bộ"
     search: "Tìm game hoặc AppID"
     filter_all: "Tất cả"
+    view_grid: "Lưới ảnh bìa"
+    view_list: "Danh sách chi tiết"
     col_game: "Game · vị trí save"
     col_local: "Local"
     col_cloud: "Cloud mới nhất"

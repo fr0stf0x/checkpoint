@@ -1,13 +1,19 @@
 {
   "meta": {
     "title": "Checkpoint · Đồng bộ save game",
-    "description": "Checkpoint backup và restore save game Steam giữa các máy của bạn qua chính Google Drive của bạn."
+    "description": "Checkpoint backup và restore save game Steam giữa các máy của bạn qua chính Google Drive của bạn.",
+    "guide_title": "Hướng dẫn · Checkpoint",
+    "google_title": "Kết nối Google Drive · Checkpoint",
+    "account_title": "Đổi tài khoản Steam · Checkpoint"
   },
   "nav": {
     "guide": "Hướng dẫn",
-    "google": "Kết nối Google",
+    "google": "Google Drive",
     "coffee": "☕ Ủng hộ",
-    "switch": "English"
+    "switch": "English",
+    "home": "Trang chủ",
+    "account": "Đổi tài khoản",
+    "download": "Tải về"
   },
   "support": {
     "title": "Ủng hộ Checkpoint",
@@ -15,8 +21,10 @@
     "button": "☕ Mời mình ly cà phê"
   },
   "hero": {
-    "title": "Đồng bộ save game Steam giữa các máy của bạn",
-    "lead": "App desktop cho Windows và Linux (Bazzite, SteamOS…). Backup và restore save game vào chính Google Drive của bạn, kể cả khi Steam chạy offline mode."
+    "title": "Save game của bạn, trên mọi máy",
+    "lead": "Steam chạy offline mode thì không có Steam Cloud. Checkpoint backup save game Steam vào chính Google Drive của bạn rồi restore trên các máy khác: Windows, Bazzite, SteamOS và Linux khác.",
+    "eyebrow": "Steam Cloud cho offline mode",
+    "platforms": "Miễn phí · mã nguồn mở · Windows và Linux (AppImage)"
   },
   "dl": {
     "latest": "Tải bản mới nhất",
@@ -36,7 +44,7 @@
   },
   "features": {
     "local_title": "Chạy trên máy bạn",
-    "local_body": "Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn.",
+    "local_body": "Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn. Game hiện dạng lưới ảnh bìa; ảnh và avatar tài khoản lấy từ bộ nhớ đệm của chính Steam, không tải thêm gì.",
     "scope_title": "Quyền tối thiểu",
     "scope_body": "Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.",
     "safe_title": "Không ghi đè nhầm",
@@ -46,14 +54,15 @@
     "account_title": "Đổi tài khoản Steam",
     "account_body": "Phải chuyển sang tài khoản Steam khác? Copy save của game sang tài khoản mới, thử trong game, rồi Giữ hoặc Hoàn tác bằng 1 click.",
     "update_title": "Tự cập nhật",
-    "update_body": "App báo khi có bản mới và cho xem có gì thay đổi. Bấm 1 lần là tải, kiểm tra chữ ký và cài đặt, cả trên Windows lẫn file AppImage."
+    "update_body": "App báo khi có bản mới và cho xem có gì thay đổi. Bấm 1 lần là tải, kiểm tra chữ ký và cài đặt, cả trên Windows lẫn file AppImage.",
+    "title": "Có gì trong app"
   },
   "guide": {
     "title": "Hướng dẫn sử dụng",
     "install_title": "Cài app",
     "install_list": "<li><b>Windows:</b> tải <code>Checkpoint_x.y.z_x64-setup.exe</code> và chạy. Windows SmartScreen có thể cảnh báo vì app chưa ký số: bấm <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> tải file <code>.AppImage</code>, chuột phải → <i>Properties → Permissions</i> → cho phép chạy (hoặc <code>chmod +x Checkpoint_*.AppImage</code>), rồi mở ở Desktop Mode.</li><li>Mở app lần đầu: bấm <b>Tải manifest</b> để app biết vị trí save của các game. App dùng ngôn ngữ của hệ thống; đổi trong <b>Cài đặt → Ngôn ngữ</b>.</li>",
     "client_title": "Tạo Google Client ID (làm 1 lần, dùng cho mọi máy)",
-    "client_body": "Xem phần <a href=\"#google\">Kết nối Google Drive</a> bên dưới. Mất khoảng 5–10 phút.",
+    "client_body": "Làm theo <a href=\"/guide/google-drive\">Kết nối Google Drive</a>. Mất khoảng 5–10 phút và chỉ làm một lần.",
     "connect_title": "Kết nối trong app",
     "connect_list": "<li>Vào <b>Cài đặt → Nơi lưu backup</b>. Nếu chưa có rclone, bấm <b>Cài rclone</b>: app tải bản chính thức từ downloads.rclone.org và kiểm tra SHA-256, không cần quyền admin.</li><li>Dán <b>Client ID</b> và <b>Client secret</b>, bấm <b>Kết nối Google Drive</b>, đăng nhập trong trình duyệt vừa mở. Nếu trình duyệt không tự mở, bấm <b>Copy link</b> trong hộp thoại đăng nhập rồi dán vào trình duyệt trên cùng máy.</li><li>Làm lại bước này trên từng máy, với <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>.</li>",
     "daily_title": "Dùng hằng ngày",
@@ -78,7 +87,10 @@
     "st_diverged_t": "So ngày trong hộp thoại rồi quyết định.",
     "st_unknown": "Chưa rõ vị trí save",
     "st_unknown_m": "Game không có trong manifest.",
-    "st_unknown_t": "Chưa hỗ trợ tự khai báo (sắp có)."
+    "st_unknown_t": "Chưa hỗ trợ tự khai báo (sắp có).",
+    "eyebrow": "Hướng dẫn",
+    "intro": "Cài app, kết nối Google Drive một lần, rồi backup và restore bằng một click.",
+    "more_title": "Hướng dẫn khác"
   },
   "google": {
     "title": "Kết nối Google Drive",
@@ -108,7 +120,8 @@
     "paste_3": "Bấm <b>Continue</b> để cho phép quyền xem và quản lý file do app tạo trong Drive.",
     "refused": "Nếu sau đó trình duyệt báo <b>“127.0.0.1 refused to connect”</b> thì <b>bỏ qua</b>. Đó là máy chủ tạm của rclone trên máy bạn: nó nhận mã đăng nhập rồi tắt ngay, nên lần tải lại trang tiếp theo sẽ báo lỗi. Quay lại app là thấy đã kết nối.",
     "faq_title": "Gặp lỗi?",
-    "faq": "<dt>Báo “Error 403: access_denied”</dt><dd>App vẫn ở chế độ Testing và tài khoản đang đăng nhập không nằm trong Test users. Bấm <b>Publish app</b> như bước 3.</dd><dt>Báo “redirect_uri_mismatch”</dt><dd>Client tạo sai loại. Tạo lại client loại <b>Desktop app</b>, không phải Web application.</dd><dt>Sau 7 ngày không backup được</dt><dd>App đang ở Testing. Publish app, rồi bấm <b>Kết nối lại Google Drive</b> trong app.</dd><dt>Máy khác không thấy bản backup</dt><dd>Hai máy phải dùng <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>. Với quyền <code>drive.file</code>, Client ID khác sẽ không thấy file do client kia tạo.</dd><dt>Muốn xóa hết dữ liệu</dt><dd>Xóa thư mục <code>Checkpoint</code> trong Google Drive, và thu hồi quyền ở <a href=\"https://myaccount.google.com/permissions\">myaccount.google.com/permissions</a>.</dd>"
+    "faq": "<dt>Báo “Error 403: access_denied”</dt><dd>App vẫn ở chế độ Testing và tài khoản đang đăng nhập không nằm trong Test users. Bấm <b>Publish app</b> như bước 3.</dd><dt>Báo “redirect_uri_mismatch”</dt><dd>Client tạo sai loại. Tạo lại client loại <b>Desktop app</b>, không phải Web application.</dd><dt>Sau 7 ngày không backup được</dt><dd>App đang ở Testing. Publish app, rồi bấm <b>Kết nối lại Google Drive</b> trong app.</dd><dt>Máy khác không thấy bản backup</dt><dd>Hai máy phải dùng <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>. Với quyền <code>drive.file</code>, Client ID khác sẽ không thấy file do client kia tạo.</dd><dt>Muốn xóa hết dữ liệu</dt><dd>Xóa thư mục <code>Checkpoint</code> trong Google Drive, và thu hồi quyền ở <a href=\"https://myaccount.google.com/permissions\">myaccount.google.com/permissions</a>.</dd>",
+    "eyebrow": "Hướng dẫn"
   },
   "notes": {
     "title": "Lưu ý",
@@ -122,9 +135,76 @@
     "about": "Checkpoint · dự án cá nhân mã nguồn mở, không liên kết với Valve hay Google.",
     "bug": "Báo lỗi",
     "privacy": "Privacy",
-    "terms": "Terms"
+    "terms": "Terms",
+    "guide": "Hướng dẫn"
   },
   "copy": {
     "title": "Bấm để copy"
+  },
+  "shots": {
+    "grid_src": "/shots/app-grid-vi.webp",
+    "grid_alt": "Checkpoint hiện lưới ảnh bìa game, mỗi game có trạng thái đồng bộ và nút Backup, Restore",
+    "list_src": "/shots/app-list-vi.webp",
+    "list_alt": "Danh sách chi tiết của Checkpoint với vị trí save, thời gian trên máy và trên cloud, trạng thái từng game",
+    "list_title": "Mọi save, nhìn là biết",
+    "list_body": "Chuyển sang danh sách chi tiết để xem mỗi game lưu save ở đâu, chơi lần cuối trên máy này lúc nào, backup lần cuối lúc nào và từ máy nào. Trạng thái so bằng nội dung file chứ không dựa vào ngày giờ, nên đồng hồ máy lệch cũng không sao."
+  },
+  "problem": {
+    "eyebrow": "Vì sao cần Checkpoint",
+    "title": "Chơi offline không có nghĩa là mất tiến trình",
+    "p1_title": "Offline thì không có Steam Cloud",
+    "p1_body": "Khi Steam chạy offline mode, Steam Cloud không đồng bộ. Chơi trên PC rồi cầm máy handheld lên là tiến trình vẫn nằm kẹt ở máy kia.",
+    "p2_title": "Drive của bạn thành cloud",
+    "p2_body": "Checkpoint tìm file save của từng game, backup vào thư mục <code>Checkpoint</code> trong chính Google Drive của bạn, rồi restore trên máy tiếp theo, kể cả giữa Windows và Proton trên Linux.",
+    "p3_title": "Đổi tài khoản Steam?",
+    "p3_body": "Một số game chỉ đọc save do đúng tài khoản đó tạo ra. Checkpoint copy save sang tài khoản kia để bạn thử trong game, rồi Giữ hoặc Hoàn tác.",
+    "flow_a": "Máy A · Windows",
+    "flow_a_sub": "Chơi xong thì backup",
+    "flow_cloud": "Google Drive của bạn",
+    "flow_cloud_sub": "Chỉ file do app tạo",
+    "flow_b": "Máy B · Bazzite",
+    "flow_b_sub": "Restore trước khi chơi"
+  },
+  "start": {
+    "eyebrow": "Bắt đầu",
+    "title": "Ba bước, khoảng 15 phút",
+    "s1_title": "Cài app",
+    "s1_body": "Bộ cài cho Windows hoặc file AppImage cho Linux. App tự tìm Steam, game và tài khoản của bạn.",
+    "s1_link": "Hướng dẫn cài",
+    "s2_title": "Kết nối Google Drive",
+    "s2_body": "Tạo Google Client ID miễn phí của riêng bạn một lần, rồi kết nối từng máy bằng nó. App tự cài rclone cho bạn.",
+    "s2_link": "Hướng dẫn Google Drive",
+    "s3_title": "Backup và restore",
+    "s3_body": "Chơi xong thì backup, sang máy khác thì restore trước khi chơi. App cảnh báo trước khi ghi đè lên bản mới hơn.",
+    "s3_link": "Dùng hằng ngày",
+    "account_title": "Chuyển sang tài khoản Steam khác?",
+    "account_body": "Xem app chuyển được gì, không chuyển được gì, và cách thử save an toàn.",
+    "account_link": "Hướng dẫn đổi tài khoản"
+  },
+  "account": {
+    "eyebrow": "Hướng dẫn",
+    "title": "Chuyển save sang tài khoản Steam khác",
+    "intro": "Nhiều game lưu save riêng theo từng tài khoản Steam. Đổi tài khoản là tài khoản mới bắt đầu lại từ đầu. Checkpoint có thể copy save của một game từ tài khoản A sang tài khoản B để bạn chơi tiếp.",
+    "how_title": "Cách chuyển save",
+    "how_list": "<li>Mở <b>Tài khoản Steam</b> và bấm <b>Chuyển save sang tài khoản khác…</b>, hoặc bấm <b>Đổi tài khoản</b> ở một game.</li><li>Chọn tài khoản đang có save (<b>từ</b>) và tài khoản bạn muốn chơi (<b>sang</b>), rồi chọn game.</li><li>Bấm <b>Chuyển save … game</b>. App copy save vào thư mục của tài khoản kia và sửa file <code>steam_autocloud.vdf</code> của Steam.</li><li>Đăng nhập Steam bằng tài khoản mới, mở game và chọn <i>Continue</i> hoặc <i>Load</i>.</li><li>Tiến trình còn nguyên: bấm <b>Chạy được, giữ</b>. Game báo save hỏng hoặc bắt đầu game mới: bấm <b>Không được, hoàn tác</b>.</li>",
+    "safe_title": "An toàn ngay từ thiết kế",
+    "safe_list": "<li>File của tài khoản gốc <b>không bao giờ bị sửa hay xóa</b>. App chỉ copy.</li><li>Trước khi copy, app ghi lại việc chuyển, nên kể cả chuyển dở dang cũng hoàn tác được.</li><li><b>Hoàn tác</b> trả lại mọi file đã bị ghi đè ở tài khoản mới và xóa file game tạo ra trong lúc bạn thử.</li><li>Mỗi game chỉ có một lần chuyển đang chờ.</li>",
+    "classes_title": "Cái gì chuyển được",
+    "classes_intro": "Trước khi bắt đầu, app kiểm tra mỗi game gắn save với tài khoản theo kiểu nào:",
+    "th_case": "Save gắn với tài khoản thế nào",
+    "th_result": "App làm gì",
+    "c1": "Không gắn với tài khoản",
+    "c1_r": "Không cần chuyển: save dùng được trên mọi tài khoản.",
+    "c2": "ID tài khoản chỉ nằm trong tên thư mục",
+    "c2_r": "Copy vào thư mục của tài khoản mới. Chạy được.",
+    "c3": "ID tài khoản đọc được bên trong file",
+    "c3_r": "Copy và thay ID bên trong file. Thử nghiệm: một số game có kiểm tra checksum.",
+    "c4": "File đã mã hóa hoặc nén",
+    "c4_r": "Copy sang. Chưa biết game có nhận không, nên thử trong game và hoàn tác nếu cần.",
+    "c5": "Save lưu trên server của game",
+    "c5_r": "Không làm được.",
+    "keep_title": "Sau khi bấm Chạy được, giữ",
+    "keep_body": "App nhớ rằng tài khoản A giờ chơi bằng tài khoản B. Khi bạn restore các bản backup cũ của A, hộp thoại Restore mặc định ghi chúng vào thư mục của B.",
+    "back": "Quay lại hướng dẫn"
   }
 }
