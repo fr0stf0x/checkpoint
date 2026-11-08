@@ -40,6 +40,7 @@ The website (`site/`) uses [i18next](https://www.i18next.com/) with `site/locale
 - Reads `libraryfolders.vdf` and `appmanifest_*.acf` for installed games, and `loginusers.vdf` for accounts.
 - Each file is stored under a logical path such as `win/winAppData/...`, `any/base/...` or `linux/xdgData/...`. On Linux, `win/*` paths are mapped into `steamapps/compatdata/<appid>/pfx/drive_c/users/steamuser/...`.
 - Status is computed from the SHA-256 of the save content and the hashes recorded at the last sync on this machine (`state.json`).
+- Steam marks save folders with their owner in `steam_autocloud.vdf` and clears folders owned by another account when a game starts. On restore, shared folders (install folder, AppData, Documents) are given to the account signed in on this PC; folders named after an account keep their owner.
 - Before each restore, the current local save is zipped to `%LOCALAPPDATA%\Checkpoint\snapshots` (`~/.local/share/Checkpoint/snapshots` on Linux). The last 5 are kept.
 
 Cloud layout:

@@ -423,9 +423,21 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     let mut state = State::load();
     let now = chrono::Utc::now().timestamp_millis();
 
+    // Account that must own shared save folders after the restore (see fix_autocloud_owners)
+    let owner = match &remap {
+        Some((_, to)) => Some(to.clone()),
+        None => this_pc_account(&ctx.steam_root),
+    };
+
     // Writing into another account must run even if the source account's save is identical
     if remap.is_none() && local_hash.as_deref() == Some(ver.content_hash.as_str()) {
-        state.games.insert(key, SyncBase { local: ver.content_hash.clone(), cloud: latest.content_hash, at_utc: now });
+        let mut local = ver.content_hash.clone();
+        if let Some(o) = &owner {
+            if fix_autocloud_owners(&scan, o)? > 0 {
+                local = hash_scan(&paths::scan(&ctx, rules, cfg.include_config))?.unwrap_or_default();
+            }
+        }
+        state.games.insert(key, SyncBase { local, cloud: latest.content_hash, at_utc: now });
         state.save()?;
         return Ok(OpResult { outcome: "unchanged".into(), message: t!("msg.restore_unchanged", game = g.name).to_string() });
     }
@@ -447,7 +459,13 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
     let _ = fs::remove_file(&tmp);
     let (restored, skipped) = result?;
 
-    let after = hash_scan(&paths::scan(&ctx, rules, cfg.include_config))?.unwrap_or_default();
+    let mut after_scan = paths::scan(&ctx, rules, cfg.include_config);
+    if let Some(o) = &owner {
+        if fix_autocloud_owners(&after_scan, o)? > 0 {
+            after_scan = paths::scan(&ctx, rules, cfg.include_config);
+        }
+    }
+    let after = hash_scan(&after_scan)?.unwrap_or_default();
     state.games.insert(key, SyncBase { local: after, cloud: latest.content_hash, at_utc: now });
     state.save()?;
     let mut message = t!("msg.restore_done", game = g.name, files = restored, device = ver.device_name, time = fmt_time(ver.created_utc)).to_string();
@@ -460,6 +478,42 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
         message.push_str(&t!("msg.restore_into_account", account = to.sid64));
     }
     Ok(OpResult { outcome: "restored".into(), message })
+}
+
+/// The Steam account playing on this PC: the one marked most recent in loginusers.vdf,
+/// or the only account when there is just one.
+fn this_pc_account(steam_root: &Path) -> Option<crate::migrate::Ids> {
+    let accts = steam::accounts(steam_root);
+    let a = accts.iter().find(|a| a.most_recent).or(if accts.len() == 1 { accts.first() } else { None })?;
+    crate::migrate::Ids::parse(&a.steamid64).ok()
+}
+
+/// Steam Auto-Cloud marks each save folder with its owner in steam_autocloud.vdf, and clears
+/// folders owned by another account when a game starts. A backup made on another PC with another
+/// account therefore vanishes on first launch unless the marker names the account on this PC.
+/// Folders named after an account (e.g. `Saved/<SteamID64>/`) keep their owner: that is the
+/// account the save belongs to, and moving it is the remap's job. Returns how many files changed.
+pub(crate) fn fix_autocloud_owners(scan: &LocalScan, owner: &crate::migrate::Ids) -> Result<usize> {
+    let mut changed = 0;
+    for f in scan.files.iter().filter(|f| crate::migrate::is_autocloud_vdf(&f.real)) {
+        let data = fs::read(&f.real)?;
+        let Some(cur) = crate::migrate::autocloud_account(&data) else { continue };
+        if cur == owner.acct {
+            continue;
+        }
+        let Ok(cur_ids) = crate::migrate::Ids::parse(&cur) else { continue };
+        let in_account_folder = f.logical.split('/').skip(2).any(|p| p == cur_ids.acct || p.contains(&cur_ids.sid64));
+        if in_account_folder {
+            continue;
+        }
+        fs::write(&f.real, crate::migrate::set_autocloud_account(&data, &owner.acct))
+            .with_context(|| tr!("err.write_file", path = f.real.display()).to_string())?;
+        changed += 1;
+    }
+    if changed > 0 {
+        log::info!("Gave {changed} shared save folder(s) to the Steam account on this PC (steam_autocloud.vdf)");
+    }
+    Ok(changed)
 }
 
 pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::migrate::Ids, crate::migrate::Ids)>) -> Result<(usize, usize)> {
@@ -667,6 +721,47 @@ mod tests {
         assert_eq!(fs::read(b_dir.join("s.sav")).unwrap(), b"prog");
         assert!(fs::read_to_string(b_dir.join("steam_autocloud.vdf")).unwrap().contains(&remap.1.acct));
         assert!(!a_dir.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Issue #2: a backup from account A restored on a PC signed in as B must not stay owned by A,
+    /// or Steam clears the folder when the game starts.
+    #[test]
+    fn restore_gives_shared_folders_to_this_pc_account() {
+        let root = std::env::temp_dir().join(format!("checkpoint-owner-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let lib = root.join("lib");
+        let a = crate::migrate::Ids::parse("76561198000000101").unwrap();
+        let b = crate::migrate::Ids::parse("76561198000000202").unwrap();
+        let vdf = |acct: &str| format!("\"steam_autocloud.vdf\"\n{{\n\t\"accountid\"\t\t\"{acct}\"\n}}\n");
+        // Shared install-folder saves (Slay the Spire) and a folder named after account A
+        let shared = lib.join("steamapps/common/G/saves");
+        let own = lib.join(format!("steamapps/common/G/Saved/{}", a.sid64));
+        fs::create_dir_all(&shared).unwrap();
+        fs::create_dir_all(&own).unwrap();
+        fs::write(shared.join("IRONCLAD.autosave"), b"run").unwrap();
+        fs::write(shared.join("steam_autocloud.vdf"), vdf(&a.acct)).unwrap();
+        fs::write(own.join("steam_autocloud.vdf"), vdf(&a.acct)).unwrap();
+        let ctx = GameCtx::new(646570, "G", &lib, &root.join("steam"));
+        let rules = vec![
+            FileRule { path: "<base>/saves".into(), tags: vec!["save".into()], when: vec![] },
+            FileRule { path: "<base>/Saved".into(), tags: vec!["save".into()], when: vec![] },
+        ];
+        let zip = root.join("v.zip");
+        write_zip(&zip, &paths::scan(&ctx, &rules, false), None).unwrap();
+        fs::remove_dir_all(lib.join("steamapps/common/G")).unwrap();
+
+        extract(&zip, &ctx, None).unwrap();
+        let scan = paths::scan(&ctx, &rules, false);
+        assert_eq!(fix_autocloud_owners(&scan, &b).unwrap(), 1);
+        let shared_vdf = fs::read(shared.join("steam_autocloud.vdf")).unwrap();
+        assert_eq!(crate::migrate::autocloud_account(&shared_vdf).as_deref(), Some(b.acct.as_str()));
+        assert_eq!(String::from_utf8(shared_vdf).unwrap(), vdf(&b.acct)); // rest of the file untouched
+        let own_vdf = fs::read(own.join("steam_autocloud.vdf")).unwrap();
+        assert_eq!(crate::migrate::autocloud_account(&own_vdf).as_deref(), Some(a.acct.as_str()));
+        assert_eq!(fs::read(shared.join("IRONCLAD.autosave")).unwrap(), b"run");
+        // Running it again changes nothing
+        assert_eq!(fix_autocloud_owners(&paths::scan(&ctx, &rules, false), &b).unwrap(), 0);
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -6,6 +6,9 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Fixed
+- Restoring a backup made with another Steam account no longer loses the save for games that keep it in a shared folder such as the game's install folder (Slay the Spire, for example). Steam marks those folders with the owning account in `steam_autocloud.vdf` and cleared them when a different account started the game; restore now gives them to the account signed in on this PC ([#2](https://github.com/fr0stf0x/checkpoint/issues/2)).
+
 ## [0.5.0] - 2026-11-08
 
 ### Added
