@@ -26,7 +26,7 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 
 ## Website
 
-- [ ] Redesign the landing page to be more attractive: modern, gaming vibe.
-- [ ] Show the problem and how the app solves it (Steam offline mode → no Steam Cloud → Checkpoint syncs saves through your own Google Drive; switching Steam accounts).
-- [ ] Take screenshots of the app (both languages if possible) and put them on the landing page.
-- [ ] Move the guides to their own pages/paths (for example `/guide`, `/guide/google-drive`, `/guide/switch-account`), keeping the landing page short. Keep `/privacy` and `/terms` (used by the Google consent screen) and redirects for old anchors.
+- [x] Redesign the landing page to be more attractive: modern, gaming vibe.
+- [x] Show the problem and how the app solves it (Steam offline mode → no Steam Cloud → Checkpoint syncs saves through your own Google Drive; switching Steam accounts).
+- [x] Take screenshots of the app (both languages if possible) and put them on the landing page.
+- [x] Move the guides to their own pages/paths (for example `/guide`, `/guide/google-drive`, `/guide/switch-account`), keeping the landing page short. Keep `/privacy` and `/terms` (used by the Google consent screen) and redirects for old anchors.

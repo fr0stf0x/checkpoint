@@ -57,7 +57,7 @@ Checkpoint/
 
 ### Why your own Google client ID
 
-rclone's shared client ID is heavily rate limited and is being retired by Google. With your own client ID each operation takes about 3 seconds instead of more than 30. Creating one is free and takes 5–10 minutes. The step-by-step guide is on the website (`site/index.html`, section *Connect Google Drive*). The short version:
+rclone's shared client ID is heavily rate limited and is being retired by Google. With your own client ID each operation takes about 3 seconds instead of more than 30. Creating one is free and takes 5–10 minutes. The step-by-step guide is on the website (`/guide/google-drive`, file `site/guide/google-drive.html`). The short version:
 
 1. Create a project in Google Cloud Console and enable the Google Drive API.
 2. Google Auth Platform: External audience, then **Publish app** so the status is **In production**. In Testing mode sign-ins expire after 7 days.
@@ -99,7 +99,7 @@ Keep a backup of the private key. If it is lost, installed copies cannot verify 
 
 ## Website
 
-`site/` is a static site (home with setup guide, Privacy Policy, Terms of Service). The home page is a single page translated with i18next (English and Vietnamese, picked from `?lng=`, the last choice, or the browser language; `/en` and `/vi` redirect to it). Deploy it to Vercel with `site` as the Root Directory. Stars, download count and the download buttons come live from the GitHub API.
+`site/` is a static site: the landing page (`index.html`), the guides (`guide/index.html` → `/guide`, `guide/google-drive.html`, `guide/switch-account.html`), and the Privacy Policy and Terms of Service used by the Google consent screen. Every page is translated with i18next (English and Vietnamese, picked from `?lng=`, the last choice, or the browser language; `/en` and `/vi` redirect to the home page). `main.js` adds the shared header and footer and sends the old home-page anchors `#guide` and `#google` to the guide pages. App screenshots live in `site/shots/` (one per language). Deploy it to Vercel with `site` as the Root Directory. Stars, download count and the download buttons come live from the GitHub API.
 
 ## Support
 

@@ -38,7 +38,7 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 | `logger.rs`, `report.rs`, `i18n.rs` | File log, prefilled GitHub issue URL, `tr!` macro (translated errors with English for logs) |
 | `src-tauri/locales/{en,vi}.yml` | All user-facing text for the backend (`err.*`, `msg.*`) and the UI (`ui.*`) |
 | `ui/` | Plain HTML/JS frontend (no Node, no bundler) |
-| `site/` | Website (Vercel): i18next single page, `/privacy`, `/terms` |
+| `site/` | Website (Vercel, clean URLs): landing page, `/guide`, `/guide/google-drive`, `/guide/switch-account`, `/privacy`, `/terms`; shared header/footer and i18next in `main.js`; screenshots in `shots/` |
 | `.github/workflows/release.yml` | Tag `vX.Y.Z` → tests, Windows NSIS + Linux AppImage, GitHub Release |
 
 ## Moving saves between Steam accounts (A → B)

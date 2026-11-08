@@ -1,13 +1,19 @@
 {
   "meta": {
     "title": "Checkpoint · Save game sync",
-    "description": "Checkpoint backs up and restores Steam save games between your own PCs using your own Google Drive."
+    "description": "Checkpoint backs up and restores Steam save games between your own PCs using your own Google Drive.",
+    "guide_title": "How to use · Checkpoint",
+    "google_title": "Connect Google Drive · Checkpoint",
+    "account_title": "Switch Steam accounts · Checkpoint"
   },
   "nav": {
     "guide": "Guide",
-    "google": "Connect Google",
+    "google": "Google Drive",
     "coffee": "☕ Support",
-    "switch": "Tiếng Việt"
+    "switch": "Tiếng Việt",
+    "home": "Home",
+    "account": "Switch account",
+    "download": "Download"
   },
   "support": {
     "title": "Support Checkpoint",
@@ -15,8 +21,10 @@
     "button": "☕ Buy me a coffee"
   },
   "hero": {
-    "title": "Sync Steam save games between your PCs",
-    "lead": "A desktop app for Windows and Linux (Bazzite, SteamOS and others). It backs up and restores Steam save games to your own Google Drive, even when Steam runs in offline mode."
+    "title": "Your saves, on every PC",
+    "lead": "Steam in offline mode has no Steam Cloud. Checkpoint backs up your Steam save games to your own Google Drive and restores them on your other PCs: Windows, Bazzite, SteamOS and other Linux.",
+    "eyebrow": "Steam Cloud for offline mode",
+    "platforms": "Free · open source · Windows and Linux (AppImage)"
   },
   "dl": {
     "latest": "Download latest",
@@ -46,14 +54,15 @@
     "account_title": "Switch Steam accounts",
     "account_body": "Moving to another Steam account? Copy a game's save to the new account, test it in game, then keep or undo in one click.",
     "update_title": "Updates itself",
-    "update_body": "The app tells you when a new version is out and shows what changed. One click downloads it, checks its signature and installs it, on Windows and in the AppImage."
+    "update_body": "The app tells you when a new version is out and shows what changed. One click downloads it, checks its signature and installs it, on Windows and in the AppImage.",
+    "title": "What you get"
   },
   "guide": {
     "title": "How to use",
     "install_title": "Install the app",
     "install_list": "<li><b>Windows:</b> download <code>Checkpoint_x.y.z_x64-setup.exe</code> and run it. Windows SmartScreen may warn because the app is not code-signed: click <i>More info → Run anyway</i>.</li><li><b>Bazzite / Linux:</b> download the <code>.AppImage</code>, right-click → <i>Properties → Permissions</i> → allow executing (or <code>chmod +x Checkpoint_*.AppImage</code>), then open it in Desktop Mode.</li><li>On first launch, click <b>Download manifest</b> so the app knows where games keep their saves. The app follows your system language; change it in <b>Settings → Language</b>.</li>",
     "client_title": "Create a Google client ID (once, reused on every PC)",
-    "client_body": "See <a href=\"#google\">Connect Google Drive</a> below. It takes about 5–10 minutes.",
+    "client_body": "Follow <a href=\"/guide/google-drive\">Connect Google Drive</a>. It takes about 5–10 minutes and you only do it once.",
     "connect_title": "Connect in the app",
     "connect_list": "<li>Open <b>Settings → Backup location</b>. If rclone is missing, click <b>Install rclone</b>: the app downloads the official build from downloads.rclone.org and verifies its SHA-256. No admin rights needed.</li><li>Paste the <b>Client ID</b> and <b>Client secret</b>, click <b>Connect Google Drive</b> and sign in in the browser window that opens. If no browser opens, click <b>Copy link</b> in the sign-in dialog and paste it into a browser on the same PC.</li><li>Repeat on every PC with the <b>same client ID</b> and the <b>same Google account</b>.</li>",
     "daily_title": "Day to day",
@@ -78,7 +87,10 @@
     "st_diverged_t": "Compare the dates in the dialog and decide.",
     "st_unknown": "Save location unknown",
     "st_unknown_m": "The game is not in the manifest.",
-    "st_unknown_t": "Custom entries are not supported yet."
+    "st_unknown_t": "Custom entries are not supported yet.",
+    "eyebrow": "Guide",
+    "intro": "Install the app, connect Google Drive once, then back up and restore with one click.",
+    "more_title": "More guides"
   },
   "google": {
     "title": "Connect Google Drive",
@@ -108,7 +120,8 @@
     "paste_3": "Click <b>Continue</b> to allow access to the files the app creates in your Drive.",
     "refused": "If the browser then says <b>“127.0.0.1 refused to connect”</b>, <b>ignore it</b>. That address is rclone's temporary local server: it receives the sign-in code and shuts down right away, so any reload afterwards fails. Go back to the app and it shows as connected.",
     "faq_title": "Troubleshooting",
-    "faq": "<dt>“Error 403: access_denied”</dt><dd>The app is still in Testing and the signed-in account is not a test user. Click <b>Publish app</b> as in step 3.</dd><dt>“redirect_uri_mismatch”</dt><dd>The client has the wrong type. Create a new client of type <b>Desktop app</b>, not Web application.</dd><dt>Backups stop working after 7 days</dt><dd>The app is in Testing. Publish it, then click <b>Reconnect Google Drive</b> in the app.</dd><dt>Another PC can't see my backups</dt><dd>Both PCs must use the <b>same client ID</b> and the <b>same Google account</b>. With <code>drive.file</code>, a different client ID can't see files created by another client.</dd><dt>Delete all data</dt><dd>Delete the <code>Checkpoint</code> folder in Google Drive and revoke access at <a href=\"https://myaccount.google.com/permissions\">myaccount.google.com/permissions</a>.</dd>"
+    "faq": "<dt>“Error 403: access_denied”</dt><dd>The app is still in Testing and the signed-in account is not a test user. Click <b>Publish app</b> as in step 3.</dd><dt>“redirect_uri_mismatch”</dt><dd>The client has the wrong type. Create a new client of type <b>Desktop app</b>, not Web application.</dd><dt>Backups stop working after 7 days</dt><dd>The app is in Testing. Publish it, then click <b>Reconnect Google Drive</b> in the app.</dd><dt>Another PC can't see my backups</dt><dd>Both PCs must use the <b>same client ID</b> and the <b>same Google account</b>. With <code>drive.file</code>, a different client ID can't see files created by another client.</dd><dt>Delete all data</dt><dd>Delete the <code>Checkpoint</code> folder in Google Drive and revoke access at <a href=\"https://myaccount.google.com/permissions\">myaccount.google.com/permissions</a>.</dd>",
+    "eyebrow": "Guide"
   },
   "notes": {
     "title": "Good to know",
@@ -122,9 +135,76 @@
     "about": "Checkpoint · open-source personal project, not affiliated with Valve or Google.",
     "bug": "Report a bug",
     "privacy": "Privacy",
-    "terms": "Terms"
+    "terms": "Terms",
+    "guide": "Guide"
   },
   "copy": {
     "title": "Click to copy"
+  },
+  "shots": {
+    "grid_src": "/shots/app-grid-en.webp",
+    "grid_alt": "Checkpoint showing a grid of game covers, each with its sync status and Backup and Restore buttons",
+    "list_src": "/shots/app-list-en.webp",
+    "list_alt": "Checkpoint's detailed list with save locations, local and cloud times, and status for each game",
+    "list_title": "Every save, at a glance",
+    "list_body": "Switch to the detailed list to see where each game keeps its saves, when it was last played here and when it was last backed up, and which PC uploaded it. Statuses compare file contents, not dates, so a wrong clock never fools it."
+  },
+  "problem": {
+    "eyebrow": "Why Checkpoint",
+    "title": "Offline mode shouldn't cost you your progress",
+    "p1_title": "No Steam Cloud offline",
+    "p1_body": "When Steam runs in offline mode, Steam Cloud never syncs. Play on the desktop, pick up the handheld, and your progress is stuck on the other PC.",
+    "p2_title": "Your Drive becomes the cloud",
+    "p2_body": "Checkpoint finds each game's save files, backs them up to a <code>Checkpoint</code> folder in your own Google Drive, and restores them on the next PC, even across Windows and Proton on Linux.",
+    "p3_title": "Changing Steam accounts?",
+    "p3_body": "Some games only load saves made by the same account. Checkpoint copies a save to your other account so you can test it in game, then keep it or undo it.",
+    "flow_a": "PC A · Windows",
+    "flow_a_sub": "Back up after playing",
+    "flow_cloud": "Your Google Drive",
+    "flow_cloud_sub": "Only files the app created",
+    "flow_b": "PC B · Bazzite",
+    "flow_b_sub": "Restore before playing"
+  },
+  "start": {
+    "eyebrow": "Get started",
+    "title": "Three steps, about 15 minutes",
+    "s1_title": "Install",
+    "s1_body": "Windows installer or Linux AppImage. The app finds Steam, your games and your accounts by itself.",
+    "s1_link": "Install guide",
+    "s2_title": "Connect Google Drive",
+    "s2_body": "Create your own free Google client ID once, then connect each PC with it. The app installs rclone for you.",
+    "s2_link": "Google Drive guide",
+    "s3_title": "Back up and restore",
+    "s3_body": "Back up when you stop playing, restore before you start on another PC. The app warns before anything newer is overwritten.",
+    "s3_link": "Day-to-day use",
+    "account_title": "Moving to another Steam account?",
+    "account_body": "Read what the app can and cannot move, and how to test a save safely.",
+    "account_link": "Switch account guide"
+  },
+  "account": {
+    "eyebrow": "Guide",
+    "title": "Move a save to another Steam account",
+    "intro": "Many games keep saves per Steam account. If you switch accounts, the new one starts with no progress. Checkpoint can copy a game's save from account A to account B so you can carry on.",
+    "how_title": "How to move a save",
+    "how_list": "<li>Open <b>Steam accounts</b> and click <b>Move saves to another account…</b>, or click <b>Switch account</b> on a game.</li><li>Pick the account that has the save (<b>from</b>) and the one you want to play on (<b>to</b>), then choose the games.</li><li>Click <b>Move saves of … games</b>. The app copies each save into the other account's folder and fixes Steam's <code>steam_autocloud.vdf</code>.</li><li>Sign in to Steam with the new account, open the game and choose <i>Continue</i> or <i>Load</i>.</li><li>Progress is there: click <b>Works, keep</b>. The game says the save is corrupt or starts a new game: click <b>Didn't work, undo</b>.</li>",
+    "safe_title": "Safe by design",
+    "safe_list": "<li>The original account's files are <b>never changed or deleted</b>. The app only copies.</li><li>Before copying, the app records the move, so even a half-finished move can be undone.</li><li><b>Undo</b> puts back anything it overwrote in the new account and removes files the game created during your test.</li><li>One pending move per game at a time.</li>",
+    "classes_title": "What works",
+    "classes_intro": "Before you start, the app checks how each game ties its saves to an account:",
+    "th_case": "How the save is tied to the account",
+    "th_result": "What the app does",
+    "c1": "Not tied to an account",
+    "c1_r": "Nothing to move: the save works on any account.",
+    "c2": "Account ID only in a folder name",
+    "c2_r": "Copies into the new account's folder. Works.",
+    "c3": "Account ID readable inside the file",
+    "c3_r": "Copies and replaces the ID inside the file. Experimental: some games check a checksum.",
+    "c4": "Encrypted or compressed file",
+    "c4_r": "Copies it. Whether the game accepts it is unknown, so test in game and undo if needed.",
+    "c5": "Saves kept on the game's servers",
+    "c5_r": "Not possible.",
+    "keep_title": "After you click Works, keep",
+    "keep_body": "The app remembers that account A now plays as account B. When you restore A's older backups later, the Restore dialog writes them into B's folder by default.",
+    "back": "Back to the guide"
   }
 }
