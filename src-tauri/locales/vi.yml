@@ -54,6 +54,12 @@ err:
   backup_corrupt: "File backup bị hỏng"
   open_folder: "Không mở được thư mục: %{detail}"
   open_browser: "Không mở được trình duyệt: %{detail}"
+  update_check: "Không kiểm tra được bản mới: %{detail}"
+  update_unsupported: "Bản này không tự cập nhật được. Bạn tải bản mới ở trang phát hành nhé."
+  update_gone: "Không còn thấy bản mới nào. Bạn kiểm tra lại sau nhé."
+  update_changed: "Trong lúc đó đã có bản mới hơn nữa (%{version}). Bạn kiểm tra lại để xem có gì mới."
+  update_install: "Không cài được bản cập nhật: %{detail}"
+  update_busy: "Đang có backup, restore hoặc chuyển save chạy dở. Đợi xong rồi hãy cập nhật."
   no_auth_url: "Chưa có link đăng nhập. Đợi vài giây hoặc bấm Kết nối lại."
 
 # Thông báo thành công từ backend (rust: t!("msg.*"))
@@ -129,6 +135,7 @@ ui:
     all_failed_other: "%{op}: %{n} game lỗi"
     manifest_failed: "Không tải được manifest"
     rclone_install_failed: "Không cài được rclone"
+    update_failed: "Không cập nhật được Checkpoint"
     connect_failed: "Không kết nối được Google Drive"
     generic: "Có lỗi xảy ra"
 
@@ -218,6 +225,26 @@ ui:
     saved_in: "Cấu hình lưu ở <span class=\"mono\">%{path}</span>"
     saved: "Đã lưu cài đặt."
     pick_storage_first: "Chọn nơi lưu backup trước."
+    updates: "Cập nhật"
+    version: "Phiên bản %{version}"
+    check_updates: "Kiểm tra bản mới khi mở app"
+    check_updates_hint: "Hỏi GitHub bản phát hành mới nhất. Không cài gì cho tới khi bạn bấm Cập nhật."
+    check_now: "Kiểm tra ngay"
+
+  update:
+    available: "<b>Đã có Checkpoint %{version}</b> (bạn đang dùng %{current})."
+    whats_new: "Có gì mới"
+    install: "Cập nhật và khởi động lại"
+    download: "Mở trang tải"
+    later: "Để sau"
+    title: "Cập nhật lên %{version}"
+    confirm: "Checkpoint sẽ tải bản mới, kiểm tra chữ ký, cài đặt rồi khởi động lại. Backup hoặc restore đang chạy phải xong trước."
+    confirm_win: "Trên Windows, cửa sổ cài đặt hiện lên một lúc rồi Checkpoint tự mở lại."
+    downloading: "Đang tải…"
+    downloading_pct: "Đang tải… %{pct}%"
+    installing: "Đang cài và khởi động lại…"
+    none: "Bạn đang dùng bản mới nhất (%{version})."
+    manual_hint: "Bản này không tự cập nhật được (không phải bản đã cài hay file AppImage). Bạn tải bản mới ở trang phát hành nhé."
 
   rclone:
     checking: "Đang kiểm tra rclone…"

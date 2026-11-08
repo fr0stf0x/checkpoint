@@ -32,6 +32,7 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 | `sync.rs` | List with status, backup, restore (with optional account remap), cloud `index.json`, snapshots |
 | `migrate.rs` | Moving a save from Steam account A to B: preview, apply, undo, keep |
 | `storage.rs`, `rclone.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect |
+| `updater.rs` | In-app updates (tauri-plugin-updater): check `latest.json`, signed download and install, restart |
 | `config.rs` | `config.json` (device, backend, language…) and `state.json` (last sync hashes) |
 | `logger.rs`, `report.rs`, `i18n.rs` | File log, prefilled GitHub issue URL, `tr!` macro (translated errors with English for logs) |
 | `src-tauri/locales/{en,vi}.yml` | All user-facing text for the backend (`err.*`, `msg.*`) and the UI (`ui.*`) |

@@ -21,8 +21,16 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk5MjVFNDE4ODVCQjY3MkIKUldRclo3dUZHT1FsbWJ1THlScGFRQnZpV1dmNEUvUktlK1BWd1ZsNGhJQWdvVC93STlOMjBlR2MK",
+      "endpoints": ["https://github.com/fr0stf0x/checkpoint/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": ["icons/icon.png", "icons/icon.ico"],
     "linux": {

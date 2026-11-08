@@ -45,6 +45,13 @@ pub struct Config {
     /// "auto" (follow the OS), "en" or "vi"
     #[serde(default = "default_language")]
     pub language: String,
+    /// Look for a new version on GitHub when the app starts
+    #[serde(default = "default_true")]
+    pub check_updates: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_keep() -> usize {
@@ -85,6 +92,7 @@ impl Config {
             keep_versions: 10,
             steam_root_override: None,
             language: default_language(),
+            check_updates: true,
         }
     }
 

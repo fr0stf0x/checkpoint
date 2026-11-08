@@ -6,6 +6,11 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-08
+
+### Added
+- In-app updates. At startup Checkpoint checks GitHub for a newer release and shows what's new; **Update and restart** downloads it, verifies its signature and installs it (Windows installer, or the AppImage file is replaced in place). Nothing is installed until you click, and updating waits while a backup, restore or move is running. Turn the check off or check by hand in **Settings → Updates**.
+
 ## [0.3.1] - 2026-11-08
 
 ### Added
@@ -54,7 +59,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.1.0...v0.2.0

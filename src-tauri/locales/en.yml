@@ -54,6 +54,12 @@ err:
   backup_corrupt: "The backup file is damaged"
   open_folder: "Could not open the folder: %{detail}"
   open_browser: "Could not open the browser: %{detail}"
+  update_check: "Could not check for updates: %{detail}"
+  update_unsupported: "This copy cannot update itself. Download the new version from the release page."
+  update_gone: "No newer version was found any more. Check again later."
+  update_changed: "An even newer version (%{version}) was released meanwhile. Check again to see what changed."
+  update_install: "Could not install the update: %{detail}"
+  update_busy: "A backup, restore or move is still running. Update when it is done."
   no_auth_url: "There is no sign-in link yet. Wait a few seconds or click Connect again."
 
 # Backend success messages (rust: t!("msg.*"))
@@ -130,6 +136,7 @@ ui:
     manifest_failed: "Could not download the manifest"
     rclone_install_failed: "Could not install rclone"
     connect_failed: "Could not connect Google Drive"
+    update_failed: "Could not update Checkpoint"
     generic: "Something went wrong"
 
   games:
@@ -218,6 +225,26 @@ ui:
     saved_in: "Settings are stored in <span class=\"mono\">%{path}</span>"
     saved: "Settings saved."
     pick_storage_first: "Choose a backup location first."
+    updates: "Updates"
+    version: "Version %{version}"
+    check_updates: "Check for a new version when the app starts"
+    check_updates_hint: "Asks GitHub for the latest release. Nothing is installed until you click Update."
+    check_now: "Check now"
+
+  update:
+    available: "<b>Checkpoint %{version} is available</b> (you have %{current})."
+    whats_new: "What's new"
+    install: "Update and restart"
+    download: "Open download page"
+    later: "Later"
+    title: "Update to %{version}"
+    confirm: "Checkpoint downloads the new version, checks its signature, installs it and restarts. Running backups or restores must finish first."
+    confirm_win: "On Windows the installer window appears briefly and Checkpoint opens again by itself."
+    downloading: "Downloading…"
+    downloading_pct: "Downloading… %{pct}%"
+    installing: "Installing and restarting…"
+    none: "You have the latest version (%{version})."
+    manual_hint: "This copy cannot update itself (it is not the installed app or the AppImage). Download the new version from the release page."
 
   rclone:
     checking: "Checking rclone…"

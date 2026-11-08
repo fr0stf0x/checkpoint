@@ -21,6 +21,7 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Saves made on Windows restore into the Proton prefix on Linux, and the other way round.
 - Move a game's save from one Steam account to another (for example when you have to switch accounts): copies the account's save folder to the new account, fixes `steam_autocloud.vdf`, optionally replaces the SteamID inside save files, then lets you test in game and **keep** or **undo** in one click. The original account's files are never touched. Restore can also write a backup into a different account.
 - Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID.
+- In-app updates: at startup the app asks GitHub for the latest release and shows what's new. **Update and restart** downloads it, checks its signature and installs it (Windows installer, or replaces the AppImage file in place). Nothing is installed until you click. Turn the check off in **Settings → Updates**. A Linux binary not started from the AppImage only gets a link to the download page.
 
 ## Languages
 
@@ -86,7 +87,15 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases.
+Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases. The in-app updater ignores pre-releases.
+
+The installers are signed for the in-app updater, and the workflow also publishes `latest.json`, which the app reads from `releases/latest/download/latest.json`. One-time setup:
+
+1. `cargo install tauri-cli --version "^2" --locked`, then `cargo tauri signer generate -w ~/.tauri/checkpoint.key` (choose a password).
+2. Put the contents of `~/.tauri/checkpoint.key.pub` into `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` (the test `updater_pubkey_is_set` fails until you do).
+3. Add the repository secrets `TAURI_SIGNING_PRIVATE_KEY` (contents of `~/.tauri/checkpoint.key`) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The workflow stops if the key is missing.
+
+Keep a backup of the private key. If it is lost, installed copies cannot verify new releases and must be updated by hand once with a new key.
 
 ## Website
 

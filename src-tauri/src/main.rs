@@ -15,6 +15,7 @@ mod report;
 mod steam;
 mod storage;
 mod sync;
+mod updater;
 mod vdf;
 
 use config::{Backend, Config};
@@ -150,8 +151,8 @@ async fn save_config(config: Config) -> Result<(), String> {
             Backend::Rclone { .. } => "rclone",
         };
         info!(
-            "Settings saved: storage={kind}, include_config={}, keep_versions={}, language={}",
-            config.include_config, config.keep_versions, config.language
+            "Settings saved: storage={kind}, include_config={}, keep_versions={}, language={}, check_updates={}",
+            config.include_config, config.keep_versions, config.language, config.check_updates
         );
         config.save()?;
         apply_language(&config);
@@ -377,6 +378,67 @@ async fn rclone_connect(client_id: String, client_secret: String) -> Result<Stri
     .await
 }
 
+/// Look for a newer version. `manual` is false for the check at startup, which is skipped when
+/// turned off in Settings or in dev builds, and which never shows an error (offline is normal).
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle, manual: bool) -> Result<Option<updater::UpdateInfo>, String> {
+    if !manual {
+        let cfg = Config::load();
+        if !cfg.check_updates || cfg!(debug_assertions) {
+            return Ok(None);
+        }
+        let r = tauri::async_runtime::spawn_blocking(move || {
+            i18n::clear();
+            updater::check(&app)
+        }).await;
+        return Ok(match r {
+            Ok(Ok(found)) => found,
+            Ok(Err(e)) => {
+                info!("Startup update check skipped: {}", i18n::to_en(&format!("{e:#}")));
+                None
+            }
+            Err(e) => {
+                info!("Startup update check skipped: {e}");
+                None
+            }
+        });
+    }
+    blocking("check_update", move || {
+        info!("Checking for updates");
+        updater::check(&app)
+    })
+    .await
+}
+
+/// Download and install `version` (the one the user saw), then restart.
+/// Refused while a backup, restore or move is running.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle, version: String) -> Result<(), String> {
+    blocking("install_update", move || {
+        let _g = match OP.try_lock() {
+            Ok(g) => g,
+            Err(std::sync::TryLockError::Poisoned(p)) => p.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => anyhow::bail!("{}", crate::tr!("err.update_busy")),
+        };
+        updater::install(&app, &version)
+    })
+    .await
+}
+
+/// Open the latest GitHub Release, for copies that cannot update themselves.
+#[tauri::command]
+fn open_release_page(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url("https://github.com/fr0stf0x/checkpoint/releases/latest", None::<&str>)
+        .map_err(|e| crate::tr!("err.open_browser", detail = e.to_string()).to_string())
+}
+
+#[tauri::command]
+fn update_progress() -> updater::Progress {
+    updater::progress()
+}
+
 /// The Google sign-in link of the connect in progress (None until rclone prints it).
 #[tauri::command]
 fn rclone_auth_url() -> Option<String> {
@@ -454,6 +516,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             get_strings,
             get_info,
@@ -476,6 +539,10 @@ fn main() {
             rclone_connect,
             rclone_auth_url,
             open_auth_url,
+            check_update,
+            install_update,
+            update_progress,
+            open_release_page,
             log_frontend,
             get_log,
             open_log_folder,

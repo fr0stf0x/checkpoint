@@ -5,7 +5,7 @@
   const pane = $('#pane'), layer = $('#layer');
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  const S = { info: null, list: null, accounts: null, view: 'games', filter: 'all', q: '', loading: false, busy: false, lang: 'en', T: {} };
+  const S = { info: null, list: null, accounts: null, view: 'games', filter: 'all', q: '', loading: false, busy: false, lang: 'en', T: {}, update: null, updateHidden: false };
 
   // ---------- i18n ----------
   // Strings come from src-tauri/locales/<lang>.yml (the "ui" subtree), loaded through get_strings.
@@ -120,6 +120,11 @@
 
   function banners() {
     const out = [];
+    if (S.update && !S.updateHidden) {
+      const u = S.update;
+      out.push(`<div class="banner"><p>${h('update.available', { version: u.version, current: u.current })}</p>
+        <button class="btn" data-act="updLater">${h('update.later')}</button><button class="btn primary" data-act="updShow">${h('update.whats_new')}</button></div>`);
+    }
     (S.pending || []).forEach((m) => {
       const v = { game: m.game_name, from: acctName(m.from), to: acctName(m.to) };
       out.push(`<div class="banner warn"><p>${h('games.pending_move', v)}</p>
@@ -259,6 +264,11 @@
       <div class="group"><h3>${h('settings.manifest')}</h3>
         <p class="note">${S.info.manifest_games ? h('settings.manifest_info', { n: S.info.manifest_games.toLocaleString(locale()), time: fmt(S.info.manifest_updated) }) : h('settings.manifest_missing')} ${h('settings.manifest_source')}</p>
         <div class="row"><button class="btn" data-act="manifest">${h('settings.manifest_update')}</button></div>
+      </div>
+      <div class="group"><h3>${h('settings.updates')}</h3>
+        <p class="note">${h('settings.version', { version: S.info.version })}</p>
+        <label class="check" for="chkUpd"><input type="checkbox" id="chkUpd" ${c.check_updates !== false ? 'checked' : ''}> <span>${h('settings.check_updates')}<br><span class="note">${h('settings.check_updates_hint')}</span></span></label>
+        <div class="row"><button class="btn" data-act="checkUpd">${h('settings.check_now')}</button></div>
       </div>
       <div class="row"><button class="btn primary" data-act="saveCfg">${h('settings.save')}</button><span class="note">${h('settings.saved_in', { path: S.info.config_dir })}</span></div>
     </div>`;
@@ -474,6 +484,7 @@
       include_config: $('#incCfg').checked,
       keep_versions: Math.max(1, Math.min(100, parseInt($('#keep').value, 10) || 10)),
       language: $('#lang').value,
+      check_updates: $('#chkUpd').checked,
     };
   }
 
@@ -695,6 +706,11 @@
           await loadInfo(); S.list = null; render(); loadGames();
         } catch (err) { clearInterval(poll); S.busy = false; fail(t('err.connect_failed'), err); loadRclone(); }
       }
+      else if (a === 'updLater') { S.updateHidden = true; render(); }
+      else if (a === 'updShow') { if (S.update) updateModal(S.update); }
+      else if (a === 'checkUpd') { await checkUpdate(true); }
+      else if (a === 'updInstall') { await installUpdate(); }
+      else if (a === 'updPage') { try { await call('open_release_page'); } catch (e) { toast(String(e), true); } }
       else if (a === 'copyAuth') {
         const url = $('#authUrl') && $('#authUrl').value;
         try { await navigator.clipboard.writeText(url); toast(t('rclone.link_copied')); }
@@ -760,6 +776,67 @@
     } catch (e) { toast(String(e), true); }
   }
 
+  // ---------- updates ----------
+  // manual=false: the silent check at startup (the backend skips it when turned off).
+  async function checkUpdate(manual) {
+    if (manual) busyModal(t('settings.check_now'));
+    let u = null;
+    try { u = await call('check_update', { manual }); }
+    catch (e) { if (manual) fail(t('err.update_failed'), e); return; }
+    S.update = u;
+    if (u) S.updateHidden = false;
+    if (manual) {
+      if (u) updateModal(u);
+      else { close(); toast(t('update.none', { version: S.info ? S.info.version : '' })); }
+    }
+    if (S.view === 'games') render();
+  }
+  // Release notes are Markdown: escape everything, then style headings, **bold** and `code` only.
+  function mdLite(text) {
+    return text.split('\n').map((line) => {
+      let l = esc(line);
+      const head = /^#{1,6}\s+(.*)$/.exec(l);
+      if (head) return `<b>${head[1]}</b>`;
+      l = l.replace(/^(\s*)[-*]\s+/, '$1• ');
+      return l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+    }).join('\n');
+  }
+  function updateModal(u) {
+    const notes = u.notes ? `<h4>${h('update.whats_new')}</h4><div class="notes">${mdLite(u.notes)}</div>` : '';
+    const how = u.can_install
+      ? `<p class="note">${h('update.confirm')}${S.info && S.info.os === 'windows' ? ' ' + h('update.confirm_win') : ''}</p>`
+      : `<div class="alert warn">${h('update.manual_hint')}</div>`;
+    const go = u.can_install
+      ? `<button class="btn primary" data-act="updInstall" ${S.busy ? 'disabled' : ''}>${h('update.install')}</button>`
+      : `<button class="btn primary" data-act="updPage">${h('update.download')}</button>`;
+    modal(`<h3>${h('update.title', { version: u.version })}</h3>
+      <p>${h('update.available', { version: u.version, current: u.current })}</p>${notes}${how}
+      <div class="mfoot"><button class="btn" data-close="1">${h('update.later')}</button>${go}</div>`);
+  }
+  async function installUpdate() {
+    const u = S.update;
+    if (!u || S.busy) return;
+    busyModal(t('update.title', { version: u.version }));
+    $('#busyText').textContent = t('update.downloading');
+    S.busy = true;
+    const poll = setInterval(async () => {
+      let p; try { p = await call('update_progress'); } catch (e) { return; }
+      const el = $('#busyText'); if (!el) return;
+      if (p.total && p.downloaded >= p.total) el.textContent = t('update.installing');
+      else if (p.total) el.textContent = t('update.downloading_pct', { pct: Math.floor(p.downloaded * 100 / p.total) });
+    }, 500);
+    try {
+      await call('install_update', { version: u.version });
+      // Linux restarts and Windows exits before this returns; if it does return, the installer is running.
+      clearInterval(poll);
+      const el = $('#busyText'); if (el) el.textContent = t('update.installing');
+    } catch (e) {
+      clearInterval(poll);
+      S.busy = false;
+      fail(t('err.update_failed'), e);
+    }
+  }
+
   // Google sign-in link printed by rclone; shown so it can be copied when no browser opened.
   async function showAuthLink() {
     const box = $('#authLink');
@@ -791,6 +868,7 @@
       await loadStrings();
       await loadInfo();
       loadAccounts();
+      checkUpdate(false);
       if (!backendReady()) { S.view = 'settings'; render(); toast(t('settings.pick_storage_first')); loadGames(); return; }
       await loadGames();
     } catch (e) {

@@ -21,6 +21,7 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Save tạo trên Windows restore được vào Proton prefix trên Linux và ngược lại.
 - Chuyển save của một game từ tài khoản Steam này sang tài khoản khác (ví dụ khi phải đổi tài khoản): copy thư mục save sang tài khoản mới, sửa `steam_autocloud.vdf`, tùy chọn thay SteamID bên trong file save, rồi để bạn thử trong game và **Giữ** hoặc **Hoàn tác** bằng 1 click. File của tài khoản cũ không bao giờ bị đụng tới. Restore cũng ghi được bản backup vào tài khoản khác.
 - Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn.
+- Cập nhật ngay trong app: khi mở, app hỏi GitHub bản phát hành mới nhất và cho xem có gì mới. Bấm **Cập nhật và khởi động lại** thì app tải bản mới, kiểm tra chữ ký rồi cài (chạy bộ cài trên Windows, hoặc thay luôn file AppImage). Không cài gì cho tới khi bạn bấm. Tắt kiểm tra ở **Cài đặt → Cập nhật**. Bản Linux không chạy từ file AppImage thì chỉ có link tới trang tải.
 
 ## Ngôn ngữ
 
@@ -86,7 +87,15 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release.
+Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release. Trình cập nhật trong app bỏ qua pre-release.
+
+Bộ cài được ký cho trình cập nhật trong app, và workflow đăng thêm `latest.json`, app đọc file này ở `releases/latest/download/latest.json`. Cài đặt một lần:
+
+1. `cargo install tauri-cli --version "^2" --locked`, rồi `cargo tauri signer generate -w ~/.tauri/checkpoint.key` (đặt mật khẩu).
+2. Dán nội dung `~/.tauri/checkpoint.key.pub` vào `plugins.updater.pubkey` trong `src-tauri/tauri.conf.json` (test `updater_pubkey_is_set` báo lỗi cho tới khi làm bước này).
+3. Thêm secret của repo: `TAURI_SIGNING_PRIVATE_KEY` (nội dung `~/.tauri/checkpoint.key`) và `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Thiếu khóa thì workflow dừng.
+
+Nhớ backup khóa private. Mất khóa thì các bản đã cài không kiểm tra được bản mới, phải cập nhật tay một lần với khóa mới.
 
 ## Trang web
 

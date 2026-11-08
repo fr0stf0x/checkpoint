@@ -113,11 +113,25 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
+      # The in-app updater only installs files signed with this key (public key in tauri.conf.json)
+      - name: Check the updater signing key
+        shell: bash
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "Repository secret TAURI_SIGNING_PRIVATE_KEY is missing (see README, Releases)." >&2
+            exit 1
+          fi
+
       - name: Build and publish the GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          includeUpdaterJson: true
           tauriScript: npx --yes @tauri-apps/cli@2
           args: --bundles ${{ matrix.bundles }}
           tagName: ${{ env.TAG }}
