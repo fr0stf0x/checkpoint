@@ -12,7 +12,7 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 
 ## Tính năng
 
-- Liệt kê game Steam đã cài và các tài khoản Steam trên máy.
+- Liệt kê game Steam đã cài và các tài khoản Steam trên máy, kèm ảnh game và avatar tài khoản lấy từ bộ nhớ đệm của Steam trên máy (chạy được khi offline). Game hiện dạng lưới ảnh bìa hoặc danh sách chi tiết (nút chuyển cạnh ô tìm kiếm), giao diện tối có icon.
 - Tìm file save bằng [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (dữ liệu PCGamingWiki, khoảng 20.000 game), cộng thêm thư mục `userdata/<account>/<appid>/remote` của Steam Cloud.
 - Backup và restore từng game, hoặc toàn bộ với màn hình xem trước game nào chạy, game nào bỏ qua.
 - So sánh bằng hash nội dung, không dựa vào ngày sửa file. Phân biệt "local mới hơn", "cloud mới hơn" và xung đột thật, cảnh báo trước khi nút nào đó ghi đè tiến trình mới hơn.

@@ -5,11 +5,11 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 ## App
 
 ### Look and feel
-- [ ] Show Steam account avatars (read from Steam's local cache, e.g. `config/avatarcache/<SteamID64>.png`; no network needed in offline mode).
-- [ ] Show game artwork (Steam's local library cache, e.g. `appcache/librarycache/<appid>/` header/capsule images; fall back to a placeholder).
-- [ ] Use icons throughout so screens are less text-heavy (status pills, buttons, sidebar, dialogs). Pick one icon set and bundle it locally (the app works offline).
-- [ ] Modern UI with a gaming vibe (cover-art game grid, darker theme, stronger visual hierarchy), keeping both languages and keyboard focus states.
-- [ ] Installer and app have no proper logo: use the Checkpoint logo from the website (`site/icon.png`, `site/logo-120.png`) to generate every icon size (`cargo tauri icon`), and check the NSIS installer, the window/taskbar icon and the AppImage icon.
+- [x] Show Steam account avatars (read from Steam's local cache, e.g. `config/avatarcache/<SteamID64>.png`; no network needed in offline mode).
+- [x] Show game artwork (Steam's local library cache, e.g. `appcache/librarycache/<appid>/` header/capsule images; fall back to a placeholder).
+- [x] Use icons throughout so screens are less text-heavy (status pills, buttons, sidebar, dialogs). Pick one icon set and bundle it locally (the app works offline).
+- [x] Modern UI with a gaming vibe (cover-art game grid, darker theme, stronger visual hierarchy), keeping both languages and keyboard focus states.
+- [x] Installer and app have no proper logo: use the Checkpoint logo from the website (`site/icon.png`, `site/logo-120.png`) to generate every icon size (`cargo tauri icon`), and check the NSIS installer, the window/taskbar icon and the AppImage icon.
 
 ### Features
 - [ ] Launch wrapper `checkpoint run -- %command%` for Steam launch options: restore before playing, back up after quitting.

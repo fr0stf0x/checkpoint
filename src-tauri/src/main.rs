@@ -6,6 +6,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 mod config;
 mod i18n;
+mod images;
 mod logger;
 mod manifest;
 mod migrate;
@@ -517,6 +518,11 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Avatars and game artwork from Steam's local caches (see images.rs)
+        .register_asynchronous_uri_scheme_protocol("steamimg", |_ctx, request, responder| {
+            let path = request.uri().path().to_string();
+            tauri::async_runtime::spawn_blocking(move || responder.respond(images::respond(&path)));
+        })
         .invoke_handler(tauri::generate_handler![
             get_strings,
             get_info,

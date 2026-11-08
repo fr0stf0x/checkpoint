@@ -12,7 +12,7 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 
 ## Features
 
-- Lists installed Steam games and the Steam accounts on the machine.
+- Lists installed Steam games and the Steam accounts on the machine, with game artwork and account avatars taken from Steam's local cache (works offline). Games show as a cover-art grid or a detailed list (toggle next to the search box), in a dark theme with icons.
 - Finds save files using the [ludusavi-manifest](https://github.com/mtkennerly/ludusavi-manifest) (PCGamingWiki data, about 20,000 games), plus Steam Cloud's local `userdata/<account>/<appid>/remote` folder.
 - Backup and restore per game, or for all games at once with a preview of what will run and what will be skipped.
 - Compares by content hash, not file dates. Tells apart "local is newer", "cloud is newer" and real conflicts, and warns before either button would overwrite newer progress.

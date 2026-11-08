@@ -6,6 +6,13 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Added
+- Game artwork in the game list and avatars on the Steam accounts page, read from Steam's local cache (no download, works in offline mode). Games or accounts without a cached image show their first letter.
+
+### Changed
+- New look: a dark theme, icons on buttons, status badges and the sidebar, and a cover-art grid for games. The detailed list is still there (toggle next to the search box), and the app remembers your choice. On narrow windows the sidebar shrinks to icons. The light theme was removed.
+- Full set of app icons generated from the Checkpoint logo, used by the Windows installer, the window and taskbar, and the AppImage.
+
 ## [0.4.0] - 2026-11-08
 
 ### Added

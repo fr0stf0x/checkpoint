@@ -36,7 +36,7 @@
   },
   "features": {
     "local_title": "Runs on your PC",
-    "local_body": "No server. The app reads your Steam folder and save files, zips them and sends them straight to your Drive.",
+    "local_body": "No server. The app reads your Steam folder and save files, zips them and sends them straight to your Drive. Your games show as a cover-art grid; artwork and account avatars come from Steam's own cache, so nothing extra is downloaded.",
     "scope_title": "Minimal access",
     "scope_body": "Uses only the <code>drive.file</code> scope: the app sees the files it created and nothing else in your Drive.",
     "safe_title": "No accidental overwrites",

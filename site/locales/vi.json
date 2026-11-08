@@ -36,7 +36,7 @@
   },
   "features": {
     "local_title": "Chạy trên máy bạn",
-    "local_body": "Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn.",
+    "local_body": "Không có server. App đọc thư mục Steam và file save trên máy, nén lại và gửi thẳng vào Drive của bạn. Game hiện dạng lưới ảnh bìa; ảnh và avatar tài khoản lấy từ bộ nhớ đệm của chính Steam, không tải thêm gì.",
     "scope_title": "Quyền tối thiểu",
     "scope_body": "Chỉ dùng quyền <code>drive.file</code>: app chỉ thấy file do chính nó tạo, không đọc được phần còn lại trong Drive.",
     "safe_title": "Không ghi đè nhầm",
