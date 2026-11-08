@@ -54,6 +54,7 @@ err:
   backup_corrupt: "The backup file is damaged"
   open_folder: "Could not open the folder: %{detail}"
   open_browser: "Could not open the browser: %{detail}"
+  no_auth_url: "There is no sign-in link yet. Wait a few seconds or click Connect again."
 
 # Backend success messages (rust: t!("msg.*"))
 msg:
@@ -238,6 +239,11 @@ ui:
     need_both: "Enter both the Client ID and the Client secret."
     signing_in: "Sign in to Google in the browser that just opened, allow access, then come back. If the browser then says \"127.0.0.1 refused to connect\", ignore it: rclone already got the code and closed its temporary server."
     connected_toast: "Connected: %{remote}"
+    link_hint: "Browser did not open? Copy this link and open it in a browser on this PC (it only works on this PC):"
+    copy_link: "Copy link"
+    open_link: "Open in browser"
+    link_copied: "Sign-in link copied. Paste it into the browser's address bar."
+    link_copy_failed: "Could not copy. Select the link and copy it by hand."
 
   move:
     title: "Move saves to another account"

@@ -53,7 +53,7 @@
     "client_title": "Tạo Google Client ID (làm 1 lần, dùng cho mọi máy)",
     "client_body": "Xem phần <a href=\"#google\">Kết nối Google Drive</a> bên dưới. Mất khoảng 5–10 phút.",
     "connect_title": "Kết nối trong app",
-    "connect_list": "<li>Vào <b>Cài đặt → Nơi lưu backup</b>. Nếu chưa có rclone, bấm <b>Cài rclone</b>: app tải bản chính thức từ downloads.rclone.org và kiểm tra SHA-256, không cần quyền admin.</li><li>Dán <b>Client ID</b> và <b>Client secret</b>, bấm <b>Kết nối Google Drive</b>, đăng nhập trong trình duyệt vừa mở.</li><li>Làm lại bước này trên từng máy, với <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>.</li>",
+    "connect_list": "<li>Vào <b>Cài đặt → Nơi lưu backup</b>. Nếu chưa có rclone, bấm <b>Cài rclone</b>: app tải bản chính thức từ downloads.rclone.org và kiểm tra SHA-256, không cần quyền admin.</li><li>Dán <b>Client ID</b> và <b>Client secret</b>, bấm <b>Kết nối Google Drive</b>, đăng nhập trong trình duyệt vừa mở. Nếu trình duyệt không tự mở, bấm <b>Copy link</b> trong hộp thoại đăng nhập rồi dán vào trình duyệt trên cùng máy.</li><li>Làm lại bước này trên từng máy, với <b>cùng Client ID</b> và <b>cùng tài khoản Google</b>.</li>",
     "daily_title": "Dùng hằng ngày",
     "daily_list": "<li>Chơi xong trên máy A: bấm <b>Backup</b> (hoặc <b>Backup toàn bộ</b>).</li><li>Trước khi chơi trên máy B: bấm <b>Restore</b> (hoặc <b>Restore toàn bộ</b>).</li><li>Tắt game trước khi backup hoặc restore. App không cho thao tác khi game đang chạy.</li>",
     "th_status": "Trạng thái",

@@ -377,6 +377,24 @@ async fn rclone_connect(client_id: String, client_secret: String) -> Result<Stri
     .await
 }
 
+/// The Google sign-in link of the connect in progress (None until rclone prints it).
+#[tauri::command]
+fn rclone_auth_url() -> Option<String> {
+    rclone::auth_url()
+}
+
+/// Open the sign-in link of the connect in progress in the default browser.
+/// Only the link captured from rclone can be opened, never a URL from the UI.
+#[tauri::command]
+fn open_auth_url(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let url = rclone::auth_url().ok_or_else(|| crate::tr!("err.no_auth_url").to_string())?;
+    info!("Opening Google sign-in link in the browser");
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| crate::tr!("err.open_browser", detail = e.to_string()).to_string())
+}
+
 // ---------- logs and bug reports ----------
 
 /// The UI sends JavaScript errors and notable events here so everything ends up in one log file.
@@ -456,6 +474,8 @@ fn main() {
             rclone_status,
             rclone_install,
             rclone_connect,
+            rclone_auth_url,
+            open_auth_url,
             log_frontend,
             get_log,
             open_log_folder,

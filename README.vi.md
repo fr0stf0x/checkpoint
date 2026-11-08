@@ -51,7 +51,7 @@ Checkpoint/
 
 ## Nơi lưu
 
-- **Google Drive qua rclone (khuyên dùng, Windows và Linux):** vào Cài đặt, bấm **Cài rclone** nếu chưa có, dán **Client ID** và **Client secret** của Google, bấm **Kết nối Google Drive**. App chạy `rclone config create gdrive drive scope=drive.file client_id=… client_secret=…`, mở trình duyệt để đăng nhập Google, rồi dùng `gdrive:Checkpoint`. Làm vậy trên mọi máy, cùng client ID và cùng tài khoản Google.
+- **Google Drive qua rclone (khuyên dùng, Windows và Linux):** vào Cài đặt, bấm **Cài rclone** nếu chưa có, dán **Client ID** và **Client secret** của Google, bấm **Kết nối Google Drive**. App chạy `rclone config create gdrive drive scope=drive.file client_id=… client_secret=…`, mở trình duyệt để đăng nhập Google, rồi dùng `gdrive:Checkpoint`. Nếu trình duyệt không tự mở (ví dụ Firefox bản Flatpak trên Bazzite), hộp thoại đăng nhập hiện link kèm nút **Copy link** và **Mở trong trình duyệt**: dán link vào trình duyệt trên cùng máy đó. Làm vậy trên mọi máy, cùng client ID và cùng tài khoản Google.
 - **Thư mục:** thư mục bất kỳ, ví dụ `G:\My Drive\Checkpoint` nếu dùng Google Drive for Desktop trên Windows.
 
 ### Vì sao cần client ID riêng

@@ -685,12 +685,23 @@
         if (!clientId || !clientSecret) { toast(t('rclone.need_both'), true); return; }
         busyModal(t('rclone.connect'));
         $('#busyText').textContent = t('rclone.signing_in');
+        layer.querySelector('.modal').insertAdjacentHTML('beforeend', '<div id="authLink" hidden></div>');
         S.busy = true;
+        const poll = setInterval(showAuthLink, 700);
         try {
           const r = await call('rclone_connect', { clientId, clientSecret });
+          clearInterval(poll);
           S.busy = false; close(); toast(t('rclone.connected_toast', { remote: r }));
           await loadInfo(); S.list = null; render(); loadGames();
-        } catch (err) { S.busy = false; fail(t('err.connect_failed'), err); loadRclone(); }
+        } catch (err) { clearInterval(poll); S.busy = false; fail(t('err.connect_failed'), err); loadRclone(); }
+      }
+      else if (a === 'copyAuth') {
+        const url = $('#authUrl') && $('#authUrl').value;
+        try { await navigator.clipboard.writeText(url); toast(t('rclone.link_copied')); }
+        catch (e) { $('#authUrl').select(); toast(t('rclone.link_copy_failed'), true); }
+      }
+      else if (a === 'openAuth') {
+        try { await call('open_auth_url'); } catch (e) { toast(String(e), true); }
       }
       else if (a === 'saveCfg') {
         const cfg = readSettings();
@@ -747,6 +758,20 @@
       toast(t('report.opened'));
       if (r.log_truncated) toast(t('report.truncated'));
     } catch (e) { toast(String(e), true); }
+  }
+
+  // Google sign-in link printed by rclone; shown so it can be copied when no browser opened.
+  async function showAuthLink() {
+    const box = $('#authLink');
+    if (!box || !box.hidden) return;
+    let url = null;
+    try { url = await call('rclone_auth_url'); } catch (e) { return; }
+    if (!url || !$('#authLink') || !box.hidden) return;
+    box.innerHTML = `<p class="note">${h('rclone.link_hint')}</p>
+      <input id="authUrl" class="mono" readonly value="${esc(url)}" style="width:100%">
+      <div class="row"><button class="btn primary" data-act="copyAuth">${h('rclone.copy_link')}</button>
+      <button class="btn" data-act="openAuth">${h('rclone.open_link')}</button></div>`;
+    box.hidden = false;
   }
 
   async function copyLog() {

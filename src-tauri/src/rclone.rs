@@ -6,8 +6,10 @@ use crate::tr;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Read;
+use log::info;
+use std::io::{BufRead, BufReader, Read};
 use std::process::Stdio;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const DOWNLOADS: &str = "https://downloads.rclone.org";
@@ -159,6 +161,30 @@ fn valid_client_id(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
 }
 
+/// Local sign-in link printed by the running `rclone config create`, if any.
+static AUTH_URL: Mutex<Option<String>> = Mutex::new(None);
+
+fn set_auth_url(url: Option<String>) {
+    if let Ok(mut g) = AUTH_URL.lock() {
+        *g = url;
+    }
+}
+
+/// The sign-in link of the connect in progress, for the UI's Copy / Open buttons.
+pub fn auth_url() -> Option<String> {
+    AUTH_URL.lock().ok().and_then(|g| g.clone())
+}
+
+/// rclone prints e.g. "... go to the following link: http://127.0.0.1:53682/auth?state=abc".
+/// Only accept a loopback /auth link, so the UI never opens anything else.
+fn find_auth_url(line: &str) -> Option<String> {
+    let start = line.find("http://127.0.0.1:")?;
+    let url: String = line[start..].chars().take_while(|c| !c.is_whitespace()).collect();
+    let rest = &url["http://127.0.0.1:".len()..];
+    let port_len = rest.chars().take_while(|c| c.is_ascii_digit()).count();
+    (port_len > 0 && rest[port_len..].starts_with("/auth")).then_some(url)
+}
+
 /// Create (or recreate) the Google Drive remote with the user's own client_id. Opens the browser for Google sign-in.
 pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client_secret: &str) -> Result<()> {
     let client_id = client_id.trim();
@@ -179,6 +205,7 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
         }
     }
 
+    set_auth_url(None);
     let mut child = rclone_command(&bin)
         .args([
             "config",
@@ -195,6 +222,23 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
         .spawn()
         .with_context(|| tr!("err.rclone_run", bin = bin).to_string())?;
 
+    // Read stderr while rclone runs: it prints the local sign-in link there, which the UI offers
+    // to copy when rclone cannot open a browser itself (e.g. Flatpak Firefox from an AppImage).
+    let reader = child.stderr.take().map(|e| {
+        std::thread::spawn(move || {
+            let mut all = String::new();
+            for line in BufReader::new(e).lines().map_while(|l| l.ok()) {
+                if let Some(url) = find_auth_url(&line) {
+                    info!("rclone sign-in link received");
+                    set_auth_url(Some(url));
+                }
+                all.push_str(&line);
+                all.push('\n');
+            }
+            all
+        })
+    });
+
     // Wait for the user to sign in in the browser, at most 5 minutes
     let start = Instant::now();
     let status = loop {
@@ -203,16 +247,16 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
         }
         if start.elapsed() > Duration::from_secs(300) {
             let _ = child.kill();
+            let _ = child.wait();
+            set_auth_url(None);
             let _ = rclone_command(&bin).args(["config", "delete", name]).output();
             bail!("{}", tr!("err.signin_timeout"));
         }
         std::thread::sleep(Duration::from_millis(400));
     };
+    set_auth_url(None);
+    let err = reader.and_then(|r| r.join().ok()).unwrap_or_default();
     if !status.success() {
-        let mut err = String::new();
-        if let Some(mut e) = child.stderr.take() {
-            let _ = e.read_to_string(&mut err);
-        }
         let last = err.lines().filter(|l| !l.trim().is_empty()).last().unwrap_or("").to_string();
         bail!("{}", tr!("err.signin_failed", detail = last));
     }
@@ -227,6 +271,15 @@ pub fn connect(configured_bin: Option<&str>, name: &str, client_id: &str, client
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn auth_url_from_rclone_output() {
+        let line = "2026/11/08 10:00:00 NOTICE: If your browser doesn't open automatically go to the following link: http://127.0.0.1:53682/auth?state=Ab-9_x";
+        assert_eq!(find_auth_url(line).as_deref(), Some("http://127.0.0.1:53682/auth?state=Ab-9_x"));
+        assert_eq!(find_auth_url("NOTICE: Log in and authorize rclone for access"), None);
+        assert_eq!(find_auth_url("see http://127.0.0.1:53682/other"), None);
+        assert_eq!(find_auth_url("see http://127.0.0.1:/auth"), None);
+    }
 
     #[test]
     fn client_id_validation() {

@@ -54,6 +54,7 @@ err:
   backup_corrupt: "File backup bị hỏng"
   open_folder: "Không mở được thư mục: %{detail}"
   open_browser: "Không mở được trình duyệt: %{detail}"
+  no_auth_url: "Chưa có link đăng nhập. Đợi vài giây hoặc bấm Kết nối lại."
 
 # Thông báo thành công từ backend (rust: t!("msg.*"))
 msg:
@@ -238,6 +239,11 @@ ui:
     need_both: "Nhập cả Client ID và Client secret."
     signing_in: "Đăng nhập Google trong trình duyệt vừa mở, cho phép quyền, rồi quay lại đây. Nếu sau đó trình duyệt báo \"127.0.0.1 refused to connect\" thì bỏ qua: rclone đã nhận mã và tắt máy chủ tạm."
     connected_toast: "Đã kết nối: %{remote}"
+    link_hint: "Trình duyệt không tự mở? Copy link này rồi mở trong trình duyệt trên máy này (link chỉ dùng được trên máy này):"
+    copy_link: "Copy link"
+    open_link: "Mở trong trình duyệt"
+    link_copied: "Đã copy link đăng nhập. Dán vào thanh địa chỉ của trình duyệt."
+    link_copy_failed: "Không copy được. Bạn chọn link rồi copy bằng tay nhé."
 
   move:
     title: "Chuyển save sang tài khoản khác"

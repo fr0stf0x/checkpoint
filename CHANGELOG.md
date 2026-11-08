@@ -6,7 +6,10 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-08
+
 ### Added
+- **Copy link** and **Open in browser** in the Google Drive sign-in dialog, for when rclone cannot open a browser itself (for example Flatpak Firefox on Bazzite). Paste the link into a browser on the same PC.
 - This changelog. Release notes now start with the changes of that version, followed by the install instructions.
 
 ## [0.3.0] - 2026-11-07
@@ -51,7 +54,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/fr0stf0x/checkpoint/releases/tag/v0.1.0

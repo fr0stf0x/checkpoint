@@ -51,7 +51,7 @@ Checkpoint/
 
 ## Storage
 
-- **Google Drive via rclone (recommended, Windows and Linux):** in Settings, click **Install rclone** if needed, paste your Google **Client ID** and **Client secret**, then **Connect Google Drive**. The app runs `rclone config create gdrive drive scope=drive.file client_id=… client_secret=…`, opens the browser for Google sign-in, and uses `gdrive:Checkpoint`. Do this on every PC with the same client ID and the same Google account.
+- **Google Drive via rclone (recommended, Windows and Linux):** in Settings, click **Install rclone** if needed, paste your Google **Client ID** and **Client secret**, then **Connect Google Drive**. The app runs `rclone config create gdrive drive scope=drive.file client_id=… client_secret=…`, opens the browser for Google sign-in, and uses `gdrive:Checkpoint`. If no browser opens (for example Flatpak Firefox on Bazzite), the sign-in dialog shows the link with **Copy link** and **Open in browser**: paste it into a browser on the same PC. Do this on every PC with the same client ID and the same Google account.
 - **Folder:** any folder, for example `G:\My Drive\Checkpoint` with Google Drive for Desktop on Windows.
 
 ### Why your own Google client ID
