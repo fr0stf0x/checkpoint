@@ -413,6 +413,18 @@ ui:
     backup_instead: "Back up instead"
     force: "Restore anyway, overwrite local"
 
+  pad:
+    a: "Choose / open game"
+    b: "Back"
+    x: "Select game"
+    lbrb: "Switch screen"
+
+  gmenu:
+    select: "Select"
+    unselect: "Unselect"
+    select_hint: "For Back up / Restore N games at the top (X on a game does the same)"
+    details: "Details and more"
+
   snap:
     row: "Earlier saves"
     count_one: "%{n} kept on this PC"

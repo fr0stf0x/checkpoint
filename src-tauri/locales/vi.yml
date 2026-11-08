@@ -413,6 +413,18 @@ ui:
     backup_instead: "Backup thay vì restore"
     force: "Vẫn restore, ghi đè local"
 
+  pad:
+    a: "Chọn / mở game"
+    b: "Quay lại"
+    x: "Đánh dấu game"
+    lbrb: "Đổi màn hình"
+
+  gmenu:
+    select: "Đánh dấu"
+    unselect: "Bỏ đánh dấu"
+    select_hint: "Để dùng nút Backup / Restore N game ở trên cùng (bấm X trên game cũng được)"
+    details: "Chi tiết và thêm"
+
   snap:
     row: "Save cũ trên máy"
     count_one: "Đang giữ %{n} bản"

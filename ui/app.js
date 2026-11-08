@@ -131,8 +131,10 @@
     if (!invoke) throw new Error('Checkpoint must run inside the desktop app (Tauri).');
     return invoke(cmd, args || {});
   }
-  function close() { layer.innerHTML = ''; }
+  function close() { layer.innerHTML = ''; restoreFocus(); }
   function modal(html) {
+    // Remember where the focus was, to go back there when the dialog closes
+    if (!layer.querySelector('.modal') && !layer.contains(document.activeElement)) S.lastKey = keyOf(document.activeElement) || S.lastKey;
     layer.innerHTML = `<div class="scrim" data-scrim="1"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
     // data-autofocus wins, so a dialog that deletes something starts on Cancel (safe for A / Enter)
     const b = layer.querySelector('.modal [data-autofocus]') || layer.querySelector('.modal .primary, .modal .danger, .modal button');
@@ -172,12 +174,16 @@
       <div>${h('side.this_pc')}<br><span class="mono">${esc(i.config.device_name)}</span></div>
       <div>${h('side.storage')}<br><span class="mono">${esc(where)}</span></div>
       <div>${h('side.manifest')}<br><span class="mono">${i.manifest_games ? h('side.manifest_games', { n: i.manifest_games.toLocaleString(locale()) }) : h('side.manifest_missing')}</span></div>`;
+    // Shown only while a controller (or the arrow keys) is in use: body.pad
+    const key = (k, cls, label) => `<div><span class="pk ${cls}">${k}</span>${h(label)}</div>`;
+    $('#padHints').innerHTML = key('A', 'pa', 'pad.a') + key('B', 'pb', 'pad.b') + key('X', 'px', 'pad.x') + key('LB RB', 'pl', 'pad.lbrb');
   }
 
   // ---------- views ----------
   function render() {
     document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.view === S.view));
     ({ games: renderGames, accounts: renderAccounts, history: renderHistory, settings: renderSettings })[S.view]();
+    restoreFocus();
   }
 
   function banner(kind, icon, text, buttons) {
@@ -260,7 +266,7 @@
     const where = gameWhere(g);
     const local = g.local_hash ? `<span class="time">${fmt(g.local_mtime)}<small>${esc(ago(g.local_mtime))} · ${esc(files(g.files))} · ${human(g.bytes)}</small></span>` : '<span class="note">—</span>';
     const cloud = g.cloud ? `<span class="time">${fmt(g.cloud.created_utc)}<small>${h('games.cloud_from', { device: g.cloud.device_name, n: g.versions })} · ${human(g.cloud.bytes)}</small></span>` : `<span class="note">${h('games.cloud_none')}</span>`;
-    return `<tr class="${sel().has(g.appid) ? 'picked' : ''}">
+    return `<tr class="${sel().has(g.appid) ? 'picked' : ''}" tabindex="0" data-card="${g.appid}" aria-label="${esc(g.name)}">
       <td class="pickcell">${pickBox(g)}</td>
       <td><div class="gcell">${art('header', g.appid, g.name, 'hdr')}<div><div class="gname">${esc(g.name)}</div><div class="gsub" title="${esc(where)}">${esc(where.split('\n')[0])}${g.roots.length > 1 ? ` (+${g.roots.length - 1})` : ''}</div>${gameFlags(g)}</div></div></td>
       <td><span class="mono">${g.appid}</span></td>
@@ -273,7 +279,7 @@
     const where = gameWhere(g);
     const local = g.local_hash ? `${esc(ago(g.local_mtime))} · ${human(g.bytes)}` : '—';
     const cloud = g.cloud ? `${esc(ago(g.cloud.created_utc))} · ${human(g.cloud.bytes)}` : h('games.cloud_none');
-    return `<article class="gcard st-${g.status} ${sel().has(g.appid) ? 'picked' : ''}">
+    return `<article class="gcard st-${g.status} ${sel().has(g.appid) ? 'picked' : ''}" tabindex="0" data-card="${g.appid}" aria-label="${esc(g.name)}">
       <div class="cover" data-cover="${g.appid}" title="${esc(g.name + '\n' + where)}">${art('capsule', g.appid, g.name, 'cap')}
         <div class="badges">${statusPill(g.status)}</div>${pickBox(g)}${g.steamid_bound || g.running ? `<div class="flags">${gameFlags(g)}</div>` : ''}</div>
       <div class="gbody">
@@ -303,10 +309,10 @@
     const body = !shown.length
       ? `<div class="empty">${h('games.no_match')}</div>`
       : grid
-        ? `<div class="ggrid ${nSel ? 'selecting' : ''}">${shown.map(gameCard).join('')}</div>`
+        ? `<div class="ggrid ${nSel ? 'selecting' : ''}" data-navgrid="1">${shown.map(gameCard).join('')}</div>`
         : `<div class="tablewrap"><table>
             <thead><tr><th class="pickcell"><label class="pick" title="${h('games.select_shown')}"><input type="checkbox" data-pickall="1" ${allShown ? 'checked' : ''} aria-label="${h('games.select_shown')}"></label></th><th>${h('games.col_game')}</th><th>AppID</th><th>${h('games.col_local')}</th><th>${h('games.col_cloud')}</th><th>${h('games.col_status')}</th><th style="text-align:right">${h('games.col_actions')}</th></tr></thead>
-            <tbody>${shown.map(gameRow).join('')}</tbody></table></div>`;
+            <tbody data-navgrid="1">${shown.map(gameRow).join('')}</tbody></table></div>`;
     const ready = backendReady() && !S.busy ? '' : 'disabled';
     const bulk = nSel
       ? `<button class="btn" data-act="clearSel">${h('games.clear_sel')}</button>
@@ -874,6 +880,27 @@
         <button class="btn primary" data-close="1" data-autofocus>${h('common.close')}</button></div>`);
   }
 
+  /** A game's actions as one menu, for the controller (A on a game) and Enter on the keyboard. */
+  function openGameMenu(id) {
+    const g = game(id);
+    if (!g) return;
+    const dis = !backendReady() || g.running || S.busy;
+    const item = (act, icon, label, hint, off) => `<button class="btn gm" data-act="${act}" data-id="${g.appid}" ${off ? 'disabled' : ''}>${ic(icon)}<span><b>${esc(label)}</b>${hint ? `<span class="note">${hint}</span>` : ''}</span></button>`;
+    const local = g.local_hash ? `${esc(ago(g.local_mtime))} · ${human(g.bytes)}` : h('game.no_local');
+    const cloud = g.cloud ? `${esc(ago(g.cloud.created_utc))} · ${esc(g.cloud.device_name)}` : h('games.cloud_none');
+    modal(`<div class="ghead">${art('header', g.appid, g.name, 'hdr')}<div><h3>${esc(g.name)}</h3><div class="note">${statusPill(g.status)}</div></div></div>
+      ${g.running ? `<div>${gameFlags(g)}</div>` : ''}
+      <div class="gmenu">
+        ${item('backup', 'upload', t('common.backup'), local, dis || !g.local_hash)}
+        ${item('restore', 'download', t('common.restore'), cloud, dis || !g.cloud)}
+        ${g.steam_ids && g.steam_ids.length ? item('migrate', 'swap', t('games.move_btn'), h('games.move_title'), g.running || S.busy) : ''}
+        ${g.snapshots ? item('snaps', 'history', t('snap.row'), h('snap.count', { n: g.snapshots }), false) : ''}
+        ${item('pickOne', 'check', t(sel().has(g.appid) ? 'gmenu.unselect' : 'gmenu.select'), h('gmenu.select_hint'), false)}
+        ${item('gameMore', 'more', t('gmenu.details'), h('game.more_title'), false)}
+      </div>
+      <div class="mfoot"><button class="btn" data-close="1">${h('common.close')}</button></div>`);
+  }
+
   /** What the bug report says about the game: English and plain, it goes to the public tracker. */
   function gameReportText(g) {
     const iso = (ms) => (ms ? new Date(ms).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '-');
@@ -1077,6 +1104,7 @@
       else if (a === 'gameMore') openGame(game(id));
       else if (a === 'delCloud') confirmDeleteGame(game(id));
       else if (a === 'snaps') openSnapshots(id);
+      else if (a === 'pickOne') { close(); setPicked([id], !sel().has(id)); S.lastKey = `[data-card="${id}"]`; restoreFocus(); }
       else if (a === 'snapGo') restoreSnapshot();
       else if (a === 'snapDel') confirmDeleteSnapshot();
       else if (a === 'snapDelGo') deleteSnapshot();
@@ -1309,16 +1337,24 @@
     else confirmBackup(g);
   }
   // ---------- controller and arrow-key navigation ----------
-  // For Gaming Mode on Bazzite / SteamOS (and any gamepad): D-pad or left stick moves the focus to
-  // the nearest control in that direction, A presses it, B closes the dialog or goes back to the
-  // sidebar, LB / RB switch screens. Arrow keys do the same, for Steam Input layouts that send keys.
-  const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disabled]),summary,a[href]';
+  // For Gaming Mode on Bazzite / SteamOS and handhelds (and any gamepad). Each game is one stop:
+  // in the grid the D-pad moves card by card in reading order (right from the last card of a row
+  // goes to the first of the next row), up/down by whole rows; the small buttons on a card are
+  // skipped, and A opens the game's menu instead. Elsewhere the focus moves to the nearest control
+  // in that direction. A presses, B closes the dialog or goes back to the sidebar, X selects the
+  // focused game, LB / RB switch screens. Arrow keys, Enter, Space and Esc do the same.
+  const FOCUSABLE = 'button:not([disabled]),input:not([disabled]),select:not([disabled]),summary,a[href],[data-card]';
   const VIEWS = ['games', 'accounts', 'history', 'settings'];
+  const usingPad = () => document.body.classList.contains('pad');
 
   function focusables() {
     const scope = layer.querySelector('.modal') || document;
     return [...scope.querySelectorAll(FOCUSABLE)].filter((el) => {
       if (el.closest('[hidden]') || (el.closest('details:not([open])') && el.tagName !== 'SUMMARY')) return false;
+      // Controls inside a game card or row are reached through the game's menu (A), not one by one
+      const card = el.closest('[data-card]');
+      if (card && card !== el) return false;
+      if (el.closest('#toasts')) return false;
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0;
     });
@@ -1326,24 +1362,18 @@
 
   function focusEl(el) {
     if (!el) return;
+    if (!layer.contains(el)) S.lastKey = keyOf(el);
     el.focus({ preventScroll: true });
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
-  /** Nearest control whose centre lies in direction `dir`, preferring ones in line with the current one. */
-  function moveFocus(dir) {
-    const items = focusables();
-    if (!items.length) return;
-    const cur = document.activeElement;
-    if (!cur || !items.includes(cur)) {
-      // Nothing focused yet: start in the dialog, or on the current screen's sidebar button
-      return focusEl(layer.querySelector('.modal') ? items[0] : document.querySelector(`#nav button[data-view="${S.view}"]`) || items[0]);
-    }
-    const a = cur.getBoundingClientRect();
+  /** Nearest control whose centre lies in direction `dir`, preferring ones in line with `from`. */
+  function nearest(from, dir, items) {
+    const a = from.getBoundingClientRect();
     const ax = a.left + a.width / 2, ay = a.top + a.height / 2;
     let best = null, bestScore = Infinity;
     for (const el of items) {
-      if (el === cur) continue;
+      if (el === from) continue;
       const b = el.getBoundingClientRect();
       const dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
       const main = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy;
@@ -1352,13 +1382,62 @@
       const score = main + cross * 2.5;
       if (score < bestScore) { bestScore = score; best = el; }
     }
-    if (best) focusEl(best);
+    return best;
+  }
+
+  /** Cards in a grid or rows in the list: move by position in the list, not by pixels. */
+  function moveInGrid(cur, dir, items) {
+    const grid = cur.closest('[data-navgrid]');
+    const cards = [...grid.querySelectorAll('[data-card]')].filter((c) => items.includes(c));
+    const i = cards.indexOf(cur);
+    // Cards per row: how many share the first card's top edge (the list view has one per row).
+    // offsetTop ignores the lift transform of the focused card.
+    const top = (c) => c.offsetTop;
+    let cols = cards.findIndex((c) => top(c) !== top(cards[0]));
+    if (cols < 1) cols = cards.length;
+    const row = Math.floor(i / cols), lastRow = Math.floor((cards.length - 1) / cols);
+    let j = null;
+    // One per row (the list view): left goes to the sidebar, right does nothing
+    if (dir === 'right') j = cols > 1 && i + 1 < cards.length ? i + 1 : null;
+    else if (dir === 'left') j = cols > 1 && i > 0 ? i - 1 : 'nav';
+    else if (dir === 'down') j = i + cols < cards.length ? i + cols : row < lastRow ? cards.length - 1 : 'out';
+    else if (dir === 'up') j = row > 0 ? i - cols : 'out';
+    if (typeof j === 'number') return focusEl(cards[j]);
+    if (j === 'nav') return focusEl(document.querySelector(`#nav button[data-view="${S.view}"]`));
+    // Leaving the grid (up to the filters, down past the last row): the closest row of controls
+    // outside it, then the control in that row nearest to the game
+    if (j !== 'out') return;
+    const a = cur.getBoundingClientRect(), cx = a.left + a.width / 2;
+    // The sidebar is left of the grid (Left from the first game, or B), never above or below it
+    const outside = items.filter((el) => !grid.contains(el) && !el.closest('#nav')).map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => (dir === 'up' ? r.bottom <= a.top + 4 : r.top >= a.bottom - 4));
+    if (!outside.length) return;
+    const gap = ({ r }) => (dir === 'up' ? a.top - r.bottom : r.top - a.bottom);
+    const minGap = Math.min(...outside.map(gap));
+    const line = outside.filter((o) => gap(o) <= minGap + 12);
+    line.sort((p, q) => Math.abs(p.r.left + p.r.width / 2 - cx) - Math.abs(q.r.left + q.r.width / 2 - cx));
+    focusEl(line[0].el);
+  }
+
+  function moveFocus(dir) {
+    const items = focusables();
+    if (!items.length) return;
+    const cur = document.activeElement;
+    if (!cur || !items.includes(cur)) {
+      // Nothing focused yet: start in the dialog, on the first game, or on the screen's sidebar button
+      const firstCard = !layer.querySelector('.modal') && items.find((el) => el.dataset.card);
+      return focusEl(layer.querySelector('.modal') ? items[0] : firstCard || document.querySelector(`#nav button[data-view="${S.view}"]`) || items[0]);
+    }
+    if (cur.dataset.card && cur.closest('[data-navgrid]')) return moveInGrid(cur, dir, items);
+    const next = nearest(cur, dir, items);
+    if (next) focusEl(next);
   }
 
   // A stable description of a control, to focus it again after the screen re-renders
   function keyOf(el) {
+    if (!el || el === document.body) return null;
     if (el.id) return '#' + CSS.escape(el.id);
-    const attrs = ['data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for', 'data-pick', 'data-pickall', 'data-plan', 'data-snap'].filter((k) => el.hasAttribute(k));
+    const attrs = ['data-card', 'data-act', 'data-id', 'data-view', 'data-f', 'data-mid', 'data-layout', 'data-for', 'data-pick', 'data-pickall', 'data-plan', 'data-snap'].filter((k) => el.hasAttribute(k));
     return attrs.length ? attrs.map((k) => `[${k}="${CSS.escape(el.getAttribute(k))}"]`).join('') : null;
   }
   function refocus(key) {
@@ -1368,10 +1447,16 @@
       focusEl((key && items.find((el) => el.matches(key))) || items[0]);
     }, 80);
   }
+  // Where the focus was outside dialogs, to return there when a dialog closes or the screen re-renders
+  document.addEventListener('focusin', (e) => { if (!layer.contains(e.target)) S.lastKey = keyOf(e.target); });
+  function restoreFocus() {
+    if (usingPad() && !layer.querySelector('.modal') && S.lastKey) refocus(S.lastKey);
+  }
 
   function press() {
     const el = document.activeElement;
     if (!el || el === document.body) return moveFocus('down');
+    if (el.dataset.card) return openGameMenu(+el.dataset.card);
     if (el.tagName === 'SELECT') {
       // A native drop-down cannot be opened from script: A picks the next option instead
       el.selectedIndex = (el.selectedIndex + 1) % el.options.length;
@@ -1384,9 +1469,18 @@
     refocus(key);
   }
 
+  /** X: select or unselect the focused game (for Back up / Restore N games). */
+  function pickFocused() {
+    const el = document.activeElement;
+    if (!el || !el.dataset || !el.dataset.card || layer.querySelector('.modal')) return;
+    const id = +el.dataset.card;
+    setPicked([id], !sel().has(id));
+    refocus(`[data-card="${id}"]`);
+  }
+
   function back() {
     if (S.busy) return;
-    if (layer.querySelector('.modal')) { close(); return refocus(null); }
+    if (layer.querySelector('.modal')) { close(); return; }
     focusEl(document.querySelector(`#nav button[data-view="${S.view}"]`));
   }
 
@@ -1397,19 +1491,33 @@
     if (next) { next.click(); focusEl(next); }
   }
 
+  // Steam Input can send the D-pad both as a gamepad and as arrow keys: one press must move once
+  const lastMove = { dir: null, at: 0, src: null };
+  function navMove(dir, src) {
+    const now = performance.now();
+    if (lastMove.dir === dir && lastMove.src !== src && now - lastMove.at < 180) return;
+    Object.assign(lastMove, { dir, at: now, src });
+    moveFocus(dir);
+  }
+
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { if (layer.querySelector('.modal')) { if (!S.busy) close(); } else back(); return; }
+    const el = document.activeElement;
+    if (el && el.dataset && el.dataset.card && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === 'Enter') { e.preventDefault(); return press(); }
+      if (e.key === ' ') { e.preventDefault(); return pickFocused(); }
+    }
     const dir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
     if (!dir || e.altKey || e.ctrlKey || e.metaKey) return;
-    const el = document.activeElement;
     // Leave arrows to drop-downs, number fields and the text cursor
     if (el && (el.tagName === 'SELECT' || el.type === 'number' || (el.tagName === 'INPUT' && ['text', 'password', 'search'].includes(el.type) && (dir === 'left' || dir === 'right')))) return;
     e.preventDefault();
-    moveFocus(dir);
+    document.body.classList.add('pad');
+    navMove(dir, 'key');
   });
 
-  // Gamepad API (standard mapping): 0 A, 1 B, 4 LB, 5 RB, 12–15 D-pad, axes 0/1 left stick
-  const pad = { held: {}, next: {}, raf: 0 };
+  // Gamepad API (standard mapping): 0 A, 1 B, 2 X, 4 LB, 5 RB, 12–15 D-pad, axes 0/1 left stick
+  const pad = { held: {}, next: {}, raf: 0, at: 0 };
   function padLoop(now) {
     const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find((g) => g && g.connected);
     if (!gp) { pad.raf = 0; return; }
@@ -1417,7 +1525,7 @@
     const ax = (i) => gp.axes[i] || 0;
     const inputs = {
       up: btn(12) || ax(1) < -0.6, down: btn(13) || ax(1) > 0.6, left: btn(14) || ax(0) < -0.6, right: btn(15) || ax(0) > 0.6,
-      a: btn(0), b: btn(1), lb: btn(4), rb: btn(5),
+      a: btn(0), b: btn(1), x: btn(2), lb: btn(4), rb: btn(5),
     };
     for (const [k, on] of Object.entries(inputs)) {
       if (!on) { pad.held[k] = false; continue; }
@@ -1426,12 +1534,14 @@
       if (first || (['up', 'down', 'left', 'right'].includes(k) && now >= pad.next[k])) {
         pad.next[k] = now + (first ? 400 : 130);
         pad.held[k] = true;
+        pad.at = now;
         document.body.classList.add('pad');
         if (k === 'a') press();
         else if (k === 'b') back();
+        else if (k === 'x') pickFocused();
         else if (k === 'lb') switchView(-1);
         else if (k === 'rb') switchView(1);
-        else moveFocus(k);
+        else navMove(k, 'pad');
       }
     }
     pad.raf = requestAnimationFrame(padLoop);
@@ -1440,9 +1550,12 @@
   window.addEventListener('gamepadconnected', startPad);
   // Some WebViews only report a pad that was already connected after a button press
   if (navigator.getGamepads && [...navigator.getGamepads()].some((g) => g)) startPad();
-  // Show focus rings while a controller or the keyboard is used; hide them again for the mouse
-  document.addEventListener('keydown', (e) => { if (e.key.startsWith('Arrow')) document.body.classList.add('pad'); });
-  document.addEventListener('mousemove', () => document.body.classList.remove('pad'));
+  // Focus rings and button hints while a controller or the arrow keys are used; a real mouse
+  // movement turns them off (small or synthetic moves right after pad input are ignored)
+  document.addEventListener('mousemove', (e) => {
+    if (!usingPad() || performance.now() - pad.at < 800 || Math.abs(e.movementX) + Math.abs(e.movementY) < 4) return;
+    document.body.classList.remove('pad');
+  });
 
   // ---------- boot ----------
   (async function boot() {

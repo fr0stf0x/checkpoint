@@ -32,6 +32,7 @@ Planned work, not scheduled yet. When an item ships, tick it and add it to `CHAN
 
 ### Release / housekeeping
 - [x] Update the notes of the v0.1.0–v0.3.0 GitHub Releases with their `CHANGELOG.md` sections (newer releases get them automatically).
+- [ ] Recheck controller navigation on a real handheld in Gaming Mode (ROG Xbox Ally X): moving right from the last game in a row must go to the next game, not the search box; focus must move between games, not land on each game's small buttons; check dialogs and the hint panel too.
 - [x] Test the AppImage and the Proton-prefix restore on a real Bazzite machine.
 
 ## Website

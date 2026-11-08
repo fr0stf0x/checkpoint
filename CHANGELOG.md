@@ -6,10 +6,13 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-08
+
 ### Added
 - Undo a restore. Every restore keeps the save it overwrites on this PC; the message after a restore has an **Undo** button, and a game's **⋯** dialog now has **Earlier saves**, listing each kept save with when it was last played, what replaced it and its size. **Go back to this save** puts it back exactly as it was, and keeps the current save as a new entry so you can change your mind. Earlier saves can also be deleted, or opened in their folder.
 
 ### Changed
+- Better controller navigation. Each game is one stop: the D-pad moves from game to game in order (right at the end of a row goes on to the next row instead of jumping to the search box) and no longer lands on each game's small buttons. **A** on a game opens its menu (Back up, Restore, Earlier saves, Select, Details), **X** selects it. Closing a dialog returns to the game you were on, the sidebar shows the button hints while a controller is in use, and a D-pad press that Steam sends both as a gamepad and as an arrow key moves only once.
 - Up to 10 earlier saves are kept per game instead of 5, and the same save is never kept twice.
 
 ## [0.6.0] - 2026-11-08
@@ -101,7 +104,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.4.0...v0.5.0
