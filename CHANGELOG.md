@@ -6,6 +6,8 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-08
+
 ### Added
 - Game artwork in the game list and avatars on the Steam accounts page, read from Steam's local cache (no download, works in offline mode). Games or accounts without a cached image show their first letter.
 
@@ -66,7 +68,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.2.0...v0.3.0
