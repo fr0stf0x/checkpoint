@@ -124,7 +124,79 @@ jobs:
             exit 1
           fi
 
-      - name: Build and publish the GitHub Release
+      # Bundling downloads NSIS / AppImage tools from github.com/tauri-apps/binary-releases, which
+      # sometimes answers 504 to runners for a while. Try up to three times; the compiled code is
+      # reused, so a retry only redoes the bundling.
+      - name: Build and publish the GitHub Release (attempt 1)
+        id: build1
+        continue-on-error: true
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          includeUpdaterJson: true
+          tauriScript: npx --yes @tauri-apps/cli@2
+          args: --bundles ${{ matrix.bundles }}
+          tagName: ${{ env.TAG }}
+          releaseName: Checkpoint ${{ env.TAG }}
+          releaseBody: |
+            ## What's new
+
+            ${{ steps.notes.outputs.body }}
+
+            ## Install
+
+            **Windows:** download `Checkpoint_${{ env.VERSION }}_x64-setup.exe` and run it.
+            **Bazzite / Linux:** download the `.AppImage`, right-click → Properties → allow executing (or `chmod +x`), then open it.
+
+            Setup guide, including connecting Google Drive: see the project website. Full history: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+          releaseDraft: false
+          prerelease: ${{ contains(env.TAG, '-') }}
+
+      - name: Wait before retry 1
+        if: steps.build1.outcome == 'failure'
+        shell: bash
+        run: sleep 90
+
+      - name: Build and publish the GitHub Release (attempt 2)
+        id: build2
+        if: steps.build1.outcome == 'failure'
+        continue-on-error: true
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          includeUpdaterJson: true
+          tauriScript: npx --yes @tauri-apps/cli@2
+          args: --bundles ${{ matrix.bundles }}
+          tagName: ${{ env.TAG }}
+          releaseName: Checkpoint ${{ env.TAG }}
+          releaseBody: |
+            ## What's new
+
+            ${{ steps.notes.outputs.body }}
+
+            ## Install
+
+            **Windows:** download `Checkpoint_${{ env.VERSION }}_x64-setup.exe` and run it.
+            **Bazzite / Linux:** download the `.AppImage`, right-click → Properties → allow executing (or `chmod +x`), then open it.
+
+            Setup guide, including connecting Google Drive: see the project website. Full history: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
+          releaseDraft: false
+          prerelease: ${{ contains(env.TAG, '-') }}
+
+      - name: Wait before retry 2
+        if: steps.build2.outcome == 'failure'
+        shell: bash
+        run: sleep 90
+
+      - name: Build and publish the GitHub Release (attempt 3)
+        id: build3
+        if: steps.build2.outcome == 'failure'
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
