@@ -40,6 +40,7 @@ Trang web (`site/`) dùng [i18next](https://www.i18next.com/) với `site/locale
 - Đọc `libraryfolders.vdf` và `appmanifest_*.acf` để biết game đã cài, `loginusers.vdf` để biết tài khoản.
 - Mỗi file được lưu theo đường dẫn logic `win/winAppData/...`, `any/base/...`, `linux/xdgData/...`. Trên Linux, đường dẫn `win/*` được ghi vào `steamapps/compatdata/<appid>/pfx/drive_c/users/steamuser/...`.
 - Trạng thái tính từ SHA-256 nội dung save và hash ghi lại lúc đồng bộ lần cuối trên máy này (`state.json`).
+- Steam đánh dấu chủ của mỗi thư mục save bằng file `steam_autocloud.vdf` và dọn thư mục thuộc tài khoản khác khi mở game. Khi restore, thư mục dùng chung (thư mục cài game, AppData, Documents) được giao cho tài khoản đang đăng nhập trên máy này; thư mục mang tên tài khoản thì giữ nguyên chủ.
 - Trước mỗi lần restore, save hiện tại được nén vào `%LOCALAPPDATA%\Checkpoint\snapshots` (Linux: `~/.local/share/Checkpoint/snapshots`), giữ 5 bản.
 
 Trên cloud:

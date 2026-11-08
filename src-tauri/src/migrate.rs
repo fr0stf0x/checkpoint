@@ -75,6 +75,24 @@ pub fn rewrite_autocloud(data: &[u8], from: &Ids, to: &Ids) -> Vec<u8> {
         .into_bytes()
 }
 
+/// The AccountID a steam_autocloud.vdf names as the folder's owner.
+pub fn autocloud_account(data: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(data);
+    let after = &text[text.find("\"accountid\"")? + "\"accountid\"".len()..];
+    let start = after.find('"')? + 1;
+    let len = after[start..].find('"')?;
+    let id = &after[start..start + len];
+    (!id.is_empty() && id.bytes().all(|b| b.is_ascii_digit())).then(|| id.to_string())
+}
+
+/// Make `acct` the owner named in a steam_autocloud.vdf, keeping the rest of the file as it is.
+pub fn set_autocloud_account(data: &[u8], acct: &str) -> Vec<u8> {
+    match autocloud_account(data) {
+        Some(old) => String::from_utf8_lossy(data).replacen(&format!("\"{old}\""), &format!("\"{acct}\""), 1).into_bytes(),
+        None => data.to_vec(),
+    }
+}
+
 fn utf16(s: &str) -> Vec<u8> {
     s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
 }
@@ -485,6 +503,18 @@ mod tests {
 
     const A: &str = "76561198000000101";
     const B: &str = "76561198000000202";
+
+    #[test]
+    fn autocloud_owner_read_and_write() {
+        let steam = b"\"steam_autocloud.vdf\"\n{\n\t\"accountid\"\t\t\"1737995649\"\n}\n";
+        assert_eq!(autocloud_account(steam).as_deref(), Some("1737995649"));
+        assert_eq!(autocloud_account(b"\"accountid\" \"42\"").as_deref(), Some("42"));
+        assert_eq!(autocloud_account(b"\"accountid\" \"\""), None);
+        assert_eq!(autocloud_account(b"garbage"), None);
+        let out = set_autocloud_account(steam, "7");
+        assert_eq!(out, b"\"steam_autocloud.vdf\"\n{\n\t\"accountid\"\t\t\"7\"\n}\n");
+        assert_eq!(set_autocloud_account(b"garbage", "7"), b"garbage");
+    }
 
     /// Read-only: `cargo test preview_real -- --ignored --nocapture`
     #[test]
