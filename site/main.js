@@ -137,9 +137,8 @@
     if (!gh || !$('stStars')) return;
     const fmtNum = (n) => n.toLocaleString(locale());
     $('stStars').textContent = fmtNum(gh.stars);
-    // Downloads of installers only: update signatures and latest.json are fetched by the app itself
-    const isInstaller = (a) => /\.(exe|msi|AppImage|deb|rpm)$/i.test(a.name);
-    $('stDl').textContent = fmtNum(gh.releases.reduce((s, r) => s + r.assets.filter(isInstaller).reduce((x, a) => x + a.n, 0), 0));
+    // Every file of every release, the same total as the README's downloads badge (shields.io)
+    $('stDl').textContent = fmtNum(gh.releases.reduce((s, r) => s + r.assets.reduce((x, a) => x + a.n, 0), 0));
     const latest = gh.releases.find((r) => !r.pre) || gh.releases[0];
     if (!latest) { $('stVer').textContent = t('stats.none'); $('stVerDate').textContent = t('stats.no_release'); return; }
     $('stVer').textContent = latest.tag;
