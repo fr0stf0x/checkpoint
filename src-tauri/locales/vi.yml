@@ -69,6 +69,10 @@ err:
 
 # Thông báo thành công từ backend (rust: t!("msg.*"))
 msg:
+  notify_restore_failed: "Checkpoint: chưa restore được bản cloud"
+  notify_backup_failed: "Checkpoint: chưa backup được save"
+  notify_decide_title: "%{game}: chưa tự đồng bộ"
+  notify_decide_body: "Save trên máy và bản cloud đều đã đổi. Mở Checkpoint để chọn giữ bản nào."
   backup_unchanged: "%{game}: không có gì thay đổi, bỏ qua upload."
   backup_done: "%{game}: đã backup %{files} file (%{size})."
   restore_unchanged: "%{game}: save trên máy đã giống bản này."
@@ -209,7 +213,7 @@ ui:
     launch_option: "Tùy chọn khởi chạy Steam (tự đồng bộ)"
     copy: "Copy"
     copied: "Đã copy. Dán vào Steam: chuột phải vào game → Properties → Launch options."
-    launch_hint: "Với tùy chọn này, Checkpoint restore save trên cloud trước khi game chạy nếu cloud mới hơn, và backup sau khi bạn thoát game nếu save trên máy mới hơn. Trường hợp xung đột thì để bạn tự quyết ở đây. Game vẫn luôn chạy, kể cả khi mất mạng."
+    launch_hint: "Với tùy chọn này, Checkpoint restore save trên cloud trước khi game chạy nếu cloud mới hơn, và backup sau khi bạn thoát game nếu save trên máy mới hơn. Trường hợp xung đột thì để bạn tự quyết ở đây. Game vẫn luôn chạy, kể cả khi mất mạng. Một thông báo hệ thống cho bạn biết kết quả (tắt được trong Cài đặt)."
     delete_title: "Xóa bản trên cloud · %{game}"
     delete_warn_one: "Thao tác này xóa phiên bản duy nhất của %{game} khỏi %{where}."
     delete_warn_other: "Thao tác này xóa cả %{n} phiên bản của %{game} khỏi %{where}."
@@ -270,6 +274,8 @@ ui:
     delete_all_tail: "Không hoàn tác được. Các máy khác của bạn cũng mất các bản backup này, và các lần chuyển tài khoản đã ghi nhớ sẽ bị quên. Save trên các máy của bạn vẫn giữ nguyên."
     delete_all_confirm: "Mình hiểu là toàn bộ backup trên cloud sẽ mất hẳn."
     backup: "Backup"
+    launch_notifications: "Thông báo khi launch option của Steam đồng bộ game"
+    launch_notifications_hint: "Hiện thông báo hệ thống sau khi tự restore hoặc backup, khi bị lỗi, hoặc khi có save cần bạn vào đây quyết định."
     include_config: "Backup cả file cài đặt (đồ họa, phím)"
     include_config_hint: "Tắt nếu các máy khác GPU hoặc màn hình, để không bị đè độ phân giải."
     keep_versions: "Số bản giữ lại mỗi game"

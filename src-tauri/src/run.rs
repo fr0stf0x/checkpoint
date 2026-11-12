@@ -9,10 +9,13 @@
 //! its install folder) has quit, it backs up if this PC's save is newer. Anything that needs a
 //! decision (conflict, never synced, cloud newer after playing) is left for the app, and the
 //! game is started regardless: the wrapper never blocks playing. Everything is logged with the
-//! game's appid, so a per-game bug report includes it.
+//! game's appid, so a per-game bug report includes it. What happened is also shown as a system
+//! notification (notify.rs; can be turned off in Settings): a restore or backup that ran, one
+//! that failed, or a save left for the app to decide.
 
 use crate::config::{Backend, Config};
-use crate::sync;
+use crate::{notify, sync};
+use rust_i18n::t;
 use log::{error, info, warn};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -79,17 +82,51 @@ pub fn main(args: &[String]) -> i32 {
     code
 }
 
+/// The error as shown to the user, and in English for the log.
+fn error_text(e: &anyhow::Error) -> (String, String) {
+    let shown = format!("{e:#}");
+    let en = crate::i18n::to_en(&shown);
+    (shown, en)
+}
+
+/// The save changed on both sides (or the cloud got newer while playing): nothing is synced
+/// automatically, the user picks in the app.
+fn notify_decide(cfg: &Config, game: &str) {
+    notify::show(cfg, &t!("msg.notify_decide_title", game = game), &t!("msg.notify_decide_body"));
+}
+
 fn before(cfg: &Config, appid: u32) {
     let st = match sync::game_status(cfg, appid) {
         Ok(s) => s,
-        Err(e) => return warn!("Launch wrapper appid={appid}: status check failed, starting without restore: {}", crate::i18n::to_en(&format!("{e:#}"))),
+        Err(e) => {
+            let (shown, en) = error_text(&e);
+            warn!("Launch wrapper appid={appid}: status check failed, starting without restore: {en}");
+            return notify::show(cfg, &t!("msg.notify_restore_failed"), &shown);
+        }
     };
+    if matches!(st.status, "conflict" | "diverged") {
+        info!("Launch wrapper appid={appid}: {} is {}, left for the app", st.name, st.status);
+        return notify_decide(cfg, &st.name);
+    }
     if st.status != "cloud" {
         return info!("Launch wrapper appid={appid}: {} is {}, nothing to restore", st.name, st.status);
     }
     match sync::restore(cfg, appid, None, false, st.remap, &sync::no_progress) {
-        Ok(r) => info!("Launch wrapper appid={appid}: restore {}", r.outcome),
-        Err(e) => warn!("Launch wrapper appid={appid}: restore skipped: {}", crate::i18n::to_en(&format!("{e:#}"))),
+        Ok(r) => {
+            info!("Launch wrapper appid={appid}: restore {}", r.outcome);
+            if r.outcome == "restored" {
+                notify::show(cfg, "Checkpoint", &r.message);
+            }
+        }
+        Err(e) => {
+            let (shown, en) = error_text(&e);
+            warn!("Launch wrapper appid={appid}: restore skipped: {en}");
+            if shown.starts_with("NEEDS_CONFIRM") {
+                notify_decide(cfg, &st.name);
+            } else {
+                notify::show(cfg, &t!("msg.notify_restore_failed"), &shown);
+            }
+        }
     }
 }
 
@@ -112,14 +149,35 @@ fn wait_until_closed(cfg: &Config, appid: u32) {
 fn after(cfg: &Config, appid: u32) {
     let st = match sync::game_status(cfg, appid) {
         Ok(s) => s,
-        Err(e) => return warn!("Launch wrapper appid={appid}: status check failed, no backup: {}", crate::i18n::to_en(&format!("{e:#}"))),
+        Err(e) => {
+            let (shown, en) = error_text(&e);
+            warn!("Launch wrapper appid={appid}: status check failed, no backup: {en}");
+            return notify::show(cfg, &t!("msg.notify_backup_failed"), &shown);
+        }
     };
     if !matches!(st.status, "local" | "new") {
-        return info!("Launch wrapper appid={appid}: {} is {} after playing, no automatic backup", st.name, st.status);
+        info!("Launch wrapper appid={appid}: {} is {} after playing, no automatic backup", st.name, st.status);
+        if matches!(st.status, "cloud" | "conflict" | "diverged") {
+            notify_decide(cfg, &st.name);
+        }
+        return;
     }
     match sync::backup(cfg, appid, false, &sync::no_progress) {
-        Ok(r) => info!("Launch wrapper appid={appid}: backup {}", r.outcome),
-        Err(e) => warn!("Launch wrapper appid={appid}: backup skipped: {}", crate::i18n::to_en(&format!("{e:#}"))),
+        Ok(r) => {
+            info!("Launch wrapper appid={appid}: backup {}", r.outcome);
+            if r.outcome == "uploaded" {
+                notify::show(cfg, "Checkpoint", &r.message);
+            }
+        }
+        Err(e) => {
+            let (shown, en) = error_text(&e);
+            warn!("Launch wrapper appid={appid}: backup skipped: {en}");
+            if shown.starts_with("NEEDS_CONFIRM") {
+                notify_decide(cfg, &st.name);
+            } else {
+                notify::show(cfg, &t!("msg.notify_backup_failed"), &shown);
+            }
+        }
     }
 }
 

@@ -7,6 +7,9 @@ Each release's section is also shown at the top of its GitHub Release notes.
 ## [Unreleased]
 
 ### Added
+- Steam launch option: a system notification tells you what happened around the game session: the cloud save was restored, the save was backed up, a sync failed (with the reason), or a save was left for you to decide in the app because both sides changed. Turn it off in Settings → Backup ("Notify when the Steam launch option syncs a game").
+
+### Added
 - A **Quit** button in the sidebar, below Report bug / Feedback, to close the app in Gaming Mode, where there is no window close button. While a backup or restore is running it shows a message instead of quitting.
 
 ### Changed

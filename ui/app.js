@@ -541,6 +541,7 @@
       </div>
       <div class="group"><h3>${h('settings.backup')}</h3>
         <label class="check" for="incCfg"><input type="checkbox" id="incCfg" ${c.include_config ? 'checked' : ''}> <span>${h('settings.include_config')}<br><span class="note">${h('settings.include_config_hint')}</span></span></label>
+        <label class="check" for="chkNotify"><input type="checkbox" id="chkNotify" ${c.launch_notifications !== false ? 'checked' : ''}> <span>${h('settings.launch_notifications')}<br><span class="note">${h('settings.launch_notifications_hint')}</span></span></label>
         <div class="field"><label class="l" for="keep">${h('settings.keep_versions')}</label><input type="number" id="keep" min="1" max="100" value="${c.keep_versions}" style="width:100px"></div>
       </div>
       <div class="group"><h3>${h('settings.manifest')}</h3>
@@ -772,6 +773,7 @@
       steam_root_override: $('#steamRoot').value.trim() || null,
       backend,
       include_config: $('#incCfg').checked,
+      launch_notifications: $('#chkNotify').checked,
       keep_versions: Math.max(1, Math.min(100, parseInt($('#keep').value, 10) || 10)),
       language: $('#lang').value,
       check_updates: $('#chkUpd').checked,
