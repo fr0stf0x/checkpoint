@@ -92,20 +92,27 @@ jobs:
           rm -f src-tauri/Cargo.toml.bak
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-      # The release notes start with this version's section of CHANGELOG.md
+      # The release notes start with this version's section of CHANGELOG.md. A pre-release tag
+      # (vX.Y.Z-beta.N: anything after a dash) uses the [Unreleased] section instead, so betas
+      # need no changelog section of their own.
       - name: Extract this version's changelog
         id: notes
         shell: bash
         run: |
-          NOTES=$(awk -v v="$VERSION" '
+          SECTION="$VERSION"
+          if [[ "$VERSION" == *-* ]]; then SECTION="Unreleased"; fi
+          NOTES=$(awk -v v="$SECTION" '
             index($0, "## [" v "]") == 1 { found = 1; next }
             found && /^## \[/ { exit }
             found && /^\[[^]]+\]: / { exit }
             found { print }
           ' CHANGELOG.md | sed -e '/./,$!d')
           if [ -z "$NOTES" ]; then
-            echo "CHANGELOG.md has no section for [$VERSION]. Add it before tagging." >&2
+            echo "CHANGELOG.md has no section for [$SECTION]. Add it before tagging." >&2
             exit 1
+          fi
+          if [[ "$SECTION" == "Unreleased" ]]; then
+            NOTES=$(printf '**Pre-release for testing.** Only installed by people who turned on test versions in Settings → Updates.\n\n%s' "$NOTES")
           fi
           {
             echo "body<<CHANGELOG_EOF"

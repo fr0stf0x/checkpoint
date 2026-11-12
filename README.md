@@ -28,7 +28,7 @@ Download: [latest release](https://github.com/fr0stf0x/checkpoint/releases/lates
 - Controller navigation: the D-pad or left stick moves from game to game in order (right at the end of a row goes on to the next row), **A** opens the game's menu (Back up, Restore, Earlier saves, Select, Details) or presses a button, **X** selects a game, **B** closes a dialog or goes back to the sidebar, **LB / RB** switch screens. Button hints show in the sidebar while a controller is in use. Arrow keys, Enter, Space and Esc do the same, for Steam Input layouts that send keys.
 - Built-in rclone setup: detects the OS, downloads the official rclone with SHA-256 verification, and connects Google Drive with your own OAuth client ID. Once connected, Settings shows the saved client ID and secret, hidden until you press the eye button, so you can copy them to your other PCs.
 - The app version is shown next to the logo.
-- In-app updates: at startup the app asks GitHub for the latest release and shows what's new. **Update and restart** downloads it, checks its signature and installs it (Windows installer, or replaces the AppImage file in place). Nothing is installed until you click. Turn the check off in **Settings → Updates**. A Linux binary not started from the AppImage only gets a link to the download page.
+- In-app updates: at startup the app asks GitHub for the latest release and shows what's new. **Update and restart** downloads it, checks its signature and installs it (Windows installer, or replaces the AppImage file in place). Nothing is installed until you click. Turn the check off in **Settings → Updates**, where you can also opt in to test versions (pre-releases, tags like `v0.9.0-beta.1`) for a PC you test with; everyone else only gets regular releases. A Linux binary not started from the AppImage only gets a link to the download page.
 
 ## Languages
 
@@ -97,7 +97,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases. The in-app updater ignores pre-releases.
+Tags containing `-` (for example `v0.2.0-beta.1`) are marked as pre-releases and use the `[Unreleased]` changelog section as notes. The in-app updater ignores pre-releases unless test versions are turned on in Settings → Updates.
 
 The installers are signed for the in-app updater, and the workflow also publishes `latest.json`, which the app reads from `releases/latest/download/latest.json`. One-time setup:
 

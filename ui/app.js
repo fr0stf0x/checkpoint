@@ -554,6 +554,7 @@
       <div class="group"><h3>${h('settings.updates')}</h3>
         <p class="note">${h('settings.version', { version: S.info.version })}</p>
         <label class="check" for="chkUpd"><input type="checkbox" id="chkUpd" ${c.check_updates !== false ? 'checked' : ''}> <span>${h('settings.check_updates')}<br><span class="note">${h('settings.check_updates_hint')}</span></span></label>
+        <label class="check" for="chkBeta"><input type="checkbox" id="chkBeta" ${c.beta_updates ? 'checked' : ''}> <span>${h('settings.beta_updates')}<br><span class="note">${h('settings.beta_updates_hint')}</span></span></label>
         <div class="row"><button class="btn" data-act="checkUpd">${ic('refresh')}${h('settings.check_now')}</button></div>
       </div>
       <div class="row"><button class="btn primary" data-act="saveCfg">${ic('save')}${h('settings.save')}</button><span class="note">${h('settings.saved_in', { path: S.info.config_dir })}</span></div>
@@ -781,6 +782,7 @@
       keep_versions: Math.max(1, Math.min(100, parseInt($('#keep').value, 10) || 10)),
       language: $('#lang').value,
       check_updates: $('#chkUpd').checked,
+      beta_updates: $('#chkBeta').checked,
     };
   }
 

@@ -305,6 +305,8 @@ ui:
     updates: "Updates"
     version: "Version %{version}"
     check_updates: "Check for a new version when the app starts"
+    beta_updates: "Also offer test versions (pre-releases)"
+    beta_updates_hint: "Gets new features earlier, before they are released to everyone. They may have bugs: only turn this on for a PC you test with."
     check_updates_hint: "Asks GitHub for the latest release. Nothing is installed until you click Update."
     check_now: "Check now"
 

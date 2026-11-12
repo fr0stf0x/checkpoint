@@ -48,6 +48,9 @@ pub struct Config {
     /// Look for a new version on GitHub when the app starts
     #[serde(default = "default_true")]
     pub check_updates: bool,
+    /// Also offer pre-releases (test versions) in the update check (updater.rs)
+    #[serde(default)]
+    pub beta_updates: bool,
     /// System notifications from the Steam launch option (notify.rs)
     #[serde(default = "default_true")]
     pub launch_notifications: bool,
@@ -104,6 +107,7 @@ impl Config {
             steam_root_override: None,
             language: default_language(),
             check_updates: true,
+            beta_updates: false,
             launch_notifications: true,
             launch_conflict: default_ask(),
         }

@@ -6,6 +6,9 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Added
+- **Test versions:** Settings → Updates → "Also offer test versions" makes the in-app updater offer pre-releases too, so new features can be tried on your own PCs before they are released to everyone. Off by default; regular users only get regular releases.
+
 ### Changed
 - Donation links in the README and on the website now point to Ko-fi (ko-fi.com/fr0stf0x) instead of Buy Me a Coffee.
 
