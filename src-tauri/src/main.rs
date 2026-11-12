@@ -6,6 +6,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 mod config;
 mod i18n;
+mod link;
 mod images;
 mod logger;
 mod manifest;
@@ -289,6 +290,33 @@ async fn migrate_preview(appid: u32, from: String, to: String) -> Result<migrate
         Ok(p)
     })
     .await
+}
+
+/// Link Steam accounts that belong to one player (link.rs); stored in the cloud index.
+#[tauri::command]
+async fn link_accounts(members: Vec<link::LinkedAccount>) -> Result<Vec<Vec<link::LinkedAccount>>, String> {
+    blocking("link_accounts", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("Linking {} Steam accounts", members.len());
+        sync::set_linked(&Config::load(), members)
+    })
+    .await
+}
+
+#[tauri::command]
+async fn unlink_accounts(sid64: String) -> Result<Vec<Vec<link::LinkedAccount>>, String> {
+    blocking("unlink_accounts", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("Unlinking a group of Steam accounts");
+        sync::remove_linked(&Config::load(), &sid64)
+    })
+    .await
+}
+
+/// Games whose save is tied to these accounts, and how (for the link dialog).
+#[tauri::command]
+async fn link_preview(ids: Vec<String>) -> Result<Vec<migrate::LinkGame>, String> {
+    blocking("link_preview", move || migrate::link_preview(&Config::load(), &ids)).await
 }
 
 #[tauri::command]
@@ -757,6 +785,9 @@ fn main() {
             pick_folder,
             migrate_preview,
             migrate_apply,
+            link_accounts,
+            unlink_accounts,
+            link_preview,
             migrate_undo,
             migrate_keep,
             migrate_pending,

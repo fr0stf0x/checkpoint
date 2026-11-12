@@ -363,7 +363,7 @@
       + b('gameMore', 'more', t('game.more'), '', t('game.more_title'));
   }
   function gameFlags(g) {
-    return (g.steamid_bound ? `<span class="flag">${ic('key')}${h('games.flag_steamid')}</span>` : '')
+    return (g.steamid_bound ? linkedHere(g) ? `<span class="flag link">${ic('swap')}${h('games.flag_linked')}</span>` : `<span class="flag">${ic('key')}${h('games.flag_steamid')}</span>` : '')
       + (g.running ? `<span class="flag run">${ic('play')}${h('games.flag_running')}</span>` : '');
   }
   function gameWhere(g) {
@@ -473,10 +473,25 @@
     pane.innerHTML = `<div class="panehead"><h2>${h('nav.accounts')}</h2></div><div class="loading"><span class="spin"></span>${h('common.loading')}</div>`;
     if (!S.accounts) await loadAccounts();
     if (S.view !== 'accounts') return;
+    const linked = new Set(linkGroups().flat().map((a) => a.sid64));
+    const me = thisAccount();
+    const groups = linkGroups().map((grp) => {
+      const member = (a) => {
+        const local = (S.accounts || []).some((x) => x.steamid64 === a.sid64);
+        const where = t(a.sid64 === me ? 'link.signed_in_here' : local ? 'link.on_this_pc' : 'link.other_pc');
+        return `<div class="member">${art('avatar', a.sid64, acctName(a.sid64), 'av')}<span class="nm"><b>${esc(acctName(a.sid64))}</b><small>${esc(where)}</small></span></div>`;
+      };
+      return `<div class="linkgroup">
+        <div class="lghead">${ic('swap')}<h3>${h('link.group_title')}</h3>${linkPill()}<span class="spacer"></span>
+          <button class="btn sm" data-act="linkEdit" data-sid="${esc(grp[0].sid64)}">${h('link.edit')}</button><button class="btn sm" data-act="unlink" data-sid="${esc(grp[0].sid64)}">${h('link.unlink')}</button></div>
+        <div class="members">${grp.map(member).join('<span class="chain">⇄</span>')}</div>
+        <ul class="chg"><li>${h('link.how_backup')}</li><li>${h('link.how_restore')}</li><li>${h('link.how_auto')}</li></ul>
+        <span class="note">${h('link.cloud_note')}</span></div>`;
+    }).join('');
     const cards = (S.accounts || []).map((a) => {
       const games = gamesOfAccount(a.steamid64);
       return `
-      <div class="card"><div class="acchead">${art('avatar', a.steamid64, a.persona_name || a.account_name, 'av')}<div class="gname">${esc(a.persona_name || a.account_name)} ${a.most_recent ? statusPill('sync', t('accounts.most_recent')) : ''}</div></div>
+      <div class="card"><div class="acchead">${art('avatar', a.steamid64, a.persona_name || a.account_name, 'av')}<div class="gname">${esc(a.persona_name || a.account_name)} ${a.most_recent ? statusPill('sync', t('accounts.most_recent')) : ''} ${linked.has(a.steamid64) ? linkPill() : ''}</div></div>
         <div class="k">login: ${esc(a.account_name)}</div>
         <div class="k">SteamID64: ${esc(a.steamid64)}</div>
         <div class="k">userdata/${a.account_id} · ${a.has_userdata ? h('accounts.apps', { n: a.userdata_apps }) : h('accounts.no_userdata')}</div>
@@ -484,7 +499,8 @@
         <div class="note">${S.list ? (games.length ? h('accounts.bound_games', { n: games.length, games: games.map((g) => g.name).join(', ') }) : h('accounts.no_bound_games')) : ''}</div>
         ${games.length ? `<div><button class="btn sm" data-act="migrateAcct" data-sid="${esc(a.steamid64)}">${ic('swap')}${h('accounts.move_btn')}</button></div>` : ''}</div>`;
     }).join('');
-    pane.innerHTML = `<div class="panehead"><h2>${h('nav.accounts')}</h2></div>
+    pane.innerHTML = `<div class="panehead"><h2>${h('nav.accounts')}</h2><span class="spacer"></span>${S.list && backendReady() ? `<button class="btn" data-act="linkOpen">${ic('swap')}${h('link.open')}</button>` : ''}</div>
+      ${groups}
       <div class="cards">${cards || `<div class="empty">${h('accounts.none')}</div>`}</div>
       <p class="note">${h('accounts.footer')}</p>`;
   }
@@ -572,7 +588,97 @@
   }
   function acctName(sid) {
     const a = (S.accounts || []).find((x) => x.steamid64 === sid);
-    return a ? (a.persona_name || a.account_name) + (a.account_name && a.persona_name ? ` (${a.account_name})` : '') : `SteamID …${String(sid).slice(-6)}`;
+    if (a) return (a.persona_name || a.account_name) + (a.account_name && a.persona_name ? ` (${a.account_name})` : '');
+    const m = linkGroups().flat().find((x) => x.sid64 === sid);
+    return m && m.name ? m.name : `SteamID …${String(sid).slice(-6)}`;
+  }
+
+  // ---------- linked accounts (link.rs) ----------
+  // Accounts of one player: the save follows the player, each PC syncs its signed-in account.
+  const linkGroups = () => (S.list && S.list.linked_accounts) || [];
+  const thisAccount = () => (S.list && S.list.this_account) || ((S.accounts || []).find((a) => a.most_recent) || {}).steamid64 || null;
+  const myGroup = () => { const me = thisAccount(); return me ? linkGroups().find((g) => g.some((a) => a.sid64 === me)) || null : null; };
+  const linkedHere = (g) => !!(g.steamid_bound && myGroup());
+  const linkPill = () => `<span class="pill s-link">${ic('swap')}${h('link.pill')}</span>`;
+  const LINK_CLASS = {
+    folder: { label: 'link.class_folder', hint: 'link.class_folder_hint', cls: 's-sync' },
+    in_file: { label: 'link.class_in_file', hint: 'link.class_in_file_hint', cls: 's-local' },
+    opaque: { label: 'link.class_opaque', hint: 'link.class_opaque_hint', cls: 's-new' },
+  };
+  let L = null;
+
+  async function openLink(pre) {
+    const me = thisAccount();
+    const cand = new Map();
+    (S.accounts || []).forEach((a) => cand.set(a.steamid64, { sid64: a.steamid64, name: a.persona_name || a.account_name, where: t(a.steamid64 === me ? 'link.signed_in_here' : 'link.on_this_pc') }));
+    linkGroups().flat().forEach((a) => { if (!cand.has(a.sid64)) cand.set(a.sid64, { sid64: a.sid64, name: a.name, where: t('link.other_pc') }); });
+    // Accounts only seen in another PC's backups (that PC's account was never signed in here)
+    (S.list ? S.list.games : []).forEach((g) => ((g.cloud && g.cloud.steam_ids) || []).forEach((id) => {
+      const sid = toSid(id);
+      if (!cand.has(sid)) cand.set(sid, { sid64: sid, name: '', where: t('link.in_backup', { device: g.cloud.device_name }) });
+    }));
+    const start = pre || (myGroup() || []).map((a) => a.sid64);
+    // A new link starts from the account signed in here
+    L = { cand: [...cand.values()], sel: new Set(start.length ? start : me ? [me] : []), preview: null, seq: 0 };
+    renderLink();
+    loadLinkPreview();
+  }
+
+  async function loadLinkPreview() {
+    if (!L) return;
+    const seq = ++L.seq;
+    L.preview = null;
+    if (L.sel.size < 2) return renderLink();
+    renderLink();
+    try {
+      const r = await call('link_preview', { ids: [...L.sel] });
+      if (L && seq === L.seq && $('#linkDlg')) { L.preview = r; renderLink(); }
+    } catch (e) { if (L && seq === L.seq) { L.preview = []; renderLink(); } }
+  }
+
+  function renderLink() {
+    const rows = L.cand.map((c) => `<label class="${L.sel.has(c.sid64) ? 'on' : ''}"><input type="checkbox" data-link="${esc(c.sid64)}" ${L.sel.has(c.sid64) ? 'checked' : ''}>${art('avatar', c.sid64, c.name || '?', 'av')}<span class="nm"><b>${esc(c.name || acctName(c.sid64))}</b><span class="note">${esc(c.where)} · <span class="mono">${esc(c.sid64)}</span></span></span></label>`).join('');
+    const games = L.sel.size < 2 ? `<p class="note">${h('link.pick_two')}</p>`
+      : !L.preview ? `<div class="loading"><span class="spin"></span>${h('common.loading')}</div>`
+        : L.preview.length ? `<div class="gtable">${L.preview.map((p) => { const k = LINK_CLASS[p.class] || LINK_CLASS.opaque; return `<div><b>${esc(p.name)}</b><span class="pill ${k.cls}">${h(k.label)}</span><span class="note">${h(k.hint)}</span></div>`; }).join('')}</div>`
+          : `<p class="note">${h('link.no_games')}</p>`;
+    modal(`<div id="linkDlg"></div><h3>${h('link.dialog_title')}</h3>
+      <p class="note">${h('link.intro')}</p>
+      <div class="pick">${rows || `<p class="note">${h('accounts.none')}</p>`}</div>
+      <h4>${h('link.games')}</h4>${games}
+      <div class="alert warn">${h('link.first_note')}</div>
+      <div class="mfoot"><button class="btn" data-close="1">${h('common.cancel')}</button>
+        <button class="btn primary" data-act="linkApply" ${L.sel.size < 2 ? 'disabled' : ''}>${h('link.apply', { n: L.sel.size })}</button></div>`);
+    layer.querySelectorAll('[data-link]').forEach((cb) => cb.addEventListener('change', () => {
+      if (cb.checked) L.sel.add(cb.dataset.link); else L.sel.delete(cb.dataset.link);
+      loadLinkPreview();
+    }));
+  }
+
+  async function applyLink() {
+    const members = [...L.sel].map((sid) => { const c = L.cand.find((x) => x.sid64 === sid); return { sid64: sid, name: (c && c.name) || acctName(sid) }; });
+    busyModal(t('link.dialog_title'));
+    try {
+      await call('link_accounts', { members });
+      L = null; close(); toast(t('link.done'));
+      await loadGames();
+      if (S.view === 'accounts') render();
+    } catch (e) { fail(t('err.link_failed'), e); }
+  }
+
+  function confirmUnlink(sid) {
+    modal(`<h3>${h('link.unlink_title')}</h3><p>${h('link.unlink_body')}</p>
+      <div class="mfoot"><button class="btn" data-close="1" data-autofocus>${h('common.cancel')}</button><button class="btn danger" data-act="unlinkYes" data-sid="${esc(sid)}">${h('link.unlink')}</button></div>`);
+  }
+
+  async function doUnlink(sid) {
+    busyModal(t('link.unlink_title'));
+    try {
+      await call('unlink_accounts', { sid64: sid });
+      close(); toast(t('link.unlinked'));
+      await loadGames();
+      if (S.view === 'accounts') render();
+    } catch (e) { fail(t('err.link_failed'), e); }
   }
   function gamesOfAccount(sid) {
     return (S.list ? S.list.games : []).filter((g) => (g.steam_ids || []).some((x) => toSid(x) === sid));
@@ -859,7 +965,12 @@
     // A backup tied to exactly one account: allow writing it into another account
     const verAccts = [...new Set((v.steam_ids || []).map(toSid))];
     let acctPick = '';
-    if (verAccts.length === 1) {
+    const grp = myGroup();
+    if (grp && verAccts.length === 1 && grp.some((a) => a.sid64 === verAccts[0])) {
+      // Linked accounts: the backend writes it into the account signed in here, no choice needed
+      acctPick = `<div class="field"><span class="l">${h('restore.account')}</span>
+        <div class="where"><span class="pill s-link">${esc(acctName(verAccts[0]))}</span><span class="arrow">→</span><span class="pill s-sync">${esc(acctName(thisAccount()))} · ${esc(t('common.signed_in'))}</span><span class="note">${h('link.restore_auto')}</span></div></div>`;
+    } else if (verAccts.length === 1) {
       const src = verAccts[0];
       const alias = S.list && S.list.account_aliases ? S.list.account_aliases[src] : null;
       const cur = (S.accounts || []).find((a) => a.most_recent);
@@ -1006,6 +1117,7 @@
           : `<span class="note">${h('snap.none')}</span>`}</div>
       </div>
       ${g.steamid_bound || g.running ? `<div>${gameFlags(g)}</div>` : ''}
+      ${linkedHere(g) ? `<div class="alert">${h('link.game_note', { account: acctName(thisAccount()) })}</div>` : ''}
       ${S.info && S.info.launch_prefix ? `<div class="field"><label class="l" for="launchOpt">${h('game.launch_option')}</label>
         <div class="secret"><input type="text" id="launchOpt" readonly value="${esc(`${S.info.launch_prefix} ${g.appid} -- %command%`)}">
         <button class="btn" data-act="copyLaunch">${ic('copy')}${h('game.copy')}</button></div>
@@ -1268,6 +1380,11 @@
       }
       else if (a === 'migrate') openMigrate({ appid: id });
       else if (a === 'migrateAcct') openMigrate({ from: n.dataset.sid });
+      else if (a === 'linkOpen') openLink();
+      else if (a === 'linkEdit') openLink((linkGroups().find((g) => g.some((x) => x.sid64 === n.dataset.sid)) || []).map((x) => x.sid64));
+      else if (a === 'linkApply') applyLink();
+      else if (a === 'unlink') confirmUnlink(n.dataset.sid);
+      else if (a === 'unlinkYes') doUnlink(n.dataset.sid);
       else if (a === 'wzBack') { W.step = 1; renderWizard(); }
       else if (a === 'wzNext') wizardPrepare();
       else if (a === 'wzApply') wizardApply();

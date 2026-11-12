@@ -34,6 +34,8 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 | `migrate.rs` | Moving a save from Steam account A to B: preview, apply, undo, keep |
 | `storage.rs`, `rclone.rs`, `rcd.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect; one `rclone rcd` per process (localhost, random password, CLI fallback, stopped on exit and before reconnecting) |
 | `run.rs` | Launch wrapper `checkpoint run --appid N -- %command%`: restore if cloud newer, run the game, wait until nothing runs from its folder, back up if local newer; no window |
+| `notify.rs`, `prompt.rs` | Launch wrapper notifications (notify-rust); the conflict question as `checkpoint prompt <file>` (small window, answer written back to the file) |
+| `link.rs` | Linked Steam accounts (one player): which files this PC syncs, normalized hash, which account a backup is restored from |
 | `updater.rs` | In-app updates (tauri-plugin-updater): check `latest.json`, signed download and install, restart |
 | `shortcuts.rs` | "Add to Steam library": binary `shortcuts.vdf` read/write (byte-exact for other shortcuts, Steam must be closed) |
 | `images.rs` | Avatars and game artwork from Steam's local caches, served to the UI by the `steamimg` URI scheme |
@@ -54,6 +56,14 @@ Classification decides what the app can do:
 - Server-side saves → impossible.
 
 Implementation rules (`migrate.rs`): always **copy**, never modify or delete A's files. The move record (`<data>/migrations/<id>.json`) is written **before** copying so a half-done move can be undone; B's overwritten files are captured in `<id>.zip` and newly created folders are recorded, so undo also removes files the game created during the test. One pending move per game. "Keep" stores `account_aliases[A] = B` in the cloud `index.json`; the Restore dialog then defaults to writing A's backups into B (`remap_from`/`remap_to`).
+
+### Linked accounts (one player, several accounts)
+
+For a player who uses account A on one PC and B on another (a library shared through Steam Family), moving saves by hand every day doesn't work. `linked_accounts` in the cloud `index.json` groups accounts; when the account signed in on a PC (most recent in `loginusers.vdf`) is in a group (`link.rs`):
+- `sync_scan` leaves out the other group accounts' folders on this PC, so a backup holds only this account's save (plus folders with no account in their path).
+- `save_hash` hashes paths and contents as if they belonged to the group's canonical account (lowest SteamID64): folder names, `steam_autocloud.vdf`, readable IDs in this account's files. The same save hashes the same on every PC, so status stays "In sync" across accounts. Without a group it is exactly `hash_scan`, so nothing changes for others.
+- Restore remaps a backup made by another group account into this one (`Link::source_of`), including same-length ID replacement inside files (`patch_in_file`). The snapshot before restoring still holds every local file.
+- After linking, each bound game needs one new backup (old hashes were not normalized). Encrypted saves that check the account can't be fixed; the UI says to test in game.
 
 Example: Phantom Blade Zero (appid 4115450) keeps saves in `<base>/ProjectPBZ/Saved/SaveGames/Steam/<SteamID64>/` (`PBZSaveGame.sav`, `1RealTime/`, `2Hourly/`, `3Daily/`, `steam_autocloud.vdf`). The `.sav` header is `PBZS` with ~8 bits/byte entropy and no readable SteamID → "test in game" class.
 

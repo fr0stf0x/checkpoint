@@ -215,7 +215,7 @@ pub struct SaveFile {
     pub mtime_ms: i64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LocalScan {
     pub files: Vec<SaveFile>,
     pub roots: Vec<String>,

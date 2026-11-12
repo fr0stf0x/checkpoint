@@ -52,7 +52,7 @@
     "cross_title": "Windows ↔ Bazzite",
     "cross_body": "Saves from Windows go into the right Proton prefix on Linux and back. Save locations come from Ludusavi's PCGamingWiki data (about 20,000 games). Add the app to your Steam library and use it in Gaming Mode with a controller (quit from the sidebar), or put it in a game's launch options to sync before and after every session, with a notification each time and a question when the save conflicts.",
     "account_title": "Switch Steam accounts",
-    "account_body": "Moving to another Steam account? Copy a game's save to the new account, test it in game, then keep or undo in one click.",
+    "account_body": "Moving to another Steam account? Copy a game's save to the new account, test it in game, then keep or undo in one click. Playing one library on two accounts (Steam Family)? Link them and the save follows you on every PC.",
     "update_title": "Updates itself",
     "update_body": "The app tells you when a new version is out and shows what changed. One click downloads it, checks its signature and installs it, on Windows and in the AppImage.",
     "title": "What you get"
