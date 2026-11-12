@@ -69,6 +69,8 @@ err:
 
 # Backend success messages (rust: t!("msg.*"))
 msg:
+  unkeep_done: "%{game}: this version is no longer kept. It is removed once it is older than the versions kept per game."
+  unkeep_removed: "%{game}: this version is no longer kept and was removed (older than the versions kept per game)."
   notify_stopped_title: "%{game} was not started"
   notify_restore_failed: "Checkpoint: cloud save not restored"
   notify_backup_failed: "Checkpoint: save not backed up"
@@ -143,6 +145,7 @@ ui:
     unknown: "Save location unknown"
 
   err:
+    unkeep_failed: "Could not stop keeping this version"
     scan_failed: "Could not scan games"
     history_failed: "Could not read the history from the cloud"
     keep_failed: "Could not keep the save move"
@@ -242,6 +245,10 @@ ui:
     empty: "No backups yet."
     footer_one: "Each game keeps its last %{n} version. Restore an older one from the game's Restore dialog."
     footer_other: "Each game keeps its last %{n} versions. Restore an older one from the game's Restore dialog."
+    kept_footer: "Versions marked Kept are not counted and never removed automatically."
+    kept: "Kept: replaced by a backup from %{device} on %{time} that overwrote its progress"
+    unkeep: "Stop keeping"
+    unkeep_hint: "Counts towards the versions kept per game again, and is removed when it is older than those."
 
   settings:
     this_pc: "This PC"
@@ -415,6 +422,7 @@ ui:
     local_newer: "<b>The local save is newer than this version by %{diff}.</b><span>Restoring overwrites the progress on this PC. You probably want to back up instead.</span>"
     diverged: "<b>This PC has never synced this game</b><span>and its save differs from the cloud. By file date the cloud is newer by %{diff}.</span>"
     cloud_newer: "The cloud is newer, from %{device}. Restoring is safe."
+    kept: "Kept"
     older_version: "This is an older version, not the latest (%{time})."
     account: "Write the save into account"
     account_original: "%{account} (as in the backup)"

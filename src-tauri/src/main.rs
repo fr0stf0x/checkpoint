@@ -335,6 +335,18 @@ async fn migrate_pending() -> Result<Vec<migrate::Migration>, String> {
     blocking("migrate_pending", || Ok(migrate::pending())).await
 }
 
+/// History: stop keeping a version that a forced backup replaced.
+#[tauri::command]
+async fn unkeep_version(appid: u32, id: String) -> Result<sync::OpResult, String> {
+    blocking_for("unkeep_version", Some(appid), move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        let r = sync::unkeep(&Config::load(), appid, &id)?;
+        info!("Stopped keeping version {id} of appid={appid}: {}", r.outcome);
+        Ok(r)
+    })
+    .await
+}
+
 #[tauri::command]
 async fn list_versions(appid: u32) -> Result<Vec<sync::VersionMeta>, String> {
     blocking_for("list_versions", Some(appid), move || sync::versions(&Config::load(), appid)).await
@@ -733,6 +745,7 @@ fn main() {
             backup_game,
             restore_game,
             list_versions,
+            unkeep_version,
             list_snapshots,
             restore_snapshot,
             delete_snapshot,
