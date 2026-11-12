@@ -185,8 +185,8 @@ async fn save_config(config: Config) -> Result<(), String> {
             Backend::Rclone { .. } => "rclone",
         };
         info!(
-            "Settings saved: storage={kind}, include_config={}, keep_versions={}, language={}, check_updates={}, launch_notifications={}",
-            config.include_config, config.keep_versions, config.language, config.check_updates, config.launch_notifications
+            "Settings saved: storage={kind}, include_config={}, keep_versions={}, language={}, check_updates={}, beta_updates={}, launch_notifications={}",
+            config.include_config, config.keep_versions, config.language, config.check_updates, config.beta_updates, config.launch_notifications
         );
         config.save()?;
         apply_language(&config);
