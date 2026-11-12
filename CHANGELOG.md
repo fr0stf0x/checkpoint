@@ -7,6 +7,7 @@ Each release's section is also shown at the top of its GitHub Release notes.
 ## [Unreleased]
 
 ### Added
+- A cloud version that a backup overwrote while it had progress this PC didn't have (a conflict, **Back up anyway** over a newer cloud version, or **Keep this PC's save** when a game starts) is now kept: History marks it **Kept** with who replaced it and when, it doesn't count towards the versions kept per game, and it is never removed automatically, so the other PC's progress can't age out. **Stop keeping** in History lets it go. Update Checkpoint on all your PCs: older versions don't know the mark and may remove such a version when they back up.
 - Steam launch option: a system notification tells you what happened around the game session: the cloud save was restored, the save was backed up, a sync failed (with the reason), or a save was left for you to decide in the app because both sides changed. Turn it off in Settings → Backup ("Notify when the Steam launch option syncs a game").
 - Steam launch option: when a game starts while its save conflicts (this PC and the cloud both have new progress, or this PC never synced and differs), a small Checkpoint window shows both versions and asks: use the cloud save and play (this PC's save is kept for Undo), keep this PC's save and play (backed up over the cloud after you quit; the cloud version stays in History), or don't start the game. It works with a controller in Gaming Mode. Settings → Backup can change this to always start the game without syncing, or to never start it.
 

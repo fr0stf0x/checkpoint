@@ -38,6 +38,37 @@ pub struct VersionMeta {
     pub zip: String,
     #[serde(default)]
     pub steam_ids: Vec<String>,
+    /// Set when a backup replaced this version while it had progress this PC didn't have (a
+    /// conflict, or "back up anyway" over a newer cloud version). Kept versions are not counted
+    /// in `keep_versions` and never removed automatically.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept: Option<Kept>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Kept {
+    /// The PC whose backup replaced this version
+    pub by_device: String,
+    pub at_utc: i64,
+}
+
+/// Drop the oldest versions beyond `keep` (the list is newest first). Kept versions don't count
+/// and always stay. Returns the removed versions, whose zips the caller deletes.
+fn prune(list: &mut Vec<VersionMeta>, keep: usize) -> Vec<VersionMeta> {
+    let keep = keep.max(1);
+    let (mut n, mut removed) = (0, Vec::new());
+    list.retain(|v| {
+        if v.kept.is_some() {
+            return true;
+        }
+        n += 1;
+        if n <= keep {
+            return true;
+        }
+        removed.push(v.clone());
+        false
+    });
+    removed
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -764,6 +795,7 @@ pub fn backup(cfg: &Config, appid: u32, force: bool, on: OnProgress) -> Result<O
         bytes: scan.bytes(),
         zip: zip_rel.clone(),
         steam_ids: steam_ids(&scan),
+        kept: None,
     };
     let tmp = cache_dir().join("tmp").join(format!("{id}.zip"));
     on(Progress::Step { step: "pack" });
@@ -777,9 +809,16 @@ pub fn backup(cfg: &Config, appid: u32, force: bool, on: OnProgress) -> Result<O
     // Re-read the index right before writing to avoid clobbering another PC's update
     let mut idx = load_index(&*st)?;
     let list = idx.games.entry(key.clone()).or_default();
+    // Overwriting progress this PC doesn't have: that cloud version is kept until the user lets
+    // it go in History, so the other PC's progress can't age out of the version list
+    if let (true, Some(old)) = (force && matches!(s, "cloud" | "conflict" | "diverged"), &latest) {
+        if let Some(v) = list.iter_mut().find(|v| v.id == old.id && v.kept.is_none()) {
+            log::info!("Keeping cloud version {} of appid={appid}: replaced by a forced backup ({s})", v.id);
+            v.kept = Some(Kept { by_device: cfg.device_name.clone(), at_utc: now.timestamp_millis() });
+        }
+    }
     list.insert(0, meta);
-    let keep = cfg.keep_versions.max(1);
-    let pruned = if list.len() > keep { list.split_off(keep) } else { vec![] };
+    let pruned = prune(list, cfg.keep_versions);
     save_index(&*st, &idx)?;
     for p in pruned {
         let _ = st.delete(&p.zip);
@@ -988,6 +1027,27 @@ pub fn versions(cfg: &Config, appid: u32) -> Result<Vec<VersionMeta>> {
     Ok(load_index(&*st)?.games.remove(&appid.to_string()).unwrap_or_default())
 }
 
+/// Stop keeping a version (History): it counts towards `keep_versions` again, so it may be removed
+/// right away if there are newer ones.
+pub fn unkeep(cfg: &Config, appid: u32, id: &str) -> Result<OpResult> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    let list = idx.games.get_mut(&appid.to_string()).context(tr!("err.version_not_found").to_string())?;
+    let v = list.iter_mut().find(|v| v.id == id).context(tr!("err.version_not_found").to_string())?;
+    v.kept = None;
+    let name = v.game_name.clone();
+    let pruned = prune(list, cfg.keep_versions);
+    save_index(&*st, &idx)?;
+    let removed = pruned.iter().any(|p| p.id == id);
+    for p in pruned {
+        let _ = st.delete(&p.zip);
+    }
+    Ok(OpResult {
+        outcome: if removed { "removed" } else { "unkept" }.into(),
+        message: if removed { t!("msg.unkeep_removed", game = name) } else { t!("msg.unkeep_done", game = name) }.to_string(),
+    })
+}
+
 pub fn history(cfg: &Config) -> Result<Vec<VersionMeta>> {
     let st = storage::open(&cfg.backend)?;
     let mut all: Vec<VersionMeta> = load_index(&*st)?.games.into_values().flatten().collect();
@@ -1074,6 +1134,7 @@ mod tests {
         VersionMeta {
             id: "x".into(), appid: 1, game_name: "g".into(), device_id: "d".into(), device_name: "d".into(),
             os: "windows".into(), created_utc: 0, content_hash: h.into(), files: 1, bytes: 1, zip: "z".into(), steam_ids: vec![],
+            kept: None,
         }
     }
     fn base(l: &str, c: &str) -> SyncBase {
@@ -1180,6 +1241,21 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(up.last(), Some(&(3_000_000, 3_000_000)));
         assert_eq!(down.last(), Some(&(3_000_000, 3_000_000)));
+    }
+
+    #[test]
+    fn prune_skips_kept_versions() {
+        let kept = |id: &str| VersionMeta { kept: Some(Kept { by_device: "PC".into(), at_utc: 1 }), ..meta(id) };
+        // newest first: a, b(kept), c, d(kept), e
+        let mut list = vec![meta("a"), kept("b"), meta("c"), kept("d"), meta("e")];
+        list.iter_mut().zip(["a", "b", "c", "d", "e"]).for_each(|(v, id)| v.id = id.into());
+        let removed = prune(&mut list, 2);
+        assert_eq!(removed.iter().map(|v| v.id.as_str()).collect::<Vec<_>>(), ["e"]);
+        assert_eq!(list.iter().map(|v| v.id.as_str()).collect::<Vec<_>>(), ["a", "b", "c", "d"]);
+        // Old index.json without the field still reads, and writes no "kept" key
+        let v: VersionMeta = serde_json::from_str(&serde_json::to_string(&meta("x")).unwrap()).unwrap();
+        assert!(v.kept.is_none());
+        assert!(!serde_json::to_string(&v).unwrap().contains("kept"));
     }
 
     #[test]

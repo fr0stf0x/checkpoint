@@ -495,8 +495,8 @@
     try { items = backendReady() ? await call('history') : []; } catch (e) { fail(t('err.history_failed'), e); }
     if (S.view !== 'history') return;
     pane.innerHTML = `<div class="panehead"><h2>${h('history.title')}</h2></div>
-      <div class="list">${items.map((v) => `<div><span class="mono">${fmt(v.created_utc)}</span><span>${esc(v.game_name)} <span class="note">· ${esc(files(v.files))} · ${human(v.bytes)}</span></span><span class="note">${esc(v.device_name)} (${v.os})</span></div>`).join('') || `<div class="empty" style="display:block">${h('history.empty')}</div>`}</div>
-      <p class="note">${h('history.footer', { n: S.info ? S.info.config.keep_versions : 10 })}</p>`;
+      <div class="list">${items.map((v) => `<div><span class="mono">${fmt(v.created_utc)}</span><span>${esc(v.game_name)} <span class="note">· ${esc(files(v.files))} · ${human(v.bytes)}</span>${v.kept ? `<span class="kept">${ic('key')}${h('history.kept', { device: v.kept.by_device, time: fmt(v.kept.at_utc) })}</span>` : ''}</span><span class="note">${esc(v.device_name)} (${v.os})${v.kept ? `<button class="btn sm" data-act="unkeep" data-id="${v.appid}" data-ver="${esc(v.id)}" title="${h('history.unkeep_hint')}">${h('history.unkeep')}</button>` : ''}</span></div>`).join('') || `<div class="empty" style="display:block">${h('history.empty')}</div>`}</div>
+      <p class="note">${h('history.footer', { n: S.info ? S.info.config.keep_versions : 10 })} ${h('history.kept_footer')}</p>`;
   }
 
   function renderSettings() {
@@ -877,7 +877,7 @@
     }
     if (S.info.os === 'linux' && v.os === 'windows') alert += `<div class="alert">${h('restore.proton_note')}</div>`;
     const danger = hasLocal && !same && (g.status === 'local' || g.status === 'conflict' || g.status === 'diverged' || localNewer);
-    const opts = versions.map((x) => `<option value="${esc(x.id)}" ${x.id === v.id ? 'selected' : ''}>${fmt(x.created_utc)} · ${esc(x.device_name)} · ${esc(files(x.files))} · ${human(x.bytes)}</option>`).join('');
+    const opts = versions.map((x) => `<option value="${esc(x.id)}" ${x.id === v.id ? 'selected' : ''}>${fmt(x.created_utc)} · ${esc(x.device_name)} · ${esc(files(x.files))} · ${human(x.bytes)}${x.kept ? ` · ${esc(t('restore.kept'))}` : ''}</option>`).join('');
     modal(`<h3>${h('common.restore')} · ${esc(g.name)}</h3>
       <div class="field"><label class="l" for="ver">${h('restore.version')}</label><select id="ver">${opts}</select></div>
       <div class="cmp">${box(t('common.local_this_pc'), g.local_mtime, hasLocal ? `${ago(g.local_mtime)} · ${files(g.files)}` : t('restore.no_save'), localNewer)}${box(t('common.cloud_from', { device: v.device_name }), v.created_utc, `${ago(v.created_utc)} · ${v.os}`, !localNewer && !same && hasLocal)}</div>
@@ -1335,6 +1335,12 @@
       else if (a === 'pCloud' || a === 'pLocal' || a === 'pCancel') {
         pane.querySelectorAll('button').forEach((b) => { b.disabled = true; });
         await call('prompt_answer', { choice: a === 'pCloud' ? 'cloud' : a === 'pLocal' ? 'local' : 'cancel' });
+      }
+      else if (a === 'unkeep') {
+        n.disabled = true;
+        try { const r = await call('unkeep_version', { appid: Number(n.dataset.id), id: n.dataset.ver }); toast(r.message); }
+        catch (e) { fail(t('err.unkeep_failed'), e); }
+        if (S.view === 'history') renderHistory();
       }
       else if (a === 'quit') { if (S.busy) toast(t('nav.quit_busy'), true); else await call('quit_app'); }
       else if (a === 'reportBug') reportIssue('bug', '[Bug] ', null);

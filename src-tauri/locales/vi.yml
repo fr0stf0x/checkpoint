@@ -69,6 +69,8 @@ err:
 
 # Thông báo thành công từ backend (rust: t!("msg.*"))
 msg:
+  unkeep_done: "%{game}: bản này không còn được giữ riêng. Nó sẽ bị xóa khi cũ hơn số bản giữ lại mỗi game."
+  unkeep_removed: "%{game}: bản này không còn được giữ riêng và đã bị xóa (cũ hơn số bản giữ lại mỗi game)."
   notify_stopped_title: "Chưa mở %{game}"
   notify_restore_failed: "Checkpoint: chưa restore được bản cloud"
   notify_backup_failed: "Checkpoint: chưa backup được save"
@@ -143,6 +145,7 @@ ui:
     unknown: "Chưa rõ vị trí save"
 
   err:
+    unkeep_failed: "Không bỏ giữ được bản này"
     scan_failed: "Không quét được game"
     history_failed: "Không đọc được lịch sử từ cloud"
     keep_failed: "Không giữ được kết quả chuyển save"
@@ -237,6 +240,10 @@ ui:
     footer: "Đọc từ <span class=\"mono\">config/loginusers.vdf</span>. Save gắn SteamID nên restore cho đúng tài khoản đã tạo ra nó, hoặc chuyển bằng nút Đổi tài khoản."
 
   history:
+    kept_footer: "Bản có nhãn Đang giữ không bị tính và không bao giờ tự bị xóa."
+    kept: "Đang giữ: bị bản backup từ %{device} lúc %{time} ghi đè tiến trình"
+    unkeep: "Bỏ giữ"
+    unkeep_hint: "Tính lại vào số bản giữ mỗi game, và sẽ bị xóa khi cũ hơn những bản đó."
     title: "Lịch sử backup"
     loading: "Đang đọc từ cloud…"
     empty: "Chưa có bản backup nào."
@@ -415,6 +422,7 @@ ui:
     local_newer: "<b>Bản local mới hơn bản này %{diff}.</b><span>Restore sẽ ghi đè tiến trình trên máy này. Có lẽ bạn muốn Backup thay vì Restore.</span>"
     diverged: "<b>Máy này chưa đồng bộ game này lần nào</b><span>và save local khác bản cloud. Theo ngày sửa file, bản cloud mới hơn %{diff}.</span>"
     cloud_newer: "Bản cloud mới hơn, từ %{device}. Restore an toàn."
+    kept: "Đang giữ"
     older_version: "Đây là bản cũ, không phải bản mới nhất (%{time})."
     account: "Ghi save vào tài khoản"
     account_original: "%{account} (như bản gốc)"
