@@ -10,6 +10,8 @@ mod images;
 mod logger;
 mod manifest;
 mod migrate;
+mod notify;
+mod prompt;
 mod paths;
 mod rclone;
 mod rcd;
@@ -183,8 +185,8 @@ async fn save_config(config: Config) -> Result<(), String> {
             Backend::Rclone { .. } => "rclone",
         };
         info!(
-            "Settings saved: storage={kind}, include_config={}, keep_versions={}, language={}, check_updates={}",
-            config.include_config, config.keep_versions, config.language, config.check_updates
+            "Settings saved: storage={kind}, include_config={}, keep_versions={}, language={}, check_updates={}, launch_notifications={}",
+            config.include_config, config.keep_versions, config.language, config.check_updates, config.launch_notifications
         );
         config.save()?;
         apply_language(&config);
@@ -625,6 +627,21 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+/// The launch prompt's data: both sides of the conflicting save (written by the launch wrapper).
+#[tauri::command]
+fn prompt_info() -> Result<sync::ConflictInfo, String> {
+    prompt::read_info().map_err(|e| format!("{e:#}"))
+}
+
+/// The launch prompt's answer: written back for the launch wrapper, then the window closes.
+#[tauri::command]
+fn prompt_answer(app: tauri::AppHandle, choice: prompt::Choice) -> Result<(), String> {
+    info!("Launch prompt answer: {choice:?}");
+    prompt::write_answer(choice).map_err(|e| format!("{e:#}"))?;
+    app.exit(0);
+    Ok(())
+}
+
 /// Open GitHub's new-issue page with prefilled content. kind: "bug" | "feature".
 /// With `appid`, the report is about that game: its details and only its log lines are attached.
 #[tauri::command]
@@ -662,7 +679,14 @@ fn main() {
         log::logger().flush();
         std::process::exit(code);
     }
-    info!("Checkpoint {} starting · {} · language={lang}", app_version(), report::system_line());
+    // `checkpoint prompt <file>`: the launch wrapper's question about a conflicting save (prompt.rs)
+    if args.get(1).map(String::as_str) == Some("prompt") {
+        let Some(file) = args.get(2) else { std::process::exit(2) };
+        prompt::set_file(file.into());
+        info!("Checkpoint {} launch prompt · {}", app_version(), report::system_line());
+    } else {
+        info!("Checkpoint {} starting · {} · language={lang}", app_version(), report::system_line());
+    }
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |p| {
         error!("PANIC: {p}");
@@ -678,6 +702,26 @@ fn main() {
         .register_asynchronous_uri_scheme_protocol("steamimg", |_ctx, request, responder| {
             let path = request.uri().path().to_string();
             tauri::async_runtime::spawn_blocking(move || responder.respond(images::respond(&path)));
+        })
+        // The main window is created here (not from tauri.conf.json) so the launch prompt can use
+        // a small window with the same UI
+        .setup(|app| {
+            let mut conf = app.config().app.windows.iter().find(|w| w.label == "main").cloned().expect("main window in tauri.conf.json");
+            let asking = prompt::active();
+            if asking {
+                conf.width = 640.0;
+                conf.height = 600.0;
+                conf.min_width = None;
+                conf.min_height = None;
+                conf.center = true;
+                conf.always_on_top = true;
+            }
+            let mut b = tauri::WebviewWindowBuilder::from_config(app.handle(), &conf)?;
+            if asking {
+                b = b.initialization_script("window.__CHECKPOINT_PROMPT__ = true;");
+            }
+            b.build()?;
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_strings,
@@ -717,7 +761,9 @@ fn main() {
             get_log,
             open_log_folder,
             report_issue,
-            quit_app
+            quit_app,
+            prompt_info,
+            prompt_answer
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Checkpoint")

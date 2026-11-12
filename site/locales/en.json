@@ -50,7 +50,7 @@
     "safe_title": "No accidental overwrites",
     "safe_body": "Compares content hashes, warns when the copy on this PC is newer than the cloud, keeps the last 10 versions, and keeps your local save before every restore so you can undo it in one click.",
     "cross_title": "Windows ↔ Bazzite",
-    "cross_body": "Saves from Windows go into the right Proton prefix on Linux and back. Save locations come from Ludusavi's PCGamingWiki data (about 20,000 games). Add the app to your Steam library and use it in Gaming Mode with a controller (quit from the sidebar), or put it in a game's launch options to sync before and after every session.",
+    "cross_body": "Saves from Windows go into the right Proton prefix on Linux and back. Save locations come from Ludusavi's PCGamingWiki data (about 20,000 games). Add the app to your Steam library and use it in Gaming Mode with a controller (quit from the sidebar), or put it in a game's launch options to sync before and after every session, with a notification each time and a question when the save conflicts.",
     "account_title": "Switch Steam accounts",
     "account_body": "Moving to another Steam account? Copy a game's save to the new account, test it in game, then keep or undo in one click.",
     "update_title": "Updates itself",

@@ -320,3 +320,11 @@ body.pad .padhints{display:flex}
 .file.sub{padding-left:42px}
 .file.xfer.wait .fn,.file.xfer.wait .fn .ic{color:var(--muted)}
 .file.xfer .nm > .sub{font-family:var(--f-mono);font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- launch prompt (checkpoint prompt <file>) ---------- */
+.app.prompt{grid-template-columns:1fr}
+.app.prompt nav.side{display:none}
+.app.prompt .pane{padding:22px}
+.prompt-box{display:flex;flex-direction:column;gap:14px;max-width:640px;margin:0 auto}
+.prompt-box h2{font-size:20px;font-weight:800}
+.btn.gm.primary .note{color:rgba(255,255,255,.88)}

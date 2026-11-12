@@ -69,6 +69,11 @@ err:
 
 # Thông báo thành công từ backend (rust: t!("msg.*"))
 msg:
+  notify_stopped_title: "Chưa mở %{game}"
+  notify_restore_failed: "Checkpoint: chưa restore được bản cloud"
+  notify_backup_failed: "Checkpoint: chưa backup được save"
+  notify_decide_title: "%{game}: chưa tự đồng bộ"
+  notify_decide_body: "Máy này và cloud đều có tiến trình mới. Mở Checkpoint để chọn."
   backup_unchanged: "%{game}: không có gì thay đổi, bỏ qua upload."
   backup_done: "%{game}: đã backup %{files} file (%{size})."
   restore_unchanged: "%{game}: save trên máy đã giống bản này."
@@ -209,7 +214,7 @@ ui:
     launch_option: "Tùy chọn khởi chạy Steam (tự đồng bộ)"
     copy: "Copy"
     copied: "Đã copy. Dán vào Steam: chuột phải vào game → Properties → Launch options."
-    launch_hint: "Với tùy chọn này, Checkpoint restore save trên cloud trước khi game chạy nếu cloud mới hơn, và backup sau khi bạn thoát game nếu save trên máy mới hơn. Trường hợp xung đột thì để bạn tự quyết ở đây. Game vẫn luôn chạy, kể cả khi mất mạng."
+    launch_hint: "Với tùy chọn này, Checkpoint restore save trên cloud trước khi game chạy nếu cloud mới hơn, và backup sau khi bạn thoát game nếu save trên máy mới hơn. Nếu lúc mở game save bị xung đột, một cửa sổ nhỏ hỏi dùng bản nào (xem Cài đặt). Khi mất mạng, game vẫn luôn chạy. Một thông báo hệ thống cho bạn biết kết quả (tắt được trong Cài đặt)."
     delete_title: "Xóa bản trên cloud · %{game}"
     delete_warn_one: "Thao tác này xóa phiên bản duy nhất của %{game} khỏi %{where}."
     delete_warn_other: "Thao tác này xóa cả %{n} phiên bản của %{game} khỏi %{where}."
@@ -270,6 +275,13 @@ ui:
     delete_all_tail: "Không hoàn tác được. Các máy khác của bạn cũng mất các bản backup này, và các lần chuyển tài khoản đã ghi nhớ sẽ bị quên. Save trên các máy của bạn vẫn giữ nguyên."
     delete_all_confirm: "Mình hiểu là toàn bộ backup trên cloud sẽ mất hẳn."
     backup: "Backup"
+    launch_conflict: "Khi mở game mà save bị xung đột (launch option của Steam)"
+    launch_conflict_ask: "Hỏi dùng bản nào"
+    launch_conflict_play: "Vẫn mở game, không đồng bộ"
+    launch_conflict_stop: "Không mở game"
+    launch_conflict_hint: "Xung đột là khi máy này và cloud đều có tiến trình mới, hoặc máy này chưa đồng bộ lần nào mà save khác cloud. Chọn Hỏi thì một cửa sổ Checkpoint nhỏ hiện ra trước khi vào game, cả trong Gaming Mode."
+    launch_notifications: "Thông báo khi launch option của Steam đồng bộ game"
+    launch_notifications_hint: "Hiện thông báo hệ thống sau khi tự restore hoặc backup, khi bị lỗi, hoặc khi có save cần bạn vào đây quyết định."
     include_config: "Backup cả file cài đặt (đồ họa, phím)"
     include_config_hint: "Tắt nếu các máy khác GPU hoặc màn hình, để không bị đè độ phân giải."
     keep_versions: "Số bản giữ lại mỗi game"
@@ -427,6 +439,19 @@ ui:
     snapshot_sub: "để Hoàn tác"
     extract_row: "Ghi file save"
     done: "Xong"
+
+  prompt:
+    title: "%{game}: dùng save nào?"
+    conflict: "<b>Cả hai bản đều có tiến trình mới.</b> Save trên máy này và bản cloud (từ %{device}) đều đã đổi từ lần đồng bộ trước. Không gộp được, chọn một bản để chơi."
+    diverged: "<b>Máy này chưa đồng bộ game này lần nào</b>, và save trên máy khác bản cloud (từ %{device}). Chọn một bản để chơi."
+    local: "Máy này"
+    cloud: "Cloud"
+    use_cloud: "Dùng bản cloud rồi chơi"
+    use_cloud_hint: "Restore bản từ %{device}. Save trên máy được giữ lại, hoàn tác được trong Checkpoint."
+    keep_local: "Giữ save trên máy rồi chơi"
+    keep_local_hint: "Sau khi thoát game, save này được backup đè lên cloud. Bản cloud cũ vẫn còn trong Lịch sử."
+    cancel: "Không mở game"
+    cancel_hint: "Không đổi gì. Mở Checkpoint để so sánh trước."
 
   pad:
     a: "Chọn / mở game"

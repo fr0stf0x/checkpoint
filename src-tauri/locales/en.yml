@@ -69,6 +69,11 @@ err:
 
 # Backend success messages (rust: t!("msg.*"))
 msg:
+  notify_stopped_title: "%{game} was not started"
+  notify_restore_failed: "Checkpoint: cloud save not restored"
+  notify_backup_failed: "Checkpoint: save not backed up"
+  notify_decide_title: "%{game}: not synced automatically"
+  notify_decide_body: "This PC and the cloud both have new progress. Open Checkpoint to choose."
   backup_unchanged: "%{game}: nothing changed, upload skipped."
   backup_done: "%{game}: backed up %{files} files (%{size})."
   restore_unchanged: "%{game}: the local save already matches this version."
@@ -209,7 +214,7 @@ ui:
     launch_option: "Steam launch option (automatic sync)"
     copy: "Copy"
     copied: "Copied. Paste it in Steam: right-click the game → Properties → Launch options."
-    launch_hint: "With this launch option, Checkpoint restores the cloud save before the game starts if the cloud is newer, and backs up after you quit if this PC's save is newer. Conflicts are left for you to decide here. The game always starts, also when offline."
+    launch_hint: "With this launch option, Checkpoint restores the cloud save before the game starts if the cloud is newer, and backs up after you quit if this PC's save is newer. If the save conflicts as the game starts, a small window asks which save to use (see Settings). Offline, the game always starts. A system notification tells you what happened (turn it off in Settings)."
     delete_title: "Delete cloud backup · %{game}"
     delete_warn_one: "This deletes the only version of %{game} from %{where}."
     delete_warn_other: "This deletes all %{n} versions of %{game} from %{where}."
@@ -271,6 +276,13 @@ ui:
     delete_all_confirm: "I understand that all cloud backups are gone for good."
     backup: "Backup"
     include_config: "Also back up settings files (graphics, controls)"
+    launch_conflict: "When a game starts with a conflicting save (Steam launch option)"
+    launch_conflict_ask: "Ask which save to use"
+    launch_conflict_play: "Start the game, sync nothing"
+    launch_conflict_stop: "Don't start the game"
+    launch_conflict_hint: "A conflict means this PC and the cloud both have new progress, or this PC never synced and its save differs. Asking opens a small Checkpoint window before the game, also in Gaming Mode."
+    launch_notifications: "Notify when the Steam launch option syncs a game"
+    launch_notifications_hint: "A system notification after an automatic restore or backup, when one fails, or when a save is left for you to decide here."
     include_config_hint: "Leave off if your PCs have different GPUs or screens, so resolutions don't get overwritten."
     keep_versions: "Versions kept per game"
     manifest: "Save-location manifest"
@@ -427,6 +439,19 @@ ui:
     snapshot_sub: "for Undo"
     extract_row: "Write save files"
     done: "Done"
+
+  prompt:
+    title: "%{game}: which save?"
+    conflict: "<b>Both saves have new progress.</b> This PC and the cloud (from %{device}) both changed since the last sync. They can't be merged; pick one to play with."
+    diverged: "<b>This PC has never synced this game</b>, and its save differs from the cloud (from %{device}). Pick one to play with."
+    local: "This PC"
+    cloud: "Cloud"
+    use_cloud: "Use the cloud save and play"
+    use_cloud_hint: "Restores the version from %{device}. The save on this PC is kept, so you can undo it in Checkpoint."
+    keep_local: "Keep this PC's save and play"
+    keep_local_hint: "After you quit, it is backed up over the cloud. The cloud version stays in History."
+    cancel: "Don't start the game"
+    cancel_hint: "Nothing changes. Open Checkpoint to compare first."
 
   pad:
     a: "Choose / open game"

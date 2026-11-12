@@ -667,6 +667,20 @@ pub struct GameStatus {
     pub name: String,
     pub status: &'static str,
     pub remap: Option<(String, String)>,
+    /// What the launch-time question shows when the save conflicts (prompt.rs)
+    pub info: ConflictInfo,
+}
+
+/// Both sides of a game's save, for the question asked when a game starts with a conflict.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConflictInfo {
+    pub appid: u32,
+    pub name: String,
+    pub status: String,
+    pub local_mtime: Option<i64>,
+    pub local_files: usize,
+    pub local_bytes: u64,
+    pub cloud: Option<VersionMeta>,
 }
 
 pub fn game_status(cfg: &Config, appid: u32) -> Result<GameStatus> {
@@ -674,7 +688,8 @@ pub fn game_status(cfg: &Config, appid: u32) -> Result<GameStatus> {
     let g = env.game(appid)?;
     let ctx = env.ctx(g);
     let rules = env.rules(appid);
-    let local = hash_scan(&paths::scan(&ctx, rules, cfg.include_config))?;
+    let scan = paths::scan(&ctx, rules, cfg.include_config);
+    let local = hash_scan(&scan)?;
     let st = storage::open(&cfg.backend)?;
     let idx = load_index(&*st)?;
     let key = appid.to_string();
@@ -685,7 +700,16 @@ pub fn game_status(cfg: &Config, appid: u32) -> Result<GameStatus> {
         let [only] = ids.as_slice() else { return None };
         idx.account_aliases.get(only).map(|to| (only.clone(), to.clone()))
     });
-    Ok(GameStatus { name: g.name.clone(), status, remap })
+    let info = ConflictInfo {
+        appid,
+        name: g.name.clone(),
+        status: status.into(),
+        local_mtime: scan.latest_mtime(),
+        local_files: scan.files.len(),
+        local_bytes: scan.bytes(),
+        cloud: latest.cloned(),
+    };
+    Ok(GameStatus { name: g.name.clone(), status, remap, info })
 }
 
 /// Where the game is installed, to tell whether it is still running.
