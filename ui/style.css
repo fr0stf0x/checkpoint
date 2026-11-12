@@ -33,8 +33,10 @@ a{color:var(--accent-2)}
 .app{display:grid;grid-template-columns:224px 1fr;height:100%}
 nav.side{border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:3px;background:rgba(11,15,24,.85);overflow:auto}
 .logo{font-family:var(--f-head);font-weight:800;font-size:18px;letter-spacing:.01em;display:flex;align-items:center;gap:10px;padding:4px 10px 18px}
-.logo svg{width:26px;height:26px;color:var(--accent);filter:drop-shadow(0 0 10px var(--accent-glow))}
-.logo .ver{font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:0;color:var(--muted);background:var(--surface-2);border:1px solid var(--line-2);border-radius:999px;padding:0 7px;align-self:center}
+/* Same icon as the window, the installer and the website */
+.logo img{width:30px;height:30px;flex:none;filter:drop-shadow(0 0 10px rgba(43,85,196,.45))}
+.logo .brand{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;line-height:1.1}
+.logo .ver{font-family:var(--f-mono);font-size:10.5px;font-weight:500;letter-spacing:0;color:var(--muted);background:var(--surface-2);border:1px solid var(--line-2);border-radius:999px;padding:1px 7px;white-space:nowrap}
 .logo .ver:empty{display:none}
 nav.side button{all:unset;cursor:pointer;padding:9px 12px;border-radius:var(--radius-sm);display:flex;align-items:center;gap:11px;color:var(--muted);position:relative;font-weight:500}
 nav.side button .navlbl{flex:1}
@@ -237,7 +239,7 @@ details.adv[open]{display:flex;flex-direction:column;gap:10px}
 .toast.act{display:flex;align-items:center;gap:12px}
 .toast.act span{flex:1}
 
-@media (max-width:820px){.app{grid-template-columns:64px 1fr}nav.side .navlbl,nav.side .count,.logo span,.meta,.sep{display:none}nav.side button{justify-content:center}.logo{justify-content:center;padding:4px 0 18px}.pane{padding:18px 16px}}
+@media (max-width:820px){.app{grid-template-columns:64px 1fr}nav.side .navlbl,nav.side .count,.logo .brand,.meta,.sep{display:none}nav.side button{justify-content:center}.logo{justify-content:center;padding:4px 0 18px}.pane{padding:18px 16px}}
 /* Controller / arrow-key use: always show where the focus is */
 body.pad :focus{outline:3px solid var(--accent-2)!important;outline-offset:2px}
 body.pad .gcard:focus-within{transform:translateY(-3px);border-color:var(--accent-2)}
