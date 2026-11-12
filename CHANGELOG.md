@@ -6,6 +6,8 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-12
+
 ### Added
 - **Test versions:** Settings → Updates → "Also offer test versions" makes the in-app updater offer pre-releases too, so new features can be tried on your own PCs before they are released to everyone. Off by default; regular users only get regular releases.
 
@@ -131,7 +133,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.0...v0.7.2
 [0.7.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.6.0...v0.7.0
