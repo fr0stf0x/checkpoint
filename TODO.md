@@ -1,43 +1,38 @@
 # TODO
 
-Planned work, not scheduled yet. When an item ships, tick it and add it to `CHANGELOG.md` under `[Unreleased]`.
+Open work, highest priority first. When an item ships, remove it here and add it to `CHANGELOG.md` under `[Unreleased]` (shipped work lives in the changelog, not here).
 
-## App
+- **P1**: next up.
+- **P2**: worth doing, no rush.
+- **P3**: only if a real need shows up.
 
-### Look and feel
-- [x] Show Steam account avatars (read from Steam's local cache, e.g. `config/avatarcache/<SteamID64>.png`; no network needed in offline mode).
-- [x] Show game artwork (Steam's local library cache, e.g. `appcache/librarycache/<appid>/` header/capsule images; fall back to a placeholder).
-- [x] Use icons throughout so screens are less text-heavy (status pills, buttons, sidebar, dialogs). Pick one icon set and bundle it locally (the app works offline).
-- [x] Modern UI with a gaming vibe (cover-art game grid, darker theme, stronger visual hierarchy), keeping both languages and keyboard focus states.
-- [x] Installer and app have no proper logo: use the Checkpoint logo from the website (`site/icon.png`, `site/logo-120.png`) to generate every icon size (`cargo tauri icon`), and check the NSIS installer, the window/taskbar icon and the AppImage icon.
-- [x] Show the app version next to the logo in the sidebar, so it is clear which version is running.
-- [x] Google client ID/secret fields: once configured, show the saved values (not only the green border), masked by default with a show/hide toggle like a password field. Never write them to the log.
-- [x] Controller navigation (gamepad API: D-pad/stick moves focus, A confirms, B goes back), so the app is usable in Bazzite/SteamOS Gaming Mode.
+## P1
 
-### Features
-- [x] Launch wrapper `checkpoint run -- %command%` for Steam launch options: restore before playing, back up after quitting.
-- [ ] "Currently playing on PC X" lock (`lock.json` in the cloud) to prevent conflicts.
-- [ ] Custom game entries (games missing from the manifest, non-Steam games, emulators).
-- [ ] Scheduled background backup and a tray icon.
-- [ ] Saves stored in the Windows Registry (Windows ↔ Proton `user.reg`).
-- [x] Restore a local snapshot from the UI.
-- [x] Keep one `rclone rcd` process running instead of starting rclone for every call (~3 s per call today).
-- [x] "Add to Steam library" button: add Checkpoint as a non-Steam game (`userdata/<id>/config/shortcuts.vdf`, Steam must be closed), so it can be opened from Gaming Mode.
-- [x] "Delete everything in the cloud" button (Settings), behind a warning dialog that names the backup location and needs a tick box before the Delete button works.
-- [x] Per game: "Delete cloud backup" button, behind a warning dialog (cannot be undone; local saves are not touched; other PCs lose this backup).
-- [x] Per game: "Report a problem" button that opens a prefilled GitHub issue with the game name, appid, status, save paths and the log lines for that game.
-- [x] Logs: keep ~3 rotated files instead of 1 (size-based rotation stays; per-run or per-day files are not worth it, the `starting` line already separates runs).
-- [x] Logs: tag game-related log lines with the appid, so a per-game report only includes that game's lines (plus recent errors) and fits GitHub's ~8 KB URL limit.
-- [x] "Open log folder" button next to "Report a bug", so users can attach the full log file to the issue when the prefilled excerpt is not enough. (Already in the Report dialog and every error dialog.)
+### Write the Steam launch option for the user
+Today the launch option must be copied from each game's **⋯** dialog into Steam, per game, per PC, per account. Write it into `userdata/<accountid>/config/localconfig.vdf` (`UserLocalConfigStore → Software → Valve → Steam → apps → <appid> → "LaunchOptions"`, text VDF) instead:
+- [ ] Per-game switch, a "Turn on for N games" button with a preview of what changes, a "Remove all" button, and an "Auto sync" badge on game cards.
+- [ ] Steam must be closed (it rewrites the file on exit), as for "Add to Steam library". On Bazzite this means Desktop mode.
+- [ ] Edit only the `LaunchOptions` line of that game (never rewrite the whole file), escape `"` and `\`, keep `localconfig.vdf.checkpoint-bak`, write to a temp file, read it back, then rename.
+- [ ] Merge with existing options: insert the wrapper before `%command%` (`gamemoderun %command%`, `VAR=1 %command%`); without `%command%`, put the wrapper first and keep the rest as game arguments (`-dx11`). Store the original so removing restores it exactly.
+- [ ] A moved or deleted Checkpoint breaks every game that uses it: on start, repair launch options that point to an old Checkpoint path (AppImage moved to another folder).
+- [ ] The launch wrapper must never keep a game from starting: catch panics before and after the game.
+- [ ] Measure how long the wrapper delays a game start when offline, and cap the cloud check with a timeout.
+- [ ] Default to the account signed in on this PC; let the user pick other accounts.
 
-### Release / housekeeping
-- [x] Update the notes of the v0.1.0–v0.3.0 GitHub Releases with their `CHANGELOG.md` sections (newer releases get them automatically).
-- [ ] Recheck controller navigation on a real handheld in Gaming Mode (ROG Xbox Ally X): moving right from the last game in a row must go to the next game, not the search box; focus must move between games, not land on each game's small buttons; check dialogs and the hint panel too.
-- [x] Test the AppImage and the Proton-prefix restore on a real Bazzite machine.
+### Check 0.8.0 on real machines
+- [ ] Bazzite: launch wrapper notifications and the conflict window in Desktop mode and Gaming Mode (does the window show, does the controller work).
+- [ ] Windows installed build (NSIS): the toast shows the Checkpoint name and icon.
+- [ ] Controller navigation on a handheld in Gaming Mode (ROG Xbox Ally X): right from the last game in a row goes to the next game, focus moves between games and not their small buttons; dialogs, the hint panel, the backup/restore progress dialog and the Quit button.
+- [ ] A forced backup over a conflicting cloud version marks that version **Kept** in History (Phantom Blade Zero is in conflict now).
+- [ ] Move Phantom Blade Zero's save to another Steam account and test it in game (encrypted save, account binding unknown).
 
-## Website
+## P2
 
-- [x] Redesign the landing page to be more attractive: modern, gaming vibe.
-- [x] Show the problem and how the app solves it (Steam offline mode → no Steam Cloud → Checkpoint syncs saves through your own Google Drive; switching Steam accounts).
-- [x] Take screenshots of the app (both languages if possible) and put them on the landing page.
-- [x] Move the guides to their own pages/paths (for example `/guide`, `/guide/google-drive`, `/guide/switch-account`), keeping the landing page short. Keep `/privacy` and `/terms` (used by the Google consent screen) and redirects for old anchors.
+- [ ] Setup code for a new PC: "Code for another PC" on a configured PC bundles the Google client ID, client secret and backup folder into one string; pasting it on a new PC installs rclone, fills those in and leaves only the Google sign-in. Warn not to post the code publicly (it contains the client secret); never log it.
+- [ ] Custom game entries (games missing from the manifest, non-Steam games, emulators): name and save folder, stored so the same entry works on Windows and in the Proton prefix on Linux.
+
+## P3
+
+- [ ] "Currently playing on PC X" lock (`lock.json` in the cloud) to prevent conflicts. Needs stale-lock handling (PC turned off, offline) and a manual unlock. Less needed now that the launch wrapper asks on a conflict.
+- [ ] Scheduled background backup and a tray icon. Mostly covered by the launch wrapper backing up after every session.
+- [ ] Saves stored in the Windows Registry (Windows ↔ Proton `user.reg`). Few games, easy to get wrong; wait for a concrete game.

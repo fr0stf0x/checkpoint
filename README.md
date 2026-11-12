@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/fr0stf0x/checkpoint)](https://github.com/fr0stf0x/checkpoint/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/fr0stf0x/checkpoint/total)](https://github.com/fr0stf0x/checkpoint/releases)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-fr0stf0x-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fr0stf0x)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-fr0stf0x-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/fr0stf0x)
 
 Back up and restore Steam save games between your own PCs (Windows and Linux, including Bazzite) through your own Google Drive. Works while Steam runs in offline mode, where Steam Cloud is unavailable.
 
@@ -113,7 +113,7 @@ Keep a backup of the private key. If it is lost, installed copies cannot verify 
 
 ## Support
 
-Checkpoint is free and open source. If it saved your progress, you can [buy me a coffee](https://buymeacoffee.com/fr0stf0x) ☕. Bug reports and ideas on [GitHub Issues](https://github.com/fr0stf0x/checkpoint/issues) help just as much.
+Checkpoint is free and open source. If it saved your progress, you can [buy me a coffee on Ko-fi](https://ko-fi.com/fr0stf0x) ☕. Bug reports and ideas on [GitHub Issues](https://github.com/fr0stf0x/checkpoint/issues) help just as much.
 
 ## Known limitations
 

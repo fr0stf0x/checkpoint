@@ -5,7 +5,7 @@
 [![Latest release](https://img.shields.io/github/v/release/fr0stf0x/checkpoint)](https://github.com/fr0stf0x/checkpoint/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/fr0stf0x/checkpoint/total)](https://github.com/fr0stf0x/checkpoint/releases)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-fr0stf0x-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fr0stf0x)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-fr0stf0x-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/fr0stf0x)
 
 Backup và restore save game Steam giữa các máy của bạn (Windows và Linux, kể cả Bazzite) qua chính Google Drive của bạn. Dùng được khi Steam chạy offline mode, lúc Steam Cloud không hoạt động.
 
@@ -113,7 +113,7 @@ Nhớ backup khóa private. Mất khóa thì các bản đã cài không kiểm 
 
 ## Ủng hộ
 
-Checkpoint miễn phí và mã nguồn mở. Nếu app giữ được tiến trình chơi của bạn, bạn có thể [mời mình một ly cà phê](https://buymeacoffee.com/fr0stf0x) ☕. Báo lỗi và góp ý trên [GitHub Issues](https://github.com/fr0stf0x/checkpoint/issues) cũng giúp rất nhiều.
+Checkpoint miễn phí và mã nguồn mở. Nếu app giữ được tiến trình chơi của bạn, bạn có thể [mời mình một ly cà phê trên Ko-fi](https://ko-fi.com/fr0stf0x) ☕. Báo lỗi và góp ý trên [GitHub Issues](https://github.com/fr0stf0x/checkpoint/issues) cũng giúp rất nhiều.
 
 ## Hạn chế
 

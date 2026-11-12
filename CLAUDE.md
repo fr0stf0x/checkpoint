@@ -67,7 +67,7 @@ Example: Phantom Blade Zero (appid 4115450) keeps saves in `<base>/ProjectPBZ/Sa
   - Add every key to **both** files; the tests `locale_files_have_same_keys` and `ui_code_keys_exist` catch missing keys.
   - Vietnamese UI text addresses the user as "bạn".
 - Keep `README.md` (English) and `README.vi.md` in sync. The website uses i18next with `site/locales/en.json` and `vi.json`.
-- **When the app changes, update the docs in the same change:** `README.md` and `README.vi.md` (features, usage, limitations), the website (`site/index.html` and both `site/locales/*.json`: features, guide, notes), `CHANGELOG.md` under `[Unreleased]`, and `TODO.md` if an item shipped. A user-visible feature is not done until the README and landing page describe it in both languages.
+- **When the app changes, update the docs in the same change:** `README.md` and `README.vi.md` (features, usage, limitations), the website (`site/index.html` and both `site/locales/*.json`: features, guide, notes), `CHANGELOG.md` under `[Unreleased]`, and `TODO.md` if an item shipped (remove it). A user-visible feature is not done until the README and landing page describe it in both languages.
 - After changing `ui/`, rebuild the Rust app: Tauri embeds the frontend in the binary.
 - Never print or commit rclone tokens, client secrets or the contents of `rclone.conf`. Logs replace the home folder with `~`; exported logs mask SteamIDs.
 - Do not add `Co-Authored-By: Claude` (or any AI attribution) to commits or PRs.
@@ -85,4 +85,4 @@ Example: Phantom Blade Zero (appid 4115450) keeps saves in `<base>/ProjectPBZ/Sa
   - While working, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog: Added / Changed / Fixed / Removed). Write for users, not a list of code changes.
   - Before tagging: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a new empty `## [Unreleased]` above it, update the compare links at the bottom, commit, then tag.
   - The workflow puts that version's section under "What's new", **above** the install instructions in the GitHub Release notes, and fails if the section is missing.
-- When a `TODO.md` item ships, tick it and add it to the changelog.
+- When a `TODO.md` item ships, remove it from `TODO.md` and add it to the changelog. `TODO.md` lists open work only, by priority (P1 next up, P2 no rush, P3 only on real need).
