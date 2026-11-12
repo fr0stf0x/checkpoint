@@ -3,7 +3,7 @@
 //! The release workflow signs the installers and publishes `latest.json` on each GitHub Release;
 //! the app reads it from `releases/latest/download/latest.json` (prereleases are skipped by GitHub).
 //! With "test versions" on (`Config::beta_updates`), the app instead asks the GitHub API for the
-//! newest release including pre-releases (tags like v0.9.0-beta.1) and reads that one's
+//! release with the highest version, pre-releases included (tags like v0.9.0-beta.1), and reads that one's
 //! `latest.json`; if the API can't be reached it falls back to the stable endpoint.
 //! Nothing is installed without the user clicking Update. The signature is checked by the plugin
 //! against the public key in tauri.conf.json before anything is installed.
@@ -67,10 +67,20 @@ fn newest_manifest_url() -> Result<String> {
     pick_manifest(&releases).ok_or_else(|| anyhow!("no release with latest.json"))
 }
 
+/// The release with the highest version (not the newest one: a 0.8.x fix published after a
+/// 0.9.0 beta must not hide the beta), among published releases that have a `latest.json`.
 fn pick_manifest(releases: &serde_json::Value) -> Option<String> {
-    releases.as_array()?.iter().filter(|r| r["draft"].as_bool() != Some(true)).find_map(|r| {
-        r["assets"].as_array()?.iter().find(|a| a["name"] == "latest.json")?["browser_download_url"].as_str().map(str::to_string)
-    })
+    releases
+        .as_array()?
+        .iter()
+        .filter(|r| r["draft"].as_bool() != Some(true))
+        .filter_map(|r| {
+            let version = semver::Version::parse(r["tag_name"].as_str()?.trim_start_matches('v')).ok()?;
+            let url = r["assets"].as_array()?.iter().find(|a| a["name"] == "latest.json")?["browser_download_url"].as_str()?;
+            Some((version, url.to_string()))
+        })
+        .max_by(|a, b| a.0.cmp(&b.0))
+        .map(|(_, url)| url)
 }
 
 fn updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater> {
@@ -165,14 +175,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn beta_channel_picks_newest_non_draft_release_with_manifest() {
+    fn beta_channel_picks_highest_version_with_manifest() {
+        let rel = |tag: &str, draft: bool, asset: &str| serde_json::json!({ "tag_name": tag, "draft": draft, "assets": [{ "name": asset, "browser_download_url": tag }] });
+        // Newest first, as GitHub lists them: a 0.8.2 fix published after the 0.9.0 beta
         let r = serde_json::json!([
-            { "draft": true, "assets": [{ "name": "latest.json", "browser_download_url": "draft" }] },
-            { "draft": false, "prerelease": true, "assets": [{ "name": "x.exe", "browser_download_url": "exe" }] },
-            { "draft": false, "prerelease": true, "assets": [{ "name": "latest.json", "browser_download_url": "beta" }] },
-            { "draft": false, "prerelease": false, "assets": [{ "name": "latest.json", "browser_download_url": "stable" }] }
+            rel("v0.9.0", true, "latest.json"),
+            rel("v0.8.2", false, "latest.json"),
+            rel("v0.9.0-beta.2", false, "x.exe"),
+            rel("v0.9.0-beta.1", false, "latest.json"),
+            rel("v0.8.1", false, "latest.json"),
+            rel("not-a-version", false, "latest.json")
         ]);
-        assert_eq!(pick_manifest(&r).as_deref(), Some("beta"));
+        assert_eq!(pick_manifest(&r).as_deref(), Some("v0.9.0-beta.1"), "highest version wins, drafts and releases without latest.json don't count");
+        let after = serde_json::json!([rel("v0.9.0", false, "latest.json"), rel("v0.9.0-beta.3", false, "latest.json")]);
+        assert_eq!(pick_manifest(&after).as_deref(), Some("v0.9.0"), "the final release beats its betas");
         assert_eq!(pick_manifest(&serde_json::json!([])), None);
     }
 
