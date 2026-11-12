@@ -56,6 +56,58 @@ pub struct OpResult {
     pub message: String,
 }
 
+/// Progress of a backup or restore, shown in the UI as a list of save files.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Progress {
+    /// A step starts: "snapshot", "pack", "upload", "download" or "extract".
+    Step { step: &'static str },
+    /// The save files being packed (backup) or written (restore), in order.
+    Files { files: Vec<ProgressFile> },
+    /// File `index` of the list is being packed or written; the ones before it are done.
+    File { index: usize },
+    /// Upload or download: bytes so far of `total` (0 while unknown).
+    Bytes { done: u64, total: u64 },
+    /// Every step of the operation up front (restore), so the UI lists them before they run.
+    Steps { steps: Vec<StepInfo> },
+    /// Files done in a step that has no file list (the snapshot before a restore).
+    Count { done: usize, total: usize },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StepInfo {
+    pub step: &'static str,
+    pub files: usize,
+    pub bytes: u64,
+    /// Download: the PC that made the backup, and when
+    pub device: Option<String>,
+    pub time: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProgressFile {
+    pub name: String,
+    /// Folder with a trailing separator
+    pub dir: String,
+    pub size: u64,
+}
+
+impl ProgressFile {
+    fn new(path: &Path, size: u64) -> Self {
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let mut dir = path.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+        if !dir.is_empty() && !dir.ends_with(std::path::MAIN_SEPARATOR) {
+            dir.push(std::path::MAIN_SEPARATOR);
+        }
+        Self { name, dir, size }
+    }
+}
+
+pub type OnProgress<'a> = &'a (dyn Fn(Progress) + Sync);
+
+/// For callers without a window (launch wrapper, tests).
+pub fn no_progress(_: Progress) {}
+
 #[derive(Debug, Serialize)]
 pub struct GameRow {
     pub appid: u32,
@@ -265,7 +317,7 @@ fn os_name() -> &'static str {
 }
 
 /// `meta`: (file name, JSON) stored next to the save files.
-fn write_zip(path: &Path, scan: &LocalScan, meta: Option<(&str, &[u8])>) -> Result<()> {
+fn write_zip(path: &Path, scan: &LocalScan, meta: Option<(&str, &[u8])>, on: OnProgress) -> Result<()> {
     use zip::write::SimpleFileOptions;
     if let Some(p) = path.parent() {
         fs::create_dir_all(p)?;
@@ -274,7 +326,8 @@ fn write_zip(path: &Path, scan: &LocalScan, meta: Option<(&str, &[u8])>) -> Resu
     let opts = SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated)
         .large_file(true);
-    for f in &scan.files {
+    for (index, f) in scan.files.iter().enumerate() {
+        on(Progress::File { index });
         zw.start_file(f.logical.clone(), opts)?;
         let mut src = File::open(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
         io::copy(&mut src, &mut zw)?;
@@ -401,7 +454,15 @@ fn read_snapshot(path: &Path, with_hash: bool) -> Result<SnapshotMeta> {
 /// Zip the save on this PC before it is overwritten. A snapshot with the same content is replaced
 /// (the new one has the newer date and reason); `protect` is never removed, even when it is the
 /// oldest, because it is the snapshot about to be restored.
-pub(crate) fn snapshot_local(dir: &Path, scan: &LocalScan, hash: &str, reason: SnapReason, include_config: bool, protect: Option<&Path>) -> Result<PathBuf> {
+pub(crate) fn snapshot_local(
+    dir: &Path,
+    scan: &LocalScan,
+    hash: &str,
+    reason: SnapReason,
+    include_config: bool,
+    protect: Option<&Path>,
+    on: OnProgress,
+) -> Result<PathBuf> {
     fs::create_dir_all(dir)?;
     for p in snapshot_zips(dir) {
         if Some(p.as_path()) != protect && read_snapshot(&p, false).ok().and_then(|m| m.content_hash).as_deref() == Some(hash) {
@@ -435,7 +496,13 @@ pub(crate) fn snapshot_local(dir: &Path, scan: &LocalScan, hash: &str, reason: S
     // Written under another name first, so a crash never leaves a half-written snapshot
     let path = dir.join(format!("{id}.zip"));
     let part = dir.join(format!("{id}.part"));
-    let written = write_zip(&part, scan, Some((SNAP_META, &serde_json::to_vec_pretty(&meta)?))).and_then(|_| Ok(fs::rename(&part, &path)?));
+    let total = scan.files.len();
+    let count = |p: Progress| {
+        if let Progress::File { index } = p {
+            on(Progress::Count { done: index, total });
+        }
+    };
+    let written = write_zip(&part, scan, Some((SNAP_META, &serde_json::to_vec_pretty(&meta)?)), &count).and_then(|_| Ok(fs::rename(&part, &path)?));
     if written.is_err() {
         let _ = fs::remove_file(&part);
     }
@@ -510,13 +577,13 @@ fn put_back(dir: &Path, path: &Path, snap: &SnapshotMeta, ctx: &GameCtx, rules: 
         return Ok(None);
     }
     if let Some(h) = &local_hash {
-        snapshot_local(dir, &scan, h, SnapReason::Snapshot(snap), include_config, Some(path)).context(tr!("err.snapshot").to_string())?;
+        snapshot_local(dir, &scan, h, SnapReason::Snapshot(snap), include_config, Some(path), &no_progress).context(tr!("err.snapshot").to_string())?;
     }
     let in_snapshot: std::collections::HashSet<String> = {
         let za = zip::ZipArchive::new(File::open(path)?).context(tr!("err.backup_corrupt").to_string())?;
         za.file_names().map(String::from).collect()
     };
-    let (restored, _) = extract(path, ctx, None)?;
+    let (restored, _) = extract(path, ctx, None, &no_progress)?;
 
     // Only remove files of the kinds the snapshot covered: an old snapshot (no metadata) removes
     // nothing, one without graphics settings files leaves those alone.
@@ -628,7 +695,7 @@ pub fn game_base(cfg: &Config, appid: u32) -> Result<PathBuf> {
     Ok(env.ctx(g).base)
 }
 
-pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
+pub fn backup(cfg: &Config, appid: u32, force: bool, on: OnProgress) -> Result<OpResult> {
     let env = Env::load(cfg)?;
     let g = env.game(appid)?;
     let ctx = env.ctx(g);
@@ -675,8 +742,11 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
         steam_ids: steam_ids(&scan),
     };
     let tmp = cache_dir().join("tmp").join(format!("{id}.zip"));
-    write_zip(&tmp, &scan, Some((META_IN_ZIP, &serde_json::to_vec_pretty(&meta)?)))?;
-    let up = st.upload(&tmp, &zip_rel);
+    on(Progress::Step { step: "pack" });
+    on(Progress::Files { files: scan.files.iter().map(|f| ProgressFile::new(&f.real, f.size)).collect() });
+    write_zip(&tmp, &scan, Some((META_IN_ZIP, &serde_json::to_vec_pretty(&meta)?)), on)?;
+    on(Progress::Step { step: "upload" });
+    let up = st.upload(&tmp, &zip_rel, &|done, total| on(Progress::Bytes { done, total }));
     let _ = fs::remove_file(&tmp);
     up?;
 
@@ -699,7 +769,14 @@ pub fn backup(cfg: &Config, appid: u32, force: bool) -> Result<OpResult> {
 }
 
 /// `remap`: (account in the backup, target account) to write A's save into B's place.
-pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool, remap: Option<(String, String)>) -> Result<OpResult> {
+pub fn restore(
+    cfg: &Config,
+    appid: u32,
+    version_id: Option<String>,
+    force: bool,
+    remap: Option<(String, String)>,
+    on: OnProgress,
+) -> Result<OpResult> {
     let remap = match remap {
         Some((a, b)) if a != b => Some((crate::migrate::Ids::parse(&a)?, crate::migrate::Ids::parse(&b)?)),
         _ => None,
@@ -749,16 +826,27 @@ pub fn restore(cfg: &Config, appid: u32, version_id: Option<String>, force: bool
         bail!("NEEDS_CONFIRM:{s}");
     }
 
+    let step = |step, files, bytes| StepInfo { step, files, bytes, device: None, time: None };
+    let mut steps = Vec::new();
+    if local_hash.is_some() {
+        steps.push(step("snapshot", scan.files.len(), scan.bytes()));
+    }
+    steps.push(StepInfo { device: Some(ver.device_name.clone()), time: Some(ver.created_utc), ..step("download", ver.files, 0) });
+    steps.push(step("extract", ver.files, ver.bytes));
+    on(Progress::Steps { steps });
     if let Some(h) = &local_hash {
-        snapshot_local(&snapshot_dir(appid), &scan, h, SnapReason::Restore(&ver), cfg.include_config, None).context(tr!("err.snapshot").to_string())?;
+        on(Progress::Step { step: "snapshot" });
+        snapshot_local(&snapshot_dir(appid), &scan, h, SnapReason::Restore(&ver), cfg.include_config, None, on).context(tr!("err.snapshot").to_string())?;
     }
 
     let tmp = cache_dir().join("tmp").join(format!("restore-{}.zip", ver.id));
     if let Some(p) = tmp.parent() {
         fs::create_dir_all(p)?;
     }
-    st.download(&ver.zip, &tmp)?;
-    let result = extract(&tmp, &ctx, remap.as_ref());
+    on(Progress::Step { step: "download" });
+    st.download(&ver.zip, &tmp, &|done, total| on(Progress::Bytes { done, total }))?;
+    on(Progress::Step { step: "extract" });
+    let result = extract(&tmp, &ctx, remap.as_ref(), on);
     let _ = fs::remove_file(&tmp);
     let (restored, skipped) = result?;
 
@@ -819,7 +907,12 @@ pub(crate) fn fix_autocloud_owners(scan: &LocalScan, owner: &crate::migrate::Ids
     Ok(changed)
 }
 
-pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::migrate::Ids, crate::migrate::Ids)>) -> Result<(usize, usize)> {
+pub(crate) fn extract(
+    zip_path: &Path,
+    ctx: &GameCtx,
+    remap: Option<&(crate::migrate::Ids, crate::migrate::Ids)>,
+    on: OnProgress,
+) -> Result<(usize, usize)> {
     let mut za = zip::ZipArchive::new(File::open(zip_path)?).context(tr!("err.backup_corrupt").to_string())?;
     // Validate every path before writing any file
     let mut plan = Vec::new();
@@ -838,12 +931,14 @@ pub(crate) fn extract(zip_path: &Path, ctx: &GameCtx, remap: Option<&(crate::mig
             None => (name.clone(), false),
         };
         match paths::logical_to_real(&logical, ctx) {
-            Ok(p) => plan.push((i, p, rewrite_vdf)),
+            Ok(p) => plan.push((i, p, rewrite_vdf, e.size())),
             Err(err) if err.to_string() == "SKIP_LINUX_NATIVE" => skipped += 1,
             Err(err) => return Err(err),
         }
     }
-    for (i, dest, rewrite_vdf) in &plan {
+    on(Progress::Files { files: plan.iter().map(|(_, p, _, size)| ProgressFile::new(p, *size)).collect() });
+    for (index, (i, dest, rewrite_vdf, _)) in plan.iter().enumerate() {
+        on(Progress::File { index });
         let mut e = za.by_index(*i)?;
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
@@ -984,9 +1079,9 @@ mod tests {
             println!("No game with saves to test a backup");
             return;
         };
-        let r = backup(&cfg, g.appid, false).expect("backup");
+        let r = backup(&cfg, g.appid, false, &no_progress).expect("backup");
         println!("backup: {}", r.message);
-        let again = backup(&cfg, g.appid, false).expect("second backup");
+        let again = backup(&cfg, g.appid, false, &no_progress).expect("second backup");
         assert_eq!(again.outcome, "unchanged");
         let l2 = list(&cfg).expect("list 2");
         let row = l2.games.iter().find(|x| x.appid == g.appid).unwrap();
@@ -1011,7 +1106,7 @@ mod tests {
         assert!(l.cloud_error.is_none(), "cloud error: {:?}", l.cloud_error);
         let g = l.games.iter().filter(|g| g.local_hash.is_some() && !g.running).min_by_key(|g| g.bytes).expect("a game with saves");
         println!("game: {} ({} files, {} B), status before: {}", g.name, g.files, g.bytes, g.status);
-        let r = backup(&cfg, g.appid, false).expect("backup");
+        let r = backup(&cfg, g.appid, false, &no_progress).expect("backup");
         println!("backup: {} -> {}", r.outcome, r.message);
         let l2 = list(&cfg).expect("list 2");
         let row = l2.games.iter().find(|x| x.appid == g.appid).unwrap();
@@ -1021,7 +1116,7 @@ mod tests {
         let v = versions(&cfg, g.appid).expect("versions");
         let st = storage::open(&cfg.backend).unwrap();
         let tmp = std::env::temp_dir().join("checkpoint-drive-check.zip");
-        st.download(&v[0].zip, &tmp).expect("download");
+        st.download(&v[0].zip, &tmp, &|_, _| {}).expect("download");
         let za = zip::ZipArchive::new(File::open(&tmp).unwrap()).unwrap();
         let names: Vec<String> = za.file_names().map(String::from).collect();
         println!("downloaded zip: {} entries: {:?}", names.len(), names);
@@ -1029,10 +1124,38 @@ mod tests {
         assert_eq!(names.len(), v[0].files + 1);
         let _ = fs::remove_file(&tmp);
 
-        let rr = restore(&cfg, g.appid, None, false, None).expect("restore");
+        let rr = restore(&cfg, g.appid, None, false, None, &no_progress).expect("restore");
         println!("restore of the same version: {} -> {}", rr.outcome, rr.message);
         crate::rcd::shutdown();
         assert_eq!(rr.outcome, "unchanged");
+    }
+
+    /// Upload and download progress against the configured storage, with a throwaway file in
+    /// `tmp/`: `cargo test progress_real -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn progress_real() {
+        let cfg = Config::load();
+        let st = storage::open(&cfg.backend).unwrap();
+        let dir = std::env::temp_dir().join(format!("checkpoint-progress-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("up.bin");
+        let data: Vec<u8> = (0..3_000_000u32).map(|i| (i.wrapping_mul(2_654_435_761) >> 13) as u8).collect();
+        fs::write(&src, &data).unwrap();
+        let seen = Mutex::new(Vec::new());
+        let on = |d: u64, t: u64| seen.lock().unwrap().push((d, t));
+        st.upload(&src, "tmp/progress-test.bin", &on).expect("upload");
+        let up = std::mem::take(&mut *seen.lock().unwrap());
+        println!("upload: {up:?}");
+        st.download("tmp/progress-test.bin", &dir.join("down.bin"), &on).expect("download");
+        let down = std::mem::take(&mut *seen.lock().unwrap());
+        println!("download: {down:?}");
+        let _ = st.delete_dir("tmp");
+        crate::rcd::shutdown();
+        assert_eq!(fs::read(dir.join("down.bin")).unwrap(), data);
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(up.last(), Some(&(3_000_000, 3_000_000)));
+        assert_eq!(down.last(), Some(&(3_000_000, 3_000_000)));
     }
 
     #[test]
@@ -1050,13 +1173,13 @@ mod tests {
         assert_eq!(scan.files[0].logical, "any/base/saves/slot1/a.sav");
         let h1 = hash_scan(&scan).unwrap().unwrap();
         let zip = root.join("b.zip");
-        write_zip(&zip, &scan, None).unwrap();
+        write_zip(&zip, &scan, None, &no_progress).unwrap();
 
         fs::write(saves.join("a.sav"), b"progress-2-newer").unwrap();
         let h2 = hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap();
         assert_ne!(h1, h2);
 
-        let (n, skipped) = extract(&zip, &ctx, None).unwrap();
+        let (n, skipped) = extract(&zip, &ctx, None, &no_progress).unwrap();
         assert_eq!((n, skipped), (1, 0));
         assert_eq!(fs::read(saves.join("a.sav")).unwrap(), b"progress-1");
         assert_eq!(hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap(), h1);
@@ -1078,11 +1201,11 @@ mod tests {
         let ctx = GameCtx::new(9, "G", &lib, &root.join("steam"));
         let rules = vec![FileRule { path: "<base>/Saved".into(), tags: vec![], when: vec![] }];
         let zip = root.join("v.zip");
-        write_zip(&zip, &paths::scan(&ctx, &rules, false), None).unwrap();
+        write_zip(&zip, &paths::scan(&ctx, &rules, false), None, &no_progress).unwrap();
         fs::remove_dir_all(&a_dir).unwrap();
 
         let remap = (crate::migrate::Ids::parse(a).unwrap(), crate::migrate::Ids::parse(b).unwrap());
-        extract(&zip, &ctx, Some(&remap)).unwrap();
+        extract(&zip, &ctx, Some(&remap), &no_progress).unwrap();
         let b_dir = lib.join(format!("steamapps/common/G/Saved/{b}"));
         assert_eq!(fs::read(b_dir.join("s.sav")).unwrap(), b"prog");
         assert!(fs::read_to_string(b_dir.join("steam_autocloud.vdf")).unwrap().contains(&remap.1.acct));
@@ -1114,10 +1237,10 @@ mod tests {
             FileRule { path: "<base>/Saved".into(), tags: vec!["save".into()], when: vec![] },
         ];
         let zip = root.join("v.zip");
-        write_zip(&zip, &paths::scan(&ctx, &rules, false), None).unwrap();
+        write_zip(&zip, &paths::scan(&ctx, &rules, false), None, &no_progress).unwrap();
         fs::remove_dir_all(lib.join("steamapps/common/G")).unwrap();
 
-        extract(&zip, &ctx, None).unwrap();
+        extract(&zip, &ctx, None, &no_progress).unwrap();
         let scan = paths::scan(&ctx, &rules, false);
         assert_eq!(fix_autocloud_owners(&scan, &b).unwrap(), 1);
         let shared_vdf = fs::read(shared.join("steam_autocloud.vdf")).unwrap();
@@ -1147,7 +1270,7 @@ mod tests {
 
         // A cloud restore overwrites a.sav and adds b.sav; the snapshot keeps the save it replaced
         let cloud = VersionMeta { device_name: "Jonsbo".into(), created_utc: 5, ..meta("c") };
-        let p1 = snapshot_local(&dir, &paths::scan(&ctx, &rules, false), &mine, SnapReason::Restore(&cloud), false, None).unwrap();
+        let p1 = snapshot_local(&dir, &paths::scan(&ctx, &rules, false), &mine, SnapReason::Restore(&cloud), false, None, &no_progress).unwrap();
         fs::write(saves.join("a.sav"), b"cloud-level-5").unwrap();
         fs::write(saves.join("b.sav"), b"cloud-extra").unwrap();
         let theirs = hash_now();
@@ -1195,7 +1318,7 @@ mod tests {
             fs::write(saves.join("a.sav"), format!("v{i}")).unwrap();
             let scan = paths::scan(&ctx, &rules, false);
             let h = hash_scan(&scan).unwrap().unwrap();
-            let p = snapshot_local(&dir, &scan, &h, SnapReason::Restore(&meta("c")), false, first.as_deref()).unwrap();
+            let p = snapshot_local(&dir, &scan, &h, SnapReason::Restore(&meta("c")), false, first.as_deref(), &no_progress).unwrap();
             first.get_or_insert(p);
         }
         let zips = snapshot_zips(&dir);
@@ -1221,7 +1344,7 @@ mod tests {
         let scan = paths::scan(&ctx, &rules, false);
         let old = hash_scan(&scan).unwrap().unwrap();
         let p = dir.join("20250102T030405Z.zip");
-        write_zip(&p, &scan, None).unwrap();
+        write_zip(&p, &scan, None, &no_progress).unwrap();
         fs::write(saves.join("a.sav"), b"new").unwrap();
         fs::write(saves.join("b.sav"), b"extra").unwrap();
 

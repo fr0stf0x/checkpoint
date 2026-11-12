@@ -4,15 +4,19 @@ use crate::config::Backend;
 use anyhow::{bail, Context, Result};
 use crate::tr;
 use std::fs;
-use std::io::Write;
+use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+/// Transfer progress: (bytes so far, total bytes; 0 while unknown).
+pub type OnBytes<'a> = &'a dyn Fn(u64, u64);
 
 pub trait Storage: Send {
     fn read(&self, rel: &str) -> Result<Option<Vec<u8>>>;
     fn write(&self, rel: &str, data: &[u8]) -> Result<()>;
-    fn upload(&self, local: &Path, rel: &str) -> Result<()>;
-    fn download(&self, rel: &str, local: &Path) -> Result<()>;
+    fn upload(&self, local: &Path, rel: &str, on: OnBytes) -> Result<()>;
+    fn download(&self, rel: &str, local: &Path, on: OnBytes) -> Result<()>;
     fn delete(&self, rel: &str) -> Result<()>;
     /// Remove a folder and everything in it. A missing folder is not an error.
     fn delete_dir(&self, rel: &str) -> Result<()>;
@@ -79,6 +83,31 @@ impl FolderStorage {
     }
 }
 
+/// Copy a file in 1 MB steps, reporting progress at most every 100 ms (and at the end).
+fn copy_with_progress(from: &Path, to: &Path, on: OnBytes) -> std::io::Result<()> {
+    let mut src = fs::File::open(from)?;
+    let total = src.metadata()?.len();
+    let mut dst = fs::File::create(to)?;
+    let mut buf = vec![0u8; 1 << 20];
+    let (mut done, mut last) = (0u64, Instant::now());
+    on(0, total);
+    loop {
+        let n = src.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        dst.write_all(&buf[..n])?;
+        done += n as u64;
+        if last.elapsed() >= Duration::from_millis(100) {
+            on(done, total);
+            last = Instant::now();
+        }
+    }
+    dst.flush()?;
+    on(done, total);
+    Ok(())
+}
+
 impl Storage for FolderStorage {
     fn read(&self, rel: &str) -> Result<Option<Vec<u8>>> {
         let p = self.full(rel);
@@ -97,16 +126,16 @@ impl Storage for FolderStorage {
         fs::rename(&tmp, &p)?;
         Ok(())
     }
-    fn upload(&self, local: &Path, rel: &str) -> Result<()> {
+    fn upload(&self, local: &Path, rel: &str, on: OnBytes) -> Result<()> {
         let p = self.full(rel);
         if let Some(parent) = p.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(local, &p).with_context(|| tr!("err.copy_to", path = p.display()).to_string())?;
+        copy_with_progress(local, &p, on).with_context(|| tr!("err.copy_to", path = p.display()).to_string())?;
         Ok(())
     }
-    fn download(&self, rel: &str, local: &Path) -> Result<()> {
-        fs::copy(self.full(rel), local).context(tr!("err.download_backup").to_string())?;
+    fn download(&self, rel: &str, local: &Path, on: OnBytes) -> Result<()> {
+        copy_with_progress(&self.full(rel), local, on).context(tr!("err.download_backup").to_string())?;
         Ok(())
     }
     fn delete(&self, rel: &str) -> Result<()> {
@@ -139,6 +168,33 @@ pub fn rclone_command(bin: &str) -> Command {
         c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     }
     c
+}
+
+enum LogLine {
+    /// Bytes transferred so far, total bytes (0 while unknown)
+    Stats(u64, u64),
+    Error(String),
+    Other,
+}
+
+/// One stderr line of rclone run with `--use-json-log`. Lines that are not JSON (an old rclone
+/// without that flag, a crash) count as errors so they still reach the message.
+fn parse_log_line(line: &str) -> LogLine {
+    let line = line.trim();
+    if line.is_empty() {
+        return LogLine::Other;
+    }
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(line) else { return LogLine::Error(line.to_string()) };
+    if let Some(st) = v.get("stats") {
+        let n = |k: &str| st.get(k).and_then(serde_json::Value::as_u64).unwrap_or(0);
+        return LogLine::Stats(n("bytes"), n("totalBytes"));
+    }
+    match v.get("level").and_then(serde_json::Value::as_str) {
+        Some("error" | "critical" | "fatal" | "emergency" | "alert") => {
+            LogLine::Error(v.get("msg").and_then(serde_json::Value::as_str).unwrap_or(line).trim().to_string())
+        }
+        _ => LogLine::Other,
+    }
 }
 
 /// rclone failed because the file or folder is not there (fine when deleting).
@@ -211,9 +267,30 @@ impl RcloneStorage {
         child.stdin.take().context("rclone stdin")?.write_all(data)?;
         Self::check(child.wait_with_output()?, "rcat")
     }
-    fn cli_copyto(&self, from: &str, to: &str, what: &str) -> Result<()> {
-        let out = self.run(&["copyto", from, to])?;
-        Self::check(out, what)
+    /// `rclone copyto` with JSON logs on stderr: the stats lines (every 250 ms) feed `on`, the
+    /// error lines become the error message.
+    fn cli_copyto(&self, from: &str, to: &str, what: &str, on: OnBytes) -> Result<()> {
+        let mut child = rclone_command(&self.bin)
+            .args(["copyto", from, to, "--use-json-log", "--stats", "250ms", "--stats-log-level", "NOTICE"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .with_context(|| tr!("err.rclone_run", bin = self.bin).to_string())?;
+        let mut errors = Vec::new();
+        for line in std::io::BufReader::new(child.stderr.take().context("rclone stderr")?).lines().map_while(Result::ok) {
+            match parse_log_line(&line) {
+                LogLine::Stats(done, total) => on(done, total),
+                LogLine::Error(m) => errors.push(m),
+                LogLine::Other => {}
+            }
+        }
+        let status = child.wait()?;
+        if !status.success() {
+            let detail = if errors.is_empty() { status.to_string() } else { errors.join("\n") };
+            bail!("{}", tr!("err.rclone_failed", what = what, detail = detail));
+        }
+        Ok(())
     }
     fn cli_delete(&self, cmd: &str, rel: &str) -> Result<()> {
         let out = self.run(&[cmd, &self.target(rel)])?;
@@ -252,19 +329,28 @@ impl Storage for RcloneStorage {
             None => self.cli_write(rel, data),
         }
     }
-    fn upload(&self, local: &Path, rel: &str) -> Result<()> {
+    fn upload(&self, local: &Path, rel: &str, on: OnBytes) -> Result<()> {
         let (fs_, name) = crate::rcd::local_parts(local).context("upload path")?;
-        match self.via_rc("upload", |rc| rc.copy_file(&fs_, &name, &self.remote, rel))? {
-            Some(()) => Ok(()),
-            None => self.cli_copyto(&local.to_string_lossy(), &self.target(rel), "upload"),
+        let size = fs::metadata(local).map(|m| m.len()).unwrap_or(0);
+        let report = |done: u64, total: u64| on(done, if total > 0 { total } else { size });
+        report(0, size);
+        match self.via_rc("upload", |rc| rc.copy_file_watch(&fs_, &name, &self.remote, rel, &report))? {
+            Some(()) => {}
+            None => self.cli_copyto(&local.to_string_lossy(), &self.target(rel), "upload", &report)?,
         }
+        report(size, size);
+        Ok(())
     }
-    fn download(&self, rel: &str, local: &Path) -> Result<()> {
+    fn download(&self, rel: &str, local: &Path, on: OnBytes) -> Result<()> {
         let (fs_, name) = crate::rcd::local_parts(local).context("download path")?;
-        match self.via_rc("download", |rc| rc.copy_file(&self.remote, rel, &fs_, &name))? {
-            Some(()) => Ok(()),
-            None => self.cli_copyto(&self.target(rel), &local.to_string_lossy(), "download"),
+        on(0, 0);
+        match self.via_rc("download", |rc| rc.copy_file_watch(&self.remote, rel, &fs_, &name, on))? {
+            Some(()) => {}
+            None => self.cli_copyto(&self.target(rel), &local.to_string_lossy(), "download", on)?,
         }
+        let size = fs::metadata(local).map(|m| m.len()).unwrap_or(0);
+        on(size, size);
+        Ok(())
     }
     fn delete(&self, rel: &str) -> Result<()> {
         let r = self.via_rc("delete", |rc| match rc.delete_file(&self.remote, rel) {
@@ -285,5 +371,21 @@ impl Storage for RcloneStorage {
             Some(()) => Ok(()),
             None => self.cli_delete("purge", rel),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rclone_json_log_lines() {
+        let stats = r#"{"time":"t","level":"notice","msg":"\nTransferred: 1 MiB / 3.8 MiB","stats":{"bytes":1048576,"totalBytes":4000000,"errors":0}}"#;
+        assert!(matches!(parse_log_line(stats), LogLine::Stats(1048576, 4000000)));
+        let err = r#"{"time":"t","level":"error","msg":"Attempt 3/3 failed with 1 errors and: directory not found","source":"cmd/cmd.go:283"}"#;
+        assert!(matches!(parse_log_line(err), LogLine::Error(m) if m.ends_with("directory not found")));
+        assert!(matches!(parse_log_line(r#"{"level":"notice","msg":"Failed to copyto"}"#), LogLine::Other));
+        assert!(matches!(parse_log_line("Error: unknown flag: --use-json-log"), LogLine::Error(_)));
+        assert!(matches!(parse_log_line("  "), LogLine::Other));
     }
 }

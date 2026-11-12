@@ -27,6 +27,20 @@ use log::{error, info};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
+use tauri::ipc::Channel;
+
+/// Version shown in the app, logs and bug reports. A debug build says when it was built instead
+/// (`debug-MMDD-HHMM`, local time of the executable), since its Cargo version is a placeholder.
+pub(crate) fn app_version() -> String {
+    if !cfg!(debug_assertions) {
+        return env!("CARGO_PKG_VERSION").into();
+    }
+    let built = std::env::current_exe().and_then(std::fs::metadata).and_then(|m| m.modified());
+    match built {
+        Ok(t) => format!("debug-{}", chrono::DateTime::<chrono::Local>::from(t).format("%m%d-%H%M")),
+        Err(_) => "debug".into(),
+    }
+}
 
 /// Only one backup/restore/move operation at a time.
 static OP: Mutex<()> = Mutex::new(());
@@ -150,7 +164,7 @@ async fn get_info() -> Result<Info, String> {
             manifest_games: m.as_ref().map(|m| m.games.len()).unwrap_or(0),
             manifest_updated: m.as_ref().map(|m| m.updated_utc),
             config_dir: config::config_dir().to_string_lossy().to_string(),
-            version: env!("CARGO_PKG_VERSION").into(),
+            version: app_version(),
             log_dir: logger::log_dir().to_string_lossy().to_string(),
             language: cfg.effective_language(),
             launch_prefix: shortcuts::launcher().map(|p| format!("\"{}\" run --appid", p.display())).unwrap_or_default(),
@@ -219,12 +233,19 @@ async fn list_accounts() -> Result<Vec<steam::Account>, String> {
     .await
 }
 
+/// Send backup/restore progress to the UI's channel.
+fn progress_to(ch: Channel<sync::Progress>) -> impl Fn(sync::Progress) + Sync {
+    move |p| {
+        let _ = ch.send(p);
+    }
+}
+
 #[tauri::command]
-async fn backup_game(appid: u32, force: bool) -> Result<sync::OpResult, String> {
+async fn backup_game(appid: u32, force: bool, on_progress: Channel<sync::Progress>) -> Result<sync::OpResult, String> {
     blocking_for("backup_game", Some(appid), move || {
         let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
         info!("Backup appid={appid} force={force}");
-        let r = sync::backup(&Config::load(), appid, force)?;
+        let r = sync::backup(&Config::load(), appid, force, &progress_to(on_progress))?;
         info!("Backup appid={appid}: {}", r.outcome);
         Ok(r)
     })
@@ -238,6 +259,7 @@ async fn restore_game(
     force: bool,
     remap_from: Option<String>,
     remap_to: Option<String>,
+    on_progress: Channel<sync::Progress>,
 ) -> Result<sync::OpResult, String> {
     blocking_for("restore_game", Some(appid), move || {
         let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
@@ -250,7 +272,7 @@ async fn restore_game(
             }
         );
         let remap = remap_from.zip(remap_to);
-        let r = sync::restore(&Config::load(), appid, version_id, force, remap)?;
+        let r = sync::restore(&Config::load(), appid, version_id, force, remap, &progress_to(on_progress))?;
         info!("Restore appid={appid}: {}", r.outcome);
         Ok(r)
     })
@@ -596,6 +618,13 @@ struct ReportResult {
     log_truncated: bool,
 }
 
+/// Quit from the sidebar: Gaming Mode shows no window close button. The Exit event stops rclone rcd.
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    info!("Quit from the sidebar");
+    app.exit(0);
+}
+
 /// Open GitHub's new-issue page with prefilled content. kind: "bug" | "feature".
 /// With `appid`, the report is about that game: its details and only its log lines are attached.
 #[tauri::command]
@@ -628,12 +657,12 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     // `checkpoint run --appid N -- %command%` from Steam's launch options: no window (run.rs)
     if args.get(1).map(String::as_str) == Some("run") {
-        info!("Checkpoint {} launch wrapper · {}", env!("CARGO_PKG_VERSION"), report::system_line());
+        info!("Checkpoint {} launch wrapper · {}", app_version(), report::system_line());
         let code = run::main(&args[2..]);
         log::logger().flush();
         std::process::exit(code);
     }
-    info!("Checkpoint {} starting · {} · language={lang}", env!("CARGO_PKG_VERSION"), report::system_line());
+    info!("Checkpoint {} starting · {} · language={lang}", app_version(), report::system_line());
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |p| {
         error!("PANIC: {p}");
@@ -687,7 +716,8 @@ fn main() {
             log_frontend,
             get_log,
             open_log_folder,
-            report_issue
+            report_issue,
+            quit_app
         ])
         .build(tauri::generate_context!())
         .expect("failed to start Checkpoint")

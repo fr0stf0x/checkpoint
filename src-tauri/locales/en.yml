@@ -90,6 +90,8 @@ ui:
     history: "History"
     settings: "Settings"
     report: "Report bug / Feedback"
+    quit: "Quit"
+    quit_busy: "Wait until the backup or restore finishes, then quit."
 
   common:
     working: "Working…"
@@ -412,6 +414,19 @@ ui:
     snapshot_note: "The save on this PC is kept first. To get it back, use Undo after the restore, or the game's ⋯ → Earlier saves."
     backup_instead: "Back up instead"
     force: "Restore anyway, overwrite local"
+
+  progress:
+    step_snapshot: "Keeping a copy of the save on this PC…"
+    step_pack: "Packing save files…"
+    step_upload: "Uploading the backup…"
+    step_download: "Downloading the backup…"
+    step_extract: "Writing save files…"
+    upload_row: "Upload backup"
+    download_row: "Download backup"
+    snapshot_row: "Keep the save on this PC"
+    snapshot_sub: "for Undo"
+    extract_row: "Write save files"
+    done: "Done"
 
   pad:
     a: "Choose / open game"

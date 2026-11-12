@@ -87,7 +87,7 @@ fn before(cfg: &Config, appid: u32) {
     if st.status != "cloud" {
         return info!("Launch wrapper appid={appid}: {} is {}, nothing to restore", st.name, st.status);
     }
-    match sync::restore(cfg, appid, None, false, st.remap) {
+    match sync::restore(cfg, appid, None, false, st.remap, &sync::no_progress) {
         Ok(r) => info!("Launch wrapper appid={appid}: restore {}", r.outcome),
         Err(e) => warn!("Launch wrapper appid={appid}: restore skipped: {}", crate::i18n::to_en(&format!("{e:#}"))),
     }
@@ -117,7 +117,7 @@ fn after(cfg: &Config, appid: u32) {
     if !matches!(st.status, "local" | "new") {
         return info!("Launch wrapper appid={appid}: {} is {} after playing, no automatic backup", st.name, st.status);
     }
-    match sync::backup(cfg, appid, false) {
+    match sync::backup(cfg, appid, false, &sync::no_progress) {
         Ok(r) => info!("Launch wrapper appid={appid}: backup {}", r.outcome),
         Err(e) => warn!("Launch wrapper appid={appid}: backup skipped: {}", crate::i18n::to_en(&format!("{e:#}"))),
     }
