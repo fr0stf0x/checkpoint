@@ -91,6 +91,7 @@ Example: Phantom Blade Zero (appid 4115450) keeps saves in `<base>/ProjectPBZ/Sa
 ## Releases and changelog
 
 - Release = push a `vX.Y.Z` tag; the workflow builds and publishes. Ask the maintainer before pushing or tagging unless they said so.
+- **Test versions first:** a tag with a suffix (`vX.Y.Z-beta.N`) becomes a GitHub pre-release with the `[Unreleased]` changelog section as notes (no section of its own needed). Regular users never see it (the updater endpoint and the website skip pre-releases); PCs with **Settings → Updates → test versions** on get it through the in-app updater. Test on the real PCs, then release `vX.Y.Z` as usual.
 - **Every release needs a changelog entry, in English:**
   - While working, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md` (Keep a Changelog: Added / Changed / Fixed / Removed). Write for users, not a list of code changes.
   - Before tagging: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a new empty `## [Unreleased]` above it, update the compare links at the bottom, commit, then tag.

@@ -9,6 +9,11 @@ Each release's section is also shown at the top of its GitHub Release notes.
 ### Added
 - **Linked accounts** for one player with several Steam accounts (for example a library shared through Steam Family, played as one account on this PC and another on a second PC). In **Steam accounts → Link accounts…**, pick the accounts; the dialog lists the games whose save is tied to them and how well each will work (automatic, experimental, or test in game). A save tied to an account then follows the player: each PC backs up only the account signed in there and restores into it, also through the Steam launch option, with no moving saves by hand, and both PCs show the game as in sync. Links are stored with your backups, so every PC uses them. After linking, back up each such game once.
 
+## [0.8.1] - 2026-11-12
+
+### Added
+- **Test versions:** Settings → Updates → "Also offer test versions" makes the in-app updater offer pre-releases too, so new features can be tried on your own PCs before they are released to everyone. Off by default; regular users only get regular releases.
+
 ### Changed
 - Donation links in the README and on the website now point to Ko-fi (ko-fi.com/fr0stf0x) instead of Buy Me a Coffee.
 
@@ -131,7 +136,8 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.0...v0.7.2
 [0.7.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.6.0...v0.7.0

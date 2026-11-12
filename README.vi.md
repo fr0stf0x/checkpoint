@@ -29,7 +29,7 @@ Tải về: [bản mới nhất](https://github.com/fr0stf0x/checkpoint/releases
 - Điều khiển bằng tay cầm: D-pad hoặc cần trái đi từ game này sang game kế theo đúng thứ tự (qua phải ở cuối hàng thì sang hàng sau), **A** mở menu của game (Backup, Restore, Save cũ, Đánh dấu, Chi tiết) hoặc bấm nút, **X** đánh dấu game, **B** đóng hộp thoại hoặc quay về thanh bên, **LB / RB** chuyển màn hình. Khi dùng tay cầm, thanh bên hiện chú thích các nút. Phím mũi tên, Enter, Space và Esc cũng làm được y như vậy, cho layout Steam Input gửi phím.
 - Cài rclone ngay trong app: nhận biết hệ điều hành, tải rclone chính thức có kiểm tra SHA-256, kết nối Google Drive bằng OAuth client ID của bạn. Sau khi kết nối, Cài đặt hiện client ID và secret đang lưu, ẩn cho tới khi bạn bấm nút con mắt, để copy sang các máy khác.
 - Phiên bản app hiện ngay cạnh logo.
-- Cập nhật ngay trong app: khi mở, app hỏi GitHub bản phát hành mới nhất và cho xem có gì mới. Bấm **Cập nhật và khởi động lại** thì app tải bản mới, kiểm tra chữ ký rồi cài (chạy bộ cài trên Windows, hoặc thay luôn file AppImage). Không cài gì cho tới khi bạn bấm. Tắt kiểm tra ở **Cài đặt → Cập nhật**. Bản Linux không chạy từ file AppImage thì chỉ có link tới trang tải.
+- Cập nhật ngay trong app: khi mở, app hỏi GitHub bản phát hành mới nhất và cho xem có gì mới. Bấm **Cập nhật và khởi động lại** thì app tải bản mới, kiểm tra chữ ký rồi cài (chạy bộ cài trên Windows, hoặc thay luôn file AppImage). Không cài gì cho tới khi bạn bấm. Tắt kiểm tra ở **Cài đặt → Cập nhật**, ở đó cũng bật được nhận bản thử nghiệm (pre-release, tag kiểu `v0.9.0-beta.1`) cho máy dùng để thử; những người khác chỉ nhận bản chính thức. Bản Linux không chạy từ file AppImage thì chỉ có link tới trang tải.
 
 ## Ngôn ngữ
 
@@ -98,7 +98,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release. Trình cập nhật trong app bỏ qua pre-release.
+Tag có dấu `-` (ví dụ `v0.2.0-beta.1`) được đánh dấu pre-release và lấy mục `[Unreleased]` trong changelog làm ghi chú. Trình cập nhật trong app bỏ qua pre-release, trừ khi bật nhận bản thử nghiệm trong Cài đặt → Cập nhật.
 
 Bộ cài được ký cho trình cập nhật trong app, và workflow đăng thêm `latest.json`, app đọc file này ở `releases/latest/download/latest.json`. Cài đặt một lần:
 

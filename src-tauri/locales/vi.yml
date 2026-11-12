@@ -307,6 +307,8 @@ ui:
     updates: "Cập nhật"
     version: "Phiên bản %{version}"
     check_updates: "Kiểm tra bản mới khi mở app"
+    beta_updates: "Nhận cả bản thử nghiệm (pre-release)"
+    beta_updates_hint: "Có tính năng mới sớm hơn, trước khi phát hành cho mọi người. Có thể còn lỗi: chỉ bật trên máy dùng để thử."
     check_updates_hint: "Hỏi GitHub bản phát hành mới nhất. Không cài gì cho tới khi bạn bấm Cập nhật."
     check_now: "Kiểm tra ngay"
 
