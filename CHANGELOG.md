@@ -6,6 +6,12 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Added
+- A **Quit** button in the sidebar, below Report bug / Feedback, to close the app in Gaming Mode, where there is no window close button. While a backup or restore is running it shows a message instead of quitting.
+
+### Changed
+- Backup and restore show their progress instead of a bare spinner: a list of the game's save files (file name and a shortened folder path), each with a spinner while it is packed or written and a check when done, plus a row for the upload or download with its percentage. A restore lists its three steps up front (keep the save on this PC for Undo, download the backup, write the save files), and each one turns from a spinner to a check as it finishes. Backing up or restoring several games shows the same list for each game in turn.
+
 ## [0.7.2] - 2026-11-08
 
 ### Fixed

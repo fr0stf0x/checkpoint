@@ -75,6 +75,38 @@ impl Rc {
             .map(|_| ())
     }
 
+    /// `copy_file` as a background job, polled every 250 ms so `on(bytes, total)` can show the
+    /// transfer (total is 0 until rclone knows it).
+    pub fn copy_file_watch(&self, src_fs: &str, src: &str, dst_fs: &str, dst: &str, on: &dyn Fn(u64, u64)) -> Result<(), RcError> {
+        let r = self.call(
+            "operations/copyfile",
+            json!({ "srcFs": src_fs, "srcRemote": src, "dstFs": dst_fs, "dstRemote": dst, "_async": true }),
+        )?;
+        let Some(id) = r.get("jobid").and_then(Value::as_u64) else {
+            return Err(RcError::Api("rclone did not return a job id".into()));
+        };
+        loop {
+            std::thread::sleep(Duration::from_millis(250));
+            if let Ok(s) = self.call("core/stats", json!({ "group": format!("job/{id}") })) {
+                let item = s.get("transferring").and_then(Value::as_array).and_then(|a| a.first());
+                let num = |v: Option<&Value>, k: &str| v.and_then(|v| v.get(k)).and_then(Value::as_u64).unwrap_or(0);
+                let (done, total) = match item {
+                    Some(_) => (num(item, "bytes"), num(item, "size")),
+                    None => (num(Some(&s), "bytes"), num(Some(&s), "totalBytes")),
+                };
+                on(done, total);
+            }
+            let st = self.call("job/status", json!({ "jobid": id }))?;
+            if st.get("finished").and_then(Value::as_bool) == Some(true) {
+                if st.get("success").and_then(Value::as_bool) == Some(true) {
+                    return Ok(());
+                }
+                let e = st.get("error").and_then(Value::as_str).filter(|e| !e.is_empty()).unwrap_or("copy failed");
+                return Err(RcError::Api(e.to_string()));
+            }
+        }
+    }
+
     pub fn delete_file(&self, fs: &str, remote: &str) -> Result<(), RcError> {
         self.call("operations/deletefile", json!({ "fs": fs, "remote": remote })).map(|_| ())
     }

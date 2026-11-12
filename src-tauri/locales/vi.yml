@@ -90,6 +90,8 @@ ui:
     history: "Lịch sử"
     settings: "Cài đặt"
     report: "Báo lỗi / Góp ý"
+    quit: "Thoát"
+    quit_busy: "Chờ backup hoặc restore xong rồi hãy thoát."
 
   common:
     working: "Đang chạy…"
@@ -412,6 +414,19 @@ ui:
     snapshot_note: "Save trên máy được giữ lại trước. Muốn lấy lại thì bấm Hoàn tác sau khi restore, hoặc vào ⋯ của game → Save cũ trên máy."
     backup_instead: "Backup thay vì restore"
     force: "Vẫn restore, ghi đè local"
+
+  progress:
+    step_snapshot: "Đang giữ lại save hiện tại trên máy…"
+    step_pack: "Đang nén file save…"
+    step_upload: "Đang tải bản backup lên…"
+    step_download: "Đang tải bản backup về…"
+    step_extract: "Đang ghi file save…"
+    upload_row: "Tải bản backup lên"
+    download_row: "Tải bản backup về"
+    snapshot_row: "Giữ lại save hiện tại trên máy"
+    snapshot_sub: "để Hoàn tác"
+    extract_row: "Ghi file save"
+    done: "Xong"
 
   pad:
     a: "Chọn / mở game"

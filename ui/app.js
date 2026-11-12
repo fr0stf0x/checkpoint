@@ -30,6 +30,7 @@
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
     check: '<path d="m5 12 5 5L20 7"/>',
+    power: '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>',
     alert: '<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
     monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
     plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
@@ -143,6 +144,115 @@
   function busyModal(title) {
     modal(`<h3>${esc(title)}</h3><div class="loading"><span class="spin"></span><span id="busyText">${h('common.working')}</span></div>`);
   }
+  // Backup/restore progress in one list. A restore lists its steps up front (keep the save on
+  // this PC, download, write files); each step row turns from waiting to spinner to check, and the
+  // save files show under the step that packs or writes them. A backup lists the files being
+  // packed, then adds the upload row. Returns the Channel to pass to the command (onProgress) and
+  // done() to show every row finished.
+  function progressModal(title, sub) {
+    modal(`<h3>${esc(title)}</h3>${sub ? `<span class="note">${esc(sub)}</span>` : ''}
+      <div class="prog-head"><span id="pgStep">${h('common.working')}</span><span class="spacer"></span><b id="pgCount"></b></div>
+      <div class="bar"><i id="pgBar"></i></div>
+      <div class="files" id="pgList" hidden></div>`);
+    // Look up rows in this dialog only: a late message for the previous game of a multi-game run
+    // must not touch the next game's list
+    const root = layer.querySelector('.modal');
+    const q = (sel) => root.querySelector(sel);
+    const LABEL = { snapshot: 'progress.step_snapshot', pack: 'progress.step_pack', upload: 'progress.step_upload', download: 'progress.step_download', extract: 'progress.step_extract' };
+    const ROW = { snapshot: 'progress.snapshot_row', upload: 'progress.upload_row', download: 'progress.download_row', extract: 'progress.extract_row' };
+    const ICON = { snapshot: 'history', upload: 'upload', download: 'download', extract: 'save' };
+    let steps = [], info = {}, cur = null, items = [], fi = -1, total = {};
+    const row = (s) => q('#pgS-' + s);
+    const size = (s, text) => { const z = q('#pgS-' + s + ' .sz'); if (z) z.textContent = text; };
+    // Whole bar across the steps of a restore; per step for a backup
+    const bar = (f) => {
+      const i = steps.indexOf(cur);
+      const all = steps.length && i >= 0 ? (i + Math.min(1, f)) / steps.length : f;
+      const b = q('#pgBar'); if (b) b.style.width = Math.round(Math.min(1, all) * 100) + '%';
+    };
+    const mark = (el, st) => {
+      if (!el) return;
+      el.classList.remove('wait', 'active', 'done');
+      el.classList.add(st);
+      el.querySelector('.st').innerHTML = st === 'active' ? '<span class="spin"></span>' : st === 'done' ? ic('check') : '<span class="dot"></span>';
+      if (st === 'active') el.scrollIntoView({ block: 'nearest' });
+    };
+    // Middle ellipsis: the start of the folder shrinks, the last two folders always show
+    const where = (dir) => {
+      const parts = dir.match(/[^\\/]*[\\/]?/g).filter(Boolean);
+      const cut = Math.max(0, parts.length - 2);
+      return `<span class="h">${esc(parts.slice(0, cut).join(''))}</span><span class="t">${esc(parts.slice(cut).join(''))}</span>`;
+    };
+    const stepRow = (s, x) => {
+      let note = '';
+      if (s === 'snapshot') note = `${files(x.files)} · ${human(x.bytes)} · ${t('progress.snapshot_sub')}`;
+      else if (s === 'download' && x.device) note = `${x.device} · ${fmt(x.time)}`;
+      else if (s === 'extract') note = `${files(x.files)} · ${human(x.bytes)}`;
+      return `<div class="file xfer wait" id="pgS-${s}"><span class="st"><span class="dot"></span></span>
+        <span class="nm"><span class="fn">${ic(ICON[s])}${h(ROW[s])}</span>${note ? `<span class="sub">${esc(note)}</span>` : ''}</span><span class="sz"></span></div>`;
+    };
+    const countFiles = () => {
+      const n = items.filter((f) => f.done).length;
+      if (row(cur)) size(cur, `${n}/${items.length}`);
+      else { const c = q('#pgCount'); if (c) c.textContent = `${n}/${items.length}`; }
+    };
+    const finishFiles = () => { items.forEach((f, i) => { if (!f.done) { f.done = true; mark(q('#pgF' + i), 'done'); } }); fi = -1; if (items.length) countFiles(); };
+    const finishStep = (s) => {
+      if (s === 'pack' || s === 'extract') finishFiles();
+      const r = row(s); if (!r) return;
+      mark(r, 'done');
+      if (total[s]) size(s, human(total[s]));
+      else if (info[s] && info[s].bytes) size(s, human(info[s].bytes));
+    };
+    const ch = new window.__TAURI__.core.Channel();
+    ch.onmessage = (m) => {
+      const l = q('#pgList'); if (!l || !root.isConnected) return;
+      if (m.kind === 'steps') {
+        steps = m.steps.map((x) => x.step);
+        m.steps.forEach((x) => { info[x.step] = x; });
+        l.insertAdjacentHTML('beforeend', m.steps.map((x) => stepRow(x.step, x)).join(''));
+        l.hidden = false;
+      } else if (m.kind === 'step') {
+        const lb = q('#pgStep'); if (lb && LABEL[m.step]) lb.textContent = t(LABEL[m.step]);
+        if (cur) finishStep(cur);
+        cur = m.step;
+        // A backup's upload row is added when the upload starts
+        if (!row(cur) && (cur === 'upload' || cur === 'download')) { l.insertAdjacentHTML('beforeend', stepRow(cur, {})); l.hidden = false; }
+        mark(row(cur), 'active');
+        const i = steps.indexOf(cur);
+        const c = q('#pgCount'); if (c && i >= 0) c.textContent = `${i + 1}/${steps.length}`;
+        bar(0);
+      } else if (m.kind === 'files') {
+        items = m.files.map((f) => ({ ...f, done: false }));
+        const under = !!row(cur);
+        l.hidden = l.hidden && !items.length;
+        l.insertAdjacentHTML('beforeend', items.map((f, i) => `<div class="file wait${under ? ' sub' : ''}" id="pgF${i}" title="${esc(f.dir + f.name)}"><span class="st"><span class="dot"></span></span>
+          <span class="nm"><span class="fn">${esc(f.name)}</span><span class="fp">${where(f.dir)}</span></span><span class="sz">${human(f.size)}</span></div>`).join(''));
+        countFiles();
+      } else if (m.kind === 'file') {
+        if (fi >= 0 && items[fi]) { items[fi].done = true; mark(q('#pgF' + fi), 'done'); }
+        fi = m.index;
+        mark(q('#pgF' + fi), 'active');
+        countFiles();
+        bar(fi / Math.max(1, items.length));
+      } else if (m.kind === 'count') {
+        size(cur, `${m.done}/${m.total}`);
+        bar(m.done / Math.max(1, m.total));
+      } else if (m.kind === 'bytes') {
+        total[cur] = m.total;
+        size(cur, m.total ? `${Math.round((100 * m.done) / m.total)}% · ${human(m.done)} / ${human(m.total)}` : human(m.done));
+        if (m.total) bar(m.done / m.total);
+      }
+    };
+    const done = () => {
+      if (cur) finishStep(cur);
+      finishFiles();
+      cur = null;
+      const b = q('#pgBar'); if (b) b.style.width = '100%';
+      const lb = q('#pgStep'); if (lb) lb.innerHTML = `<span class="ok-text">${h('progress.done')}</span>`;
+    };
+    return { ch, done };
+  }
   const backendReady = () => S.info && S.info.config.backend.kind !== 'none';
 
   // ---------- data ----------
@@ -187,7 +297,7 @@
     const b = i.config.backend;
     const where = b.kind === 'folder' ? b.path : b.kind === 'rclone' ? b.remote : t('side.not_connected');
     const ver = $('#appVer');
-    if (ver) { ver.textContent = 'v' + i.version; ver.title = t('side.version', { version: i.version }); }
+    if (ver) { ver.textContent = (/^\d/.test(i.version) ? 'v' : '') + i.version; ver.title = t('side.version', { version: i.version }); }
     $('#sideMeta').innerHTML = `
       <div>${h('side.this_pc')}<br><span class="mono">${esc(i.config.device_name)}</span></div>
       <div>${h('side.storage')}<br><span class="mono">${esc(where)}</span></div>
@@ -677,12 +787,14 @@
   }
 
   async function doOp(kind, g, opts) {
-    busyModal(`${opName(kind)} · ${g.name}`);
+    const pg = progressModal(`${opName(kind)} · ${g.name}`);
     S.busy = true;
     try {
       const r = kind === 'backup'
-        ? await call('backup_game', { appid: g.appid, force: !!opts.force })
-        : await call('restore_game', { appid: g.appid, versionId: opts.versionId || null, force: !!opts.force, remapFrom: opts.remapFrom || null, remapTo: opts.remapTo || null });
+        ? await call('backup_game', { appid: g.appid, force: !!opts.force, onProgress: pg.ch })
+        : await call('restore_game', { appid: g.appid, versionId: opts.versionId || null, force: !!opts.force, remapFrom: opts.remapFrom || null, remapTo: opts.remapTo || null, onProgress: pg.ch });
+      // Let the finished list show for a moment before the dialog closes
+      if ($('#pgList') && !$('#pgList').hidden) { pg.done(); await new Promise((ok) => setTimeout(ok, 700)); }
       close();
       // A restore over a local save kept it as a snapshot: offer to go back to it right away
       const undo = kind === 'restore' && r.outcome === 'restored' && g.local_hash
@@ -848,15 +960,14 @@
     const kind = P.kind;
     const todo = P.plan.filter((p) => p.run && P.on.has(p.g.appid)).map((p) => p.g);
     const label = t(kind === 'backup' ? 'games.backup_all' : 'games.restore_all');
-    busyModal(label);
     S.busy = true;
     let ok = 0; const errs = [];
     for (let i = 0; i < todo.length; i++) {
       const g = todo[i];
-      const el = $('#busyText'); if (el) el.textContent = `${i + 1}/${todo.length} · ${g.name}`;
+      const pg = progressModal(label, `${i + 1}/${todo.length} · ${g.name}`);
       try {
-        if (kind === 'backup') await call('backup_game', { appid: g.appid, force: false });
-        else await call('restore_game', { appid: g.appid, versionId: null, force: false });
+        if (kind === 'backup') await call('backup_game', { appid: g.appid, force: false, onProgress: pg.ch });
+        else await call('restore_game', { appid: g.appid, versionId: null, force: false, onProgress: pg.ch });
         ok++;
       } catch (e) { errs.push(`${g.name}: ${String(e).startsWith('NEEDS_CONFIRM') ? t('all.changed_skipped') : e}`); }
     }
@@ -1214,6 +1325,8 @@
         await loadInfo(); toast(t('settings.saved')); S.list = null; S.accounts = null; render(); loadGames(); loadAccounts();
       }
       else if (a === 'report') openReport();
+      // Gaming Mode has no window close button: quit from the sidebar (not in the middle of a backup)
+      else if (a === 'quit') { if (S.busy) toast(t('nav.quit_busy'), true); else await call('quit_app'); }
       else if (a === 'reportBug') reportIssue('bug', '[Bug] ', null);
       else if (a === 'reportFeature') reportIssue('feature', '[Feature] ', null);
       else if (a === 'issueFromError') reportIssue('bug', `[Bug] ${S.lastError ? S.lastError.title : ''}`, S.lastError ? S.lastError.msg : null);

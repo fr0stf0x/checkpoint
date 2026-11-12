@@ -63,7 +63,7 @@ pub fn issue_url(kind: &str, title: &str, error: Option<&str>, game: Option<&Gam
     let mut head = format!(
         "{base}?template=bug_report.yml&title={}&version={}&os={}&what-happened={}",
         enc(title),
-        enc(env!("CARGO_PKG_VERSION")),
+        enc(&crate::app_version()),
         enc(&system_line()),
         enc(&what)
     );
