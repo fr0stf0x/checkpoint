@@ -541,6 +541,9 @@
       </div>
       <div class="group"><h3>${h('settings.backup')}</h3>
         <label class="check" for="incCfg"><input type="checkbox" id="incCfg" ${c.include_config ? 'checked' : ''}> <span>${h('settings.include_config')}<br><span class="note">${h('settings.include_config_hint')}</span></span></label>
+        <div class="field"><label class="l" for="onConflict">${h('settings.launch_conflict')}</label>
+          <select id="onConflict">${['ask', 'play', 'stop'].map((v) => `<option value="${v}" ${(c.launch_conflict || 'ask') === v ? 'selected' : ''}>${esc(t({ ask: 'settings.launch_conflict_ask', play: 'settings.launch_conflict_play', stop: 'settings.launch_conflict_stop' }[v]))}</option>`).join('')}</select>
+          <span class="note">${h('settings.launch_conflict_hint')}</span></div>
         <label class="check" for="chkNotify"><input type="checkbox" id="chkNotify" ${c.launch_notifications !== false ? 'checked' : ''}> <span>${h('settings.launch_notifications')}<br><span class="note">${h('settings.launch_notifications_hint')}</span></span></label>
         <div class="field"><label class="l" for="keep">${h('settings.keep_versions')}</label><input type="number" id="keep" min="1" max="100" value="${c.keep_versions}" style="width:100px"></div>
       </div>
@@ -774,6 +777,7 @@
       backend,
       include_config: $('#incCfg').checked,
       launch_notifications: $('#chkNotify').checked,
+      launch_conflict: $('#onConflict').value,
       keep_versions: Math.max(1, Math.min(100, parseInt($('#keep').value, 10) || 10)),
       language: $('#lang').value,
       check_updates: $('#chkUpd').checked,
@@ -1328,6 +1332,10 @@
       }
       else if (a === 'report') openReport();
       // Gaming Mode has no window close button: quit from the sidebar (not in the middle of a backup)
+      else if (a === 'pCloud' || a === 'pLocal' || a === 'pCancel') {
+        pane.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+        await call('prompt_answer', { choice: a === 'pCloud' ? 'cloud' : a === 'pLocal' ? 'local' : 'cancel' });
+      }
       else if (a === 'quit') { if (S.busy) toast(t('nav.quit_busy'), true); else await call('quit_app'); }
       else if (a === 'reportBug') reportIssue('bug', '[Bug] ', null);
       else if (a === 'reportFeature') reportIssue('feature', '[Feature] ', null);
@@ -1690,9 +1698,39 @@
     document.body.classList.remove('pad');
   });
 
+  // ---------- launch prompt ----------
+  // `checkpoint prompt <file>` (prompt.rs): the Steam launch option found a conflicting save as the
+  // game starts. This small window shows both sides and asks; the answer goes back to the launch
+  // wrapper, which then restores, keeps this PC's save, or doesn't start the game.
+  async function launchPrompt() {
+    document.querySelector('.app').classList.add('prompt');
+    const p = await call('prompt_info');
+    const local = p.local_mtime || 0, cloud = p.cloud ? p.cloud.created_utc : 0;
+    const item = (act, icon, label, hint, primary) => `<button class="btn gm${primary ? ' primary' : ''}" data-act="${act}">${ic(icon)}<span><b>${esc(label)}</b><span class="note">${esc(hint)}</span></span></button>`;
+    const device = p.cloud ? p.cloud.device_name : '';
+    pane.innerHTML = `<div class="prompt-box">
+      <h2>${h('prompt.title', { game: p.name })}</h2>
+      <div class="alert warn">${h(p.status === 'diverged' ? 'prompt.diverged' : 'prompt.conflict', { device })}</div>
+      <div class="cmp">
+        ${box(t('prompt.local'), local, `${files(p.local_files)} · ${human(p.local_bytes)}`, local > cloud)}
+        ${box(t('prompt.cloud'), cloud, `${device} · ${files(p.cloud ? p.cloud.files : 0)} · ${human(p.cloud ? p.cloud.bytes : 0)}`, cloud > local)}
+      </div>
+      <div class="gmenu">
+        ${item('pCloud', 'download', t('prompt.use_cloud'), t('prompt.use_cloud_hint', { device }), true)}
+        ${item('pLocal', 'monitor', t('prompt.keep_local'), t('prompt.keep_local_hint'))}
+        ${item('pCancel', 'minus', t('prompt.cancel'), t('prompt.cancel_hint'))}
+      </div>
+    </div>`;
+    const first = pane.querySelector('[data-act="pCloud"]'); if (first) first.focus();
+  }
+
   // ---------- boot ----------
   (async function boot() {
     document.querySelectorAll('[data-ic]').forEach((el) => { el.innerHTML = ic(el.dataset.ic); });
+    if (window.__CHECKPOINT_PROMPT__) {
+      try { await loadStrings(); await launchPrompt(); } catch (e) { pane.innerHTML = `<div class="banner bad"><p>${esc(e)}</p></div>`; }
+      return;
+    }
     try {
       await loadStrings();
       await loadInfo();

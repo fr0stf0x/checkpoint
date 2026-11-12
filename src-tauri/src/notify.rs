@@ -16,9 +16,13 @@ use log::warn;
 const APP_ID: &str = "dev.checkpoint.savesync";
 
 pub fn show(cfg: &Config, title: &str, body: &str) {
-    if !cfg.launch_notifications {
-        return;
+    if cfg.launch_notifications {
+        show_always(title, body);
     }
+}
+
+/// Also when notifications are off: the only sign that the launch option did not start the game.
+pub fn show_always(title: &str, body: &str) {
     let mut n = notify_rust::Notification::new();
     n.summary(title).body(body).appname("Checkpoint");
     #[cfg(windows)]

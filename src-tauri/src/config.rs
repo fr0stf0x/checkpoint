@@ -51,6 +51,14 @@ pub struct Config {
     /// System notifications from the Steam launch option (notify.rs)
     #[serde(default = "default_true")]
     pub launch_notifications: bool,
+    /// Launch option, when the save conflicts as the game starts: "ask" (a window with both
+    /// versions), "play" (start the game, sync nothing) or "stop" (don't start the game)
+    #[serde(default = "default_ask")]
+    pub launch_conflict: String,
+}
+
+fn default_ask() -> String {
+    "ask".into()
 }
 
 fn default_true() -> bool {
@@ -97,6 +105,7 @@ impl Config {
             language: default_language(),
             check_updates: true,
             launch_notifications: true,
+            launch_conflict: default_ask(),
         }
     }
 

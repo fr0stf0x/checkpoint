@@ -8,6 +8,7 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ### Added
 - Steam launch option: a system notification tells you what happened around the game session: the cloud save was restored, the save was backed up, a sync failed (with the reason), or a save was left for you to decide in the app because both sides changed. Turn it off in Settings → Backup ("Notify when the Steam launch option syncs a game").
+- Steam launch option: when a game starts while its save conflicts (this PC and the cloud both have new progress, or this PC never synced and differs), a small Checkpoint window shows both versions and asks: use the cloud save and play (this PC's save is kept for Undo), keep this PC's save and play (backed up over the cloud after you quit; the cloud version stays in History), or don't start the game. It works with a controller in Gaming Mode. Settings → Backup can change this to always start the game without syncing, or to never start it.
 
 ### Added
 - A **Quit** button in the sidebar, below Report bug / Feedback, to close the app in Gaming Mode, where there is no window close button. While a backup or restore is running it shows a message instead of quitting.
