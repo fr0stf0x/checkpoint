@@ -32,6 +32,7 @@ sysinfo = "0.33"
 ureq = "2"
 rand = "0.8"
 notify-rust = "4"
+semver = "1"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

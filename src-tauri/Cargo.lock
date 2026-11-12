@@ -514,6 +514,7 @@ dependencies = [
  "notify-rust",
  "rand",
  "rust-i18n",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",
