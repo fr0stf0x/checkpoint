@@ -6,6 +6,9 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Added
+- **Linked accounts** for one player with several Steam accounts (for example a library shared through Steam Family, played as one account on this PC and another on a second PC). In **Steam accounts → Link accounts…**, pick the accounts; the dialog lists the games whose save is tied to them and how well each will work (automatic, experimental, or test in game). A save tied to an account then follows the player: each PC backs up only the account signed in there and restores into it, also through the Steam launch option, with no moving saves by hand, and both PCs show the game as in sync. Links are stored with your backups, so every PC uses them. After linking, back up each such game once.
+
 ## [0.8.1] - 2026-11-12
 
 ### Added

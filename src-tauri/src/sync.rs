@@ -5,6 +5,7 @@
 //!   games/<appid>/<stamp>_<device>.zip save files + checkpoint-meta.json
 
 use crate::config::{cache_dir, data_dir, Config, State, SyncBase};
+use crate::link::{self, Link, LinkedAccount};
 use crate::manifest::{self, FileRule, Index};
 use crate::paths::{self, GameCtx, LocalScan};
 use crate::steam::{self, InstalledGame};
@@ -79,6 +80,9 @@ pub struct CloudIndex {
     /// Restoring A's backup on another PC then defaults to writing into B.
     #[serde(default)]
     pub account_aliases: BTreeMap<String, String>,
+    /// Groups of Steam accounts that belong to one player (link.rs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub linked_accounts: Vec<Vec<LinkedAccount>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -169,6 +173,10 @@ pub struct ListResult {
     pub steam_root: String,
     pub manifest_games: usize,
     pub account_aliases: BTreeMap<String, String>,
+    /// Groups of accounts that belong to one player (link.rs)
+    pub linked_accounts: Vec<Vec<LinkedAccount>>,
+    /// SteamID64 of the account signed in on this PC (most recent in loginusers.vdf)
+    pub this_account: Option<String>,
 }
 
 // ---------- manifest cache ----------
@@ -233,6 +241,46 @@ pub fn hash_scan(scan: &LocalScan) -> Result<Option<String>> {
         h.update([0xffu8]);
     }
     Ok(Some(hex::encode(h.finalize())))
+}
+
+/// The hash status compares. With a linked group (link.rs) the files are hashed in a fixed order
+/// as if they belonged to the group's canonical account, so the same save gives the same hash on
+/// every PC whichever account plays there. Without one this is `hash_scan`.
+pub fn save_hash(scan: &LocalScan, link: Option<&Link>) -> Result<Option<String>> {
+    let Some(l) = link else { return hash_scan(scan) };
+    if scan.files.is_empty() {
+        return Ok(None);
+    }
+    let mut files: Vec<(String, &paths::SaveFile)> = scan.files.iter().map(|f| (l.normalize_path(&f.logical), f)).collect();
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut h = Sha256::new();
+    for (logical, f) in files {
+        h.update(logical.as_bytes());
+        h.update([0u8]);
+        let autocloud = crate::migrate::is_autocloud_vdf(&f.real);
+        if l.content_needs_normalizing(&f.logical, autocloud) {
+            let data = fs::read(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
+            h.update(l.normalize_content(data, autocloud));
+        } else {
+            let mut file = File::open(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
+            io::copy(&mut file, &mut h)?;
+        }
+        h.update([0xffu8]);
+    }
+    Ok(Some(hex::encode(h.finalize())))
+}
+
+/// The linked group of the account signed in on this PC, if any.
+fn link_here(idx: &CloudIndex, steam_root: &Path) -> Option<Link> {
+    link::for_pc(&idx.linked_accounts, this_pc_account(steam_root))
+}
+
+/// The save files this PC syncs: with a linked group, not the other accounts' folders.
+fn sync_scan(scan: LocalScan, link: Option<&Link>) -> LocalScan {
+    match link {
+        Some(l) => l.filter(scan),
+        None => scan,
+    }
 }
 
 /// SteamID64 / AccountID present in save paths: a sign the save is tied to an account.
@@ -614,7 +662,7 @@ fn put_back(dir: &Path, path: &Path, snap: &SnapshotMeta, ctx: &GameCtx, rules: 
         let za = zip::ZipArchive::new(File::open(path)?).context(tr!("err.backup_corrupt").to_string())?;
         za.file_names().map(String::from).collect()
     };
-    let (restored, _) = extract(path, ctx, None, &no_progress)?;
+    let (restored, _) = extract(path, ctx, None, false, &no_progress)?;
 
     // Only remove files of the kinds the snapshot covered: an old snapshot (no metadata) removes
     // nothing, one without graphics settings files leaves those alone.
@@ -652,12 +700,14 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
         Err(e) => (CloudIndex::default(), Some(format!("{e:#}"))),
     };
     let procs = Procs::snapshot();
+    let me = this_pc_account(&env.root);
+    let link = link::for_pc(&idx.linked_accounts, me.clone());
     let mut rows = Vec::new();
     for g in &env.games {
         let ctx = env.ctx(g);
         let rules = env.rules(g.appid);
-        let scan = paths::scan(&ctx, rules, cfg.include_config);
-        let local_hash = hash_scan(&scan).unwrap_or(None);
+        let scan = sync_scan(paths::scan(&ctx, rules, cfg.include_config), link.as_ref());
+        let local_hash = save_hash(&scan, link.as_ref()).unwrap_or(None);
         let key = g.appid.to_string();
         let versions = idx.games.get(&key).map(|v| v.len()).unwrap_or(0);
         let cloud = idx.games.get(&key).and_then(|v| v.first()).cloned();
@@ -689,6 +739,8 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
         steam_root: env.root.to_string_lossy().to_string(),
         manifest_games: env.manifest.as_ref().map(|m| m.games.len()).unwrap_or(0),
         account_aliases: idx.account_aliases,
+        linked_accounts: idx.linked_accounts,
+        this_account: me.map(|i| i.sid64),
     })
 }
 
@@ -719,14 +771,16 @@ pub fn game_status(cfg: &Config, appid: u32) -> Result<GameStatus> {
     let g = env.game(appid)?;
     let ctx = env.ctx(g);
     let rules = env.rules(appid);
-    let scan = paths::scan(&ctx, rules, cfg.include_config);
-    let local = hash_scan(&scan)?;
     let st = storage::open(&cfg.backend)?;
     let idx = load_index(&*st)?;
+    let link = link_here(&idx, &ctx.steam_root);
+    let scan = sync_scan(paths::scan(&ctx, rules, cfg.include_config), link.as_ref());
+    let local = save_hash(&scan, link.as_ref())?;
     let key = appid.to_string();
     let latest = idx.games.get(&key).and_then(|v| v.first());
     let status = status(local.as_deref(), latest, State::load().games.get(&key), !rules.is_empty());
-    let remap = latest.and_then(|v| {
+    // With a linked group, restore picks the account itself
+    let remap = latest.filter(|_| link.is_none()).and_then(|v| {
         let ids: Vec<String> = v.steam_ids.iter().filter_map(|i| crate::migrate::Ids::parse(i).ok()).map(|i| i.sid64).collect();
         let [only] = ids.as_slice() else { return None };
         idx.account_aliases.get(only).map(|to| (only.clone(), to.clone()))
@@ -757,12 +811,13 @@ pub fn backup(cfg: &Config, appid: u32, force: bool, on: OnProgress) -> Result<O
     if Procs::snapshot().running(&ctx.base) {
         bail!("{}", tr!("err.game_running", game = g.name));
     }
-    let scan = paths::scan(&ctx, env.rules(appid), cfg.include_config);
-    let Some(hash) = hash_scan(&scan)? else {
-        bail!("{}", tr!("err.no_save_files", game = g.name));
-    };
     let st = storage::open(&cfg.backend)?;
     let idx = load_index(&*st)?;
+    let link = link_here(&idx, &ctx.steam_root);
+    let scan = sync_scan(paths::scan(&ctx, env.rules(appid), cfg.include_config), link.as_ref());
+    let Some(hash) = save_hash(&scan, link.as_ref())? else {
+        bail!("{}", tr!("err.no_save_files", game = g.name));
+    };
     let key = appid.to_string();
     let latest = idx.games.get(&key).and_then(|v| v.first()).cloned();
     let mut state = State::load();
@@ -851,11 +906,17 @@ pub fn restore(
         bail!("{}", tr!("err.game_running", game = g.name));
     }
     let rules = env.rules(appid);
-    let scan = paths::scan(&ctx, rules, cfg.include_config);
-    let local_hash = hash_scan(&scan)?;
-
     let st = storage::open(&cfg.backend)?;
     let idx = load_index(&*st)?;
+    let link = link_here(&idx, &ctx.steam_root);
+    // Every file on this PC (the snapshot before restoring keeps all of them); status and the
+    // last-sync record use the files this PC syncs (see sync_scan)
+    let scan = paths::scan(&ctx, rules, cfg.include_config);
+    let local_hash = save_hash(&sync_scan(scan.clone(), link.as_ref()), link.as_ref())?;
+    let synced_hash = |c: &GameCtx| -> Result<String> {
+        Ok(save_hash(&sync_scan(paths::scan(c, rules, cfg.include_config), link.as_ref()), link.as_ref())?.unwrap_or_default())
+    };
+
     let key = appid.to_string();
     let versions = idx.games.get(&key).filter(|v| !v.is_empty()).context(tr!("err.no_cloud_backup").to_string())?;
     let latest = versions[0].clone();
@@ -877,7 +938,7 @@ pub fn restore(
         let mut local = ver.content_hash.clone();
         if let Some(o) = &owner {
             if fix_autocloud_owners(&scan, o)? > 0 {
-                local = hash_scan(&paths::scan(&ctx, rules, cfg.include_config))?.unwrap_or_default();
+                local = synced_hash(&ctx)?;
             }
         }
         state.games.insert(key, SyncBase { local, cloud: latest.content_hash, at_utc: now });
@@ -897,9 +958,18 @@ pub fn restore(
     steps.push(StepInfo { device: Some(ver.device_name.clone()), time: Some(ver.created_utc), ..step("download", ver.files, 0) });
     steps.push(step("extract", ver.files, ver.bytes));
     on(Progress::Steps { steps });
-    if let Some(h) = &local_hash {
+    // A linked group writes another group account's backup into this PC's account
+    let (remap, patch_in_file) = match (remap, &link) {
+        (Some(r), _) => (Some(r), false),
+        (None, Some(l)) => match l.source_of(&ver.steam_ids) {
+            Some(src) => (Some((src, l.me.clone())), true),
+            None => (None, false),
+        },
+        (None, None) => (None, false),
+    };
+    if let Some(h) = hash_scan(&scan)?.filter(|_| local_hash.is_some()) {
         on(Progress::Step { step: "snapshot" });
-        snapshot_local(&snapshot_dir(appid), &scan, h, SnapReason::Restore(&ver), cfg.include_config, None, on).context(tr!("err.snapshot").to_string())?;
+        snapshot_local(&snapshot_dir(appid), &scan, &h, SnapReason::Restore(&ver), cfg.include_config, None, on).context(tr!("err.snapshot").to_string())?;
     }
 
     let tmp = cache_dir().join("tmp").join(format!("restore-{}.zip", ver.id));
@@ -909,7 +979,7 @@ pub fn restore(
     on(Progress::Step { step: "download" });
     st.download(&ver.zip, &tmp, &|done, total| on(Progress::Bytes { done, total }))?;
     on(Progress::Step { step: "extract" });
-    let result = extract(&tmp, &ctx, remap.as_ref(), on);
+    let result = extract(&tmp, &ctx, remap.as_ref(), patch_in_file, on);
     let _ = fs::remove_file(&tmp);
     let (restored, skipped) = result?;
 
@@ -919,7 +989,7 @@ pub fn restore(
             after_scan = paths::scan(&ctx, rules, cfg.include_config);
         }
     }
-    let after = hash_scan(&after_scan)?.unwrap_or_default();
+    let after = save_hash(&sync_scan(after_scan, link.as_ref()), link.as_ref())?.unwrap_or_default();
     state.games.insert(key, SyncBase { local: after, cloud: latest.content_hash, at_utc: now });
     state.save()?;
     let mut message = t!("msg.restore_done", game = g.name, files = restored, device = ver.device_name, time = fmt_time(ver.created_utc)).to_string();
@@ -974,6 +1044,7 @@ pub(crate) fn extract(
     zip_path: &Path,
     ctx: &GameCtx,
     remap: Option<&(crate::migrate::Ids, crate::migrate::Ids)>,
+    patch_in_file: bool,
     on: OnProgress,
 ) -> Result<(usize, usize)> {
     let mut za = zip::ZipArchive::new(File::open(zip_path)?).context(tr!("err.backup_corrupt").to_string())?;
@@ -1013,6 +1084,13 @@ pub(crate) fn extract(
                 fs::write(dest, crate::migrate::rewrite_autocloud(&buf, from, to))
                     .with_context(|| tr!("err.write_file", path = dest.display()).to_string())?;
             }
+            // Linked accounts: readable IDs inside the account's files too (same length)
+            (Some((from, to)), false) if patch_in_file && *rewrite_vdf => {
+                let mut buf = Vec::new();
+                io::Read::read_to_end(&mut e, &mut buf)?;
+                crate::migrate::replace_ids(&mut buf, from, to);
+                fs::write(dest, buf).with_context(|| tr!("err.write_file", path = dest.display()).to_string())?;
+            }
             _ => {
                 let mut out = File::create(dest).with_context(|| tr!("err.write_file", path = dest.display()).to_string())?;
                 io::copy(&mut e, &mut out)?;
@@ -1025,6 +1103,24 @@ pub(crate) fn extract(
 pub fn versions(cfg: &Config, appid: u32) -> Result<Vec<VersionMeta>> {
     let st = storage::open(&cfg.backend)?;
     Ok(load_index(&*st)?.games.remove(&appid.to_string()).unwrap_or_default())
+}
+
+/// Link `members` as one player (they leave any other group). Returns the groups now stored.
+pub fn set_linked(cfg: &Config, members: Vec<LinkedAccount>) -> Result<Vec<Vec<LinkedAccount>>> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    link::set_group(&mut idx.linked_accounts, members);
+    save_index(&*st, &idx)?;
+    Ok(idx.linked_accounts)
+}
+
+/// Unlink the group that contains `sid64`.
+pub fn remove_linked(cfg: &Config, sid64: &str) -> Result<Vec<Vec<LinkedAccount>>> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    link::remove_group(&mut idx.linked_accounts, sid64);
+    save_index(&*st, &idx)?;
+    Ok(idx.linked_accounts)
 }
 
 /// Stop keeping a version (History): it counts towards `keep_versions` again, so it may be removed
@@ -1279,7 +1375,7 @@ mod tests {
         let h2 = hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap();
         assert_ne!(h1, h2);
 
-        let (n, skipped) = extract(&zip, &ctx, None, &no_progress).unwrap();
+        let (n, skipped) = extract(&zip, &ctx, None, false, &no_progress).unwrap();
         assert_eq!((n, skipped), (1, 0));
         assert_eq!(fs::read(saves.join("a.sav")).unwrap(), b"progress-1");
         assert_eq!(hash_scan(&paths::scan(&ctx, &rules, false)).unwrap().unwrap(), h1);
@@ -1305,11 +1401,63 @@ mod tests {
         fs::remove_dir_all(&a_dir).unwrap();
 
         let remap = (crate::migrate::Ids::parse(a).unwrap(), crate::migrate::Ids::parse(b).unwrap());
-        extract(&zip, &ctx, Some(&remap), &no_progress).unwrap();
+        extract(&zip, &ctx, Some(&remap), false, &no_progress).unwrap();
         let b_dir = lib.join(format!("steamapps/common/G/Saved/{b}"));
         assert_eq!(fs::read(b_dir.join("s.sav")).unwrap(), b"prog");
         assert!(fs::read_to_string(b_dir.join("steam_autocloud.vdf")).unwrap().contains(&remap.1.acct));
         assert!(!a_dir.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Linked accounts: PC 1 plays as A (with B's old folder still on disk), PC 2 as B. A backup
+    /// from PC 1 holds only A's folder; restored on PC 2 it lands in B's folder with B's IDs, and
+    /// both PCs then compute the same normalized hash.
+    #[test]
+    fn linked_accounts_round_trip() {
+        use crate::link::{for_pc, LinkedAccount};
+        use crate::migrate::Ids;
+        let root = std::env::temp_dir().join(format!("checkpoint-linked-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (a, b) = ("76561198000000101", "76561198000000202");
+        let groups = vec![vec![LinkedAccount { sid64: a.into(), name: "A".into() }, LinkedAccount { sid64: b.into(), name: "B".into() }]];
+        let (ia, ib) = (Ids::parse(a).unwrap(), Ids::parse(b).unwrap());
+        let rules = vec![FileRule { path: "<base>/Saved".into(), tags: vec![], when: vec![] }];
+        let write_save = |lib: &Path, who: &Ids, body: &str| {
+            let d = lib.join(format!("steamapps/common/G/Saved/{}", who.sid64));
+            fs::create_dir_all(&d).unwrap();
+            fs::write(d.join("s.sav"), format!("{body}|owner={}", who.sid64)).unwrap();
+            fs::write(d.join("steam_autocloud.vdf"), format!("\"accountid\" \"{}\"", who.acct)).unwrap();
+        };
+
+        // PC 1: signed in as A, B's stale folder is still there
+        let lib1 = root.join("pc1");
+        write_save(&lib1, &ia, "progress-7");
+        write_save(&lib1, &ib, "progress-3-old");
+        let ctx1 = GameCtx::new(9, "G", &lib1, &root.join("steam1"));
+        let link1 = for_pc(&groups, Some(ia.clone()));
+        let scan1 = sync_scan(paths::scan(&ctx1, &rules, false), link1.as_ref());
+        assert_eq!(scan1.files.len(), 2, "only A's folder is synced on PC 1");
+        assert_eq!(steam_ids(&scan1), vec![a.to_string()]);
+        let h1 = save_hash(&scan1, link1.as_ref()).unwrap().unwrap();
+        assert_eq!(Some(h1.clone()), hash_scan(&scan1).unwrap(), "on the canonical account's PC the hash is the plain one");
+        let zip = root.join("v.zip");
+        write_zip(&zip, &scan1, None, &no_progress).unwrap();
+
+        // PC 2: signed in as B, restores PC 1's backup
+        let lib2 = root.join("pc2");
+        let ctx2 = GameCtx::new(9, "G", &lib2, &root.join("steam2"));
+        let link2 = for_pc(&groups, Some(ib.clone())).unwrap();
+        let src = link2.source_of(&steam_ids(&scan1)).expect("backup belongs to A");
+        extract(&zip, &ctx2, Some(&(src, ib.clone())), true, &no_progress).unwrap();
+        let b_dir = lib2.join(format!("steamapps/common/G/Saved/{b}"));
+        assert_eq!(fs::read_to_string(b_dir.join("s.sav")).unwrap(), format!("progress-7|owner={b}"), "ID inside the file follows");
+        assert!(fs::read_to_string(b_dir.join("steam_autocloud.vdf")).unwrap().contains(&ib.acct));
+        assert!(!lib2.join(format!("steamapps/common/G/Saved/{a}")).exists());
+        let scan2 = sync_scan(paths::scan(&ctx2, &rules, false), Some(&link2));
+        assert_eq!(save_hash(&scan2, Some(&link2)).unwrap().unwrap(), h1, "same save, same status hash on both PCs");
+
+        // Without a link the plain hash is unchanged (older index.json, other users)
+        assert_eq!(save_hash(&paths::scan(&ctx2, &rules, false), None).unwrap(), hash_scan(&paths::scan(&ctx2, &rules, false)).unwrap());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1340,7 +1488,7 @@ mod tests {
         write_zip(&zip, &paths::scan(&ctx, &rules, false), None, &no_progress).unwrap();
         fs::remove_dir_all(lib.join("steamapps/common/G")).unwrap();
 
-        extract(&zip, &ctx, None, &no_progress).unwrap();
+        extract(&zip, &ctx, None, false, &no_progress).unwrap();
         let scan = paths::scan(&ctx, &rules, false);
         assert_eq!(fix_autocloud_owners(&scan, &b).unwrap(), 1);
         let shared_vdf = fs::read(shared.join("steam_autocloud.vdf")).unwrap();

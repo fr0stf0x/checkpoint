@@ -134,6 +134,32 @@ fn replace_same_len(data: &mut [u8], from: &[u8], to: &[u8]) -> usize {
     n
 }
 
+/// Replace every readable form of `from`'s SteamID64 with `to`'s (same length). Returns the count.
+pub(crate) fn replace_ids(data: &mut [u8], from: &Ids, to: &Ids) -> usize {
+    id_patterns(from, to).iter().map(|(a, b)| replace_same_len(data, a, b)).sum()
+}
+
+/// How a game's save is tied to the accounts of a linked group (link.rs), like a move's class:
+/// "folder" (ID only in folder names), "in_file" (readable ID inside files) or "opaque"
+/// (encrypted or compressed). None when no file is in one of these accounts' folders.
+pub fn link_class(scan: &LocalScan, members: &[Ids]) -> Result<Option<&'static str>> {
+    let (mut any, mut in_file, mut opaque) = (false, false, false);
+    for f in &scan.files {
+        let Some(m) = members.iter().find(|m| remap_logical(&f.logical, m, m).is_some()) else { continue };
+        any = true;
+        if is_autocloud_vdf(&f.real) {
+            continue;
+        }
+        let data = fs::read(&f.real).with_context(|| tr!("err.read_file", path = f.real.display()).to_string())?;
+        if id_patterns(m, m).iter().any(|(a, _)| count(&data, a) > 0) {
+            in_file = true;
+        } else if f.size >= 256 && entropy(&data[..data.len().min(1 << 20)]) > 7.5 {
+            opaque = true;
+        }
+    }
+    Ok(any.then_some(if in_file { "in_file" } else if opaque { "opaque" } else { "folder" }))
+}
+
 /// Shannon entropy in bits per byte. Close to 8 means compressed or encrypted.
 fn entropy(data: &[u8]) -> f64 {
     if data.is_empty() {
@@ -490,6 +516,29 @@ pub fn keep(cfg: &Config, id: &str) -> Result<(Migration, Option<String>)> {
         .err()
         .map(|e| tr!("err.alias_not_saved", detail = format!("{e:#}")).to_string());
     Ok((m, warn))
+}
+
+#[derive(Debug, Serialize)]
+pub struct LinkGame {
+    pub appid: u32,
+    pub name: String,
+    /// folder | in_file | opaque (see link_class)
+    pub class: &'static str,
+}
+
+/// For the link dialog: the installed games whose save is in one of these accounts' folders.
+pub fn link_preview(cfg: &Config, ids: &[String]) -> Result<Vec<LinkGame>> {
+    let members: Vec<Ids> = ids.iter().map(|i| Ids::parse(i)).collect::<Result<_>>()?;
+    let env = Env::load(cfg)?;
+    let mut out = Vec::new();
+    for g in &env.games {
+        let scan = paths::scan(&env.ctx(g), env.rules(g.appid), cfg.include_config);
+        if let Some(class) = link_class(&scan, &members)? {
+            out.push(LinkGame { appid: g.appid, name: g.name.clone(), class });
+        }
+    }
+    out.sort_by_key(|g| g.name.to_lowercase());
+    Ok(out)
 }
 
 pub fn pending() -> Vec<Migration> {
