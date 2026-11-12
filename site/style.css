@@ -63,8 +63,8 @@ body > .wrap > header nav{display:flex;gap:16px;margin-left:auto;font-size:14px}
 .btn:hover{border-color:var(--accent);color:var(--fg);transform:translateY(-1px)}
 .btn.primary{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 8px 30px -10px var(--accent-glow)}
 .btn.primary:hover{filter:brightness(1.08);box-shadow:0 10px 36px -8px var(--accent-glow)}
-.btn.coffee{background:#ffdd00;border-color:#ffdd00;color:#1a1a1a;white-space:nowrap}
-.btn.coffee:hover{border-color:#fff;color:#1a1a1a}
+.btn.coffee{background:#ff5e5b;border-color:#ff5e5b;color:#fff;white-space:nowrap}
+.btn.coffee:hover{border-color:#fff;color:#fff}
 .dl{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 
 /* ---------- hero ---------- */

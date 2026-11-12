@@ -53,7 +53,7 @@
       <a href="/guide" data-i18n="footer.guide"></a>
       <a href="https://github.com/${REPO}">GitHub</a>
       <a href="https://github.com/${REPO}/issues" data-i18n="footer.bug"></a>
-      <a href="https://buymeacoffee.com/fr0stf0x">Buy Me a Coffee</a>
+      <a href="https://ko-fi.com/fr0stf0x">Ko-fi</a>
       <a href="/privacy" data-i18n="footer.privacy"></a>
       <a href="/terms" data-i18n="footer.terms"></a>`;
   }

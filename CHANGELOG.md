@@ -6,6 +6,9 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ## [Unreleased]
 
+### Changed
+- Donation links in the README and on the website now point to Ko-fi (ko-fi.com/fr0stf0x) instead of Buy Me a Coffee.
+
 ## [0.8.0] - 2026-11-12
 
 ### Added
