@@ -19,6 +19,7 @@ Open work, highest priority first. When an item ships, remove it here and add it
 - [ ] Controller navigation on a handheld in Gaming Mode (ROG Xbox Ally X): right from the last game in a row goes to the next game, focus moves between games and not their small buttons; dialogs, the hint panel, the backup/restore progress dialog and the Quit button.
 - [ ] A forced backup over a conflicting cloud version marks that version **Kept** in History (Phantom Blade Zero is in conflict now).
 - [ ] Move Phantom Blade Zero's save to another Steam account and test it in game (encrypted save, account binding unknown).
+- [ ] One player mode on the real PCs: turn it on from Jonsbo, then open the app on a PC with an account Checkpoint has not seen; it asks once, "yes" joins, the game shows In sync after one backup, and the launch option does not sync before the answer.
 - [ ] Linked accounts on the real PCs (PC A signed in as Acc1, PC B as Acc2): link, back up each bound game once, then a full day/night cycle through the launch option; both PCs show In sync, and the game loads the save on each account (Phantom Blade Zero is encrypted: test in game).
 
 ## P2

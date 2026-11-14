@@ -314,6 +314,39 @@ async fn unlink_accounts(sid64: String) -> Result<Vec<Vec<link::LinkedAccount>>,
     .await
 }
 
+/// Turn "one player" mode on or off (link.rs).
+#[tauri::command]
+async fn one_player_set(on: bool) -> Result<(), String> {
+    blocking("one_player_set", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("One player mode {}", if on { "on" } else { "off" });
+        sync::set_one_player(&Config::load(), on)
+    })
+    .await
+}
+
+/// One player mode: whether the account signed in on this PC is the player.
+#[tauri::command]
+async fn player_answer(is_player: bool) -> Result<(), String> {
+    blocking("player_answer", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("One player mode: this PC's account is {}", if is_player { "the player" } else { "not the player" });
+        sync::answer_player(&Config::load(), is_player)
+    })
+    .await
+}
+
+/// One player mode: ask an account that answered "not me" again.
+#[tauri::command]
+async fn not_player_forget(sid64: String) -> Result<(), String> {
+    blocking("not_player_forget", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("One player mode: asking an account again");
+        sync::forget_not_player(&Config::load(), &sid64)
+    })
+    .await
+}
+
 /// Games whose save is tied to these accounts, and how (for the link dialog).
 #[tauri::command]
 async fn link_preview(ids: Vec<String>) -> Result<Vec<migrate::LinkGame>, String> {
@@ -824,6 +857,9 @@ fn main() {
             link_accounts,
             unlink_accounts,
             link_preview,
+            one_player_set,
+            player_answer,
+            not_player_forget,
             migrate_undo,
             migrate_keep,
             migrate_pending,

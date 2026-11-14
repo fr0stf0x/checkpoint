@@ -83,6 +83,22 @@ pub struct CloudIndex {
     /// Groups of Steam accounts that belong to one player (link.rs)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub linked_accounts: Vec<Vec<LinkedAccount>>,
+    /// The canonical account of each group, kept when accounts join (link.rs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub link_canon: Vec<String>,
+    /// "One player" mode: every account that uses this backup location is this player (link.rs)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub one_player: Option<LinkedAccount>,
+    /// Accounts that answered "not me" in one player mode: they sync on their own
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub not_player: Vec<LinkedAccount>,
+}
+
+impl CloudIndex {
+    /// One player mode is on and this account has not said whether it is the player.
+    pub fn asks(&self, me: Option<&str>) -> bool {
+        link::asks(self.one_player.as_ref(), &self.linked_accounts, &self.not_player, me)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -177,6 +193,11 @@ pub struct ListResult {
     pub linked_accounts: Vec<Vec<LinkedAccount>>,
     /// SteamID64 of the account signed in on this PC (most recent in loginusers.vdf)
     pub this_account: Option<String>,
+    /// One player mode (link.rs): the player's first account, accounts that are not the player,
+    /// and whether this PC's account must still say whether it is the player
+    pub one_player: Option<LinkedAccount>,
+    pub not_player: Vec<LinkedAccount>,
+    pub ask_player: bool,
 }
 
 // ---------- manifest cache ----------
@@ -272,7 +293,7 @@ pub fn save_hash(scan: &LocalScan, link: Option<&Link>) -> Result<Option<String>
 
 /// The linked group of the account signed in on this PC, if any.
 fn link_here(idx: &CloudIndex, steam_root: &Path) -> Option<Link> {
-    link::for_pc(&idx.linked_accounts, this_pc_account(steam_root))
+    link::for_pc(&idx.linked_accounts, &idx.link_canon, this_pc_account(steam_root))
 }
 
 /// The save files this PC syncs: with a linked group, not the other accounts' folders.
@@ -701,7 +722,7 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
     };
     let procs = Procs::snapshot();
     let me = this_pc_account(&env.root);
-    let link = link::for_pc(&idx.linked_accounts, me.clone());
+    let link = link::for_pc(&idx.linked_accounts, &idx.link_canon, me.clone());
     let mut rows = Vec::new();
     for g in &env.games {
         let ctx = env.ctx(g);
@@ -738,15 +759,20 @@ pub fn list(cfg: &Config) -> Result<ListResult> {
         cloud_error,
         steam_root: env.root.to_string_lossy().to_string(),
         manifest_games: env.manifest.as_ref().map(|m| m.games.len()).unwrap_or(0),
+        ask_player: idx.asks(me.as_ref().map(|i| i.sid64.as_str())),
         account_aliases: idx.account_aliases,
         linked_accounts: idx.linked_accounts,
         this_account: me.map(|i| i.sid64),
+        one_player: idx.one_player,
+        not_player: idx.not_player,
     })
 }
 
 /// One game's status (same rules as `list`), plus the account pair to restore into when the
 /// latest backup belongs to an account that was replaced by a kept move (`account_aliases`).
 pub struct GameStatus {
+    /// One player mode: this PC's account has not said whether it is the player (no sync yet)
+    pub ask_player: bool,
     pub name: String,
     pub status: &'static str,
     pub remap: Option<(String, String)>,
@@ -794,7 +820,8 @@ pub fn game_status(cfg: &Config, appid: u32) -> Result<GameStatus> {
         local_bytes: scan.bytes(),
         cloud: latest.cloned(),
     };
-    Ok(GameStatus { name: g.name.clone(), status, remap, info })
+    let ask_player = idx.asks(this_pc_account(&ctx.steam_root).as_ref().map(|i| i.sid64.as_str()));
+    Ok(GameStatus { name: g.name.clone(), status, remap, info, ask_player })
 }
 
 /// Where the game is installed, to tell whether it is still running.
@@ -1109,7 +1136,8 @@ pub fn versions(cfg: &Config, appid: u32) -> Result<Vec<VersionMeta>> {
 pub fn set_linked(cfg: &Config, members: Vec<LinkedAccount>) -> Result<Vec<Vec<LinkedAccount>>> {
     let st = storage::open(&cfg.backend)?;
     let mut idx = load_index(&*st)?;
-    link::set_group(&mut idx.linked_accounts, members);
+    let prefer = idx.one_player.as_ref().map(|p| p.sid64.clone());
+    link::set_group(&mut idx.linked_accounts, &mut idx.link_canon, members, prefer.as_deref());
     save_index(&*st, &idx)?;
     Ok(idx.linked_accounts)
 }
@@ -1118,9 +1146,75 @@ pub fn set_linked(cfg: &Config, members: Vec<LinkedAccount>) -> Result<Vec<Vec<L
 pub fn remove_linked(cfg: &Config, sid64: &str) -> Result<Vec<Vec<LinkedAccount>>> {
     let st = storage::open(&cfg.backend)?;
     let mut idx = load_index(&*st)?;
-    link::remove_group(&mut idx.linked_accounts, sid64);
+    // Unlinking the player's group ends one player mode
+    let player_group = idx.one_player.as_ref().map(|p| link::player_group(&idx.linked_accounts, p)).unwrap_or_default();
+    if player_group.iter().any(|a| a.sid64 == sid64) {
+        idx.one_player = None;
+        idx.not_player.clear();
+    }
+    link::remove_group(&mut idx.linked_accounts, &mut idx.link_canon, sid64);
     save_index(&*st, &idx)?;
     Ok(idx.linked_accounts)
+}
+
+/// The account signed in on this PC, with its name for PCs that don't know it.
+fn this_pc_named(cfg: &Config) -> Result<LinkedAccount> {
+    let root = steam::find_root(cfg.steam_root_override.as_deref()).with_context(|| tr!("err.no_steam").to_string())?;
+    let me = this_pc_account(&root).with_context(|| tr!("err.no_steam_account").to_string())?;
+    let name = steam::accounts(&root)
+        .into_iter()
+        .find(|a| a.steamid64 == me.sid64)
+        .map(|a| if a.persona_name.is_empty() { a.account_name } else { a.persona_name })
+        .unwrap_or_default();
+    Ok(LinkedAccount { sid64: me.sid64, name })
+}
+
+/// Turn "one player" mode on or off. On: the player's group is the linked group of this PC's
+/// account, else the only linked group there is (this PC's account joins it), else this PC's
+/// account alone. The group's canonical account stays (so hashes made before stay valid).
+/// Off: links stay as they are.
+pub fn set_one_player(cfg: &Config, on: bool) -> Result<()> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    if on {
+        let me = this_pc_named(cfg)?;
+        let player = link::turn_on(&mut idx.linked_accounts, &mut idx.link_canon, me);
+        idx.not_player.retain(|a| a.sid64 != player.sid64);
+        idx.one_player = Some(player);
+    } else {
+        idx.one_player = None;
+        idx.not_player.clear();
+    }
+    save_index(&*st, &idx)
+}
+
+/// The answer of this PC's account in one player mode: yes adds it to the player's group (the
+/// player's account stays canonical), no lets it sync on its own.
+pub fn answer_player(cfg: &Config, is_player: bool) -> Result<()> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    let Some(player) = idx.one_player.clone() else { return Ok(()) };
+    let me = this_pc_named(cfg)?;
+    idx.not_player.retain(|a| a.sid64 != me.sid64);
+    if is_player {
+        let mut members = link::player_group(&idx.linked_accounts, &player);
+        if !members.iter().any(|a| a.sid64 == me.sid64) {
+            members.push(me);
+        }
+        let canon = link::canon_of(&link::player_group(&idx.linked_accounts, &player), &idx.link_canon).unwrap_or(player.sid64.clone());
+        link::set_group(&mut idx.linked_accounts, &mut idx.link_canon, members, Some(&canon));
+    } else {
+        idx.not_player.push(me);
+    }
+    save_index(&*st, &idx)
+}
+
+/// Ask an account that answered "not me" again (one player mode).
+pub fn forget_not_player(cfg: &Config, sid64: &str) -> Result<()> {
+    let st = storage::open(&cfg.backend)?;
+    let mut idx = load_index(&*st)?;
+    idx.not_player.retain(|a| a.sid64 != sid64);
+    save_index(&*st, &idx)
 }
 
 /// Stop keeping a version (History): it counts towards `keep_versions` again, so it may be removed
@@ -1434,7 +1528,7 @@ mod tests {
         write_save(&lib1, &ia, "progress-7");
         write_save(&lib1, &ib, "progress-3-old");
         let ctx1 = GameCtx::new(9, "G", &lib1, &root.join("steam1"));
-        let link1 = for_pc(&groups, Some(ia.clone()));
+        let link1 = for_pc(&groups, &[], Some(ia.clone()));
         let scan1 = sync_scan(paths::scan(&ctx1, &rules, false), link1.as_ref());
         assert_eq!(scan1.files.len(), 2, "only A's folder is synced on PC 1");
         assert_eq!(steam_ids(&scan1), vec![a.to_string()]);
@@ -1446,7 +1540,7 @@ mod tests {
         // PC 2: signed in as B, restores PC 1's backup
         let lib2 = root.join("pc2");
         let ctx2 = GameCtx::new(9, "G", &lib2, &root.join("steam2"));
-        let link2 = for_pc(&groups, Some(ib.clone())).unwrap();
+        let link2 = for_pc(&groups, &[], Some(ib.clone())).unwrap();
         let src = link2.source_of(&steam_ids(&scan1)).expect("backup belongs to A");
         extract(&zip, &ctx2, Some(&(src, ib.clone())), true, &no_progress).unwrap();
         let b_dir = lib2.join(format!("steamapps/common/G/Saved/{b}"));

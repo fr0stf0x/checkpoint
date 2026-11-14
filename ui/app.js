@@ -344,6 +344,10 @@
       out.push(banner('warn', 'swap', h('games.pending_move', v),
         `<button class="btn" data-act="migUndo" data-mid="${esc(m.id)}">${h('move.undo_btn')}</button><button class="btn primary" data-act="migKeep" data-mid="${esc(m.id)}">${h('move.keep_btn')}</button>`));
     });
+    if (S.list && S.list.ask_player) {
+      out.push(banner('accent', 'users', h('player.ask', { account: acctName(thisAccount()), player: acctName(S.list.one_player.sid64) }),
+        `<button class="btn" data-act="playerNo">${h('player.no')}</button><button class="btn primary" data-act="playerYes">${h('player.yes')}</button>`));
+    }
     const old = launchOld();
     if (old.length) {
       out.push(banner('warn', 'alert', h('auto.old_banner', { n: old.length, games: old.map((g) => g.name).join(', ') }),
@@ -524,6 +528,7 @@
         ${games.length ? `<div><button class="btn sm" data-act="migrateAcct" data-sid="${esc(a.steamid64)}">${ic('swap')}${h('accounts.move_btn')}</button></div>` : ''}</div>`;
     }).join('');
     pane.innerHTML = `<div class="panehead"><h2>${h('nav.accounts')}</h2><span class="spacer"></span>${S.list && backendReady() ? `<button class="btn" data-act="linkOpen">${ic('swap')}${h('link.open')}</button>` : ''}</div>
+      ${playerCard()}
       ${groups}
       <div class="cards">${cards || `<div class="empty">${h('accounts.none')}</div>`}</div>
       <p class="note">${h('accounts.footer')}</p>`;
@@ -614,7 +619,7 @@
   function acctName(sid) {
     const a = (S.accounts || []).find((x) => x.steamid64 === sid);
     if (a) return (a.persona_name || a.account_name) + (a.account_name && a.persona_name ? ` (${a.account_name})` : '');
-    const m = linkGroups().flat().find((x) => x.sid64 === sid);
+    const m = linkGroups().flat().concat(S.list && S.list.one_player ? [S.list.one_player] : [], (S.list && S.list.not_player) || []).find((x) => x.sid64 === sid);
     return m && m.name ? m.name : `SteamID …${String(sid).slice(-6)}`;
   }
 
@@ -705,6 +710,46 @@
       if (S.view === 'accounts') render();
     } catch (e) { fail(t('err.link_failed'), e); }
   }
+  // ---------- one player mode (link.rs) ----------
+  // Every Steam account that uses this backup location is one player; a new account is asked once.
+  function playerCard() {
+    if (!S.list || !backendReady() || S.list.cloud_error) return '';
+    const p = S.list.one_player;
+    if (!p) {
+      return `<div class="linkgroup"><div class="lghead">${ic('users')}<h3>${h('player.title')}</h3><span class="spacer"></span>
+        <button class="btn sm primary" data-act="playerOn" ${thisAccount() ? '' : 'disabled'}>${h('player.turn_on')}</button></div>
+        <span class="note">${h('player.intro')}</span></div>`;
+    }
+    const members = (linkGroups().find((g) => g.some((a) => a.sid64 === p.sid64)) || [p]).map((a) => acctName(a.sid64)).join(', ');
+    const notMe = (S.list.not_player || []).map((a) => `<li>${esc(acctName(a.sid64))} <button class="btn sm" data-act="playerForget" data-sid="${esc(a.sid64)}">${h('player.ask_again')}</button></li>`).join('');
+    return `<div class="linkgroup"><div class="lghead">${ic('users')}<h3>${h('player.title')}</h3>${statusPill('sync', t('player.on'))}<span class="spacer"></span>
+      <button class="btn sm" data-act="playerOff">${h('player.turn_off')}</button></div>
+      <span>${h('player.members', { accounts: members })}</span>
+      <span class="note">${h('player.how')}</span>
+      ${notMe ? `<span class="note">${h('player.not_me_list')}</span><ul class="chg">${notMe}</ul>` : ''}</div>`;
+  }
+
+  function confirmPlayerOn() {
+    // Same choice as link::turn_on: this account's group, else the only group (it joins), else alone
+    const me = thisAccount(), gs = linkGroups();
+    const grp = myGroup() || (gs.length === 1 ? gs[0].concat([{ sid64: me }]) : [{ sid64: me }]);
+    modal(`<h3>${h('player.title')}</h3>
+      <p>${h('player.on_body', { accounts: grp.map((a) => acctName(a.sid64)).join(', ') })}</p>
+      <ul class="chg"><li>${h('player.on_ask')}</li><li>${h('player.on_wrapper')}</li><li>${h('link.how_backup')}</li><li>${h('link.how_restore')}</li></ul>
+      <div class="alert warn"><span>${h('player.on_warn')}</span></div>
+      <div class="mfoot"><button class="btn" data-close="1" data-autofocus>${h('common.cancel')}</button><button class="btn primary" data-act="playerOnGo">${h('player.turn_on')}</button></div>`);
+  }
+
+  async function playerCall(cmd, args, done) {
+    busyModal(t('player.title'));
+    try {
+      await call(cmd, args);
+      close(); toast(done);
+      await loadGames();
+      if (S.view === 'accounts') render();
+    } catch (e) { fail(t('err.link_failed'), e); }
+  }
+
   function gamesOfAccount(sid) {
     return (S.list ? S.list.games : []).filter((g) => (g.steam_ids || []).some((x) => toSid(x) === sid));
   }
@@ -1469,6 +1514,12 @@
       else if (a === 'linkApply') applyLink();
       else if (a === 'unlink') confirmUnlink(n.dataset.sid);
       else if (a === 'unlinkYes') doUnlink(n.dataset.sid);
+      else if (a === 'playerOn') confirmPlayerOn();
+      else if (a === 'playerOnGo') playerCall('one_player_set', { on: true }, t('player.done_on'));
+      else if (a === 'playerOff') playerCall('one_player_set', { on: false }, t('player.done_off'));
+      else if (a === 'playerYes') playerCall('player_answer', { isPlayer: true }, t('player.done_yes'));
+      else if (a === 'playerNo') playerCall('player_answer', { isPlayer: false }, t('player.done_no'));
+      else if (a === 'playerForget') playerCall('not_player_forget', { sid64: n.dataset.sid }, t('player.done_forget'));
       else if (a === 'wzBack') { W.step = 1; renderWizard(); }
       else if (a === 'wzNext') wizardPrepare();
       else if (a === 'wzApply') wizardApply();

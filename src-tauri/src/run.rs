@@ -144,6 +144,12 @@ fn before(cfg: &Config, appid: u32) -> Start {
             return PLAY;
         }
     };
+    if st.ask_player {
+        // Another person's account on a shared PC must not overwrite the player's save
+        info!("Launch wrapper appid={appid}: one player mode, this account has not said whether it is the player: no sync");
+        notify::show_always(&t!("msg.notify_player_title", game = st.name), &t!("msg.notify_player_body"));
+        return PLAY;
+    }
     if matches!(st.status, "conflict" | "diverged") {
         info!("Launch wrapper appid={appid}: {} is {}, on conflict: {}", st.name, st.status, cfg.launch_conflict);
         return match cfg.launch_conflict.as_str() {
@@ -223,6 +229,10 @@ fn after(cfg: &Config, appid: u32, keep_local: bool) {
             return notify::show(cfg, &t!("msg.notify_backup_failed"), &shown);
         }
     };
+    if st.ask_player {
+        info!("Launch wrapper appid={appid}: one player mode, account not confirmed: no backup");
+        return;
+    }
     // Chosen before playing: this PC's save wins over the cloud version (which stays in History)
     let force = keep_local && matches!(st.status, "local" | "new" | "conflict" | "diverged");
     if !force && !matches!(st.status, "local" | "new") {
