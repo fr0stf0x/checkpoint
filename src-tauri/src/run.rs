@@ -10,8 +10,8 @@
 //! decision (conflict, never synced, cloud newer after playing) is left for the app, and the
 //! game is started (conflicts at the start: see below). Everything is logged with the
 //! game's appid, so a per-game bug report includes it. What happened is also shown as a system
-//! notification (notify.rs; can be turned off in Settings): a restore or backup that ran, one
-//! that failed, or a save left for the app to decide.
+//! notification (notify.rs; can be turned off in Settings): a restore or backup as it starts and
+//! its result, one that failed, or a save left for the app to decide.
 //!
 //! A conflict when the game starts (both sides changed, or this PC never synced and differs)
 //! follows the `launch_conflict` setting: "ask" opens a small window (prompt.rs) to use the cloud
@@ -69,7 +69,12 @@ pub fn main(args: &[String]) -> i32 {
     }
     let mut keep_local = false;
     if let (true, Some(id)) = (sync_on, a.appid) {
-        match before(&cfg, id) {
+        // A bug in the sync must never keep the game from starting
+        let start = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| before(&cfg, id))).unwrap_or_else(|_| {
+            error!("Launch wrapper appid={id}: crashed before the game, starting it without sync");
+            PLAY
+        });
+        match start {
             Start::Play { keep_local: k } => keep_local = k,
             Start::Stop => {
                 info!("Launch wrapper appid={id}: game not started");
@@ -91,7 +96,9 @@ pub fn main(args: &[String]) -> i32 {
     if let (true, Some(id)) = (sync_on, a.appid) {
         info!("Launch wrapper appid={id}: game command exited with {code}");
         wait_until_closed(&cfg, id);
-        after(&cfg, id, keep_local);
+        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| after(&cfg, id, keep_local))).is_err() {
+            error!("Launch wrapper appid={id}: crashed after the game, no backup");
+        }
     }
     crate::rcd::shutdown();
     code
@@ -108,6 +115,11 @@ fn error_text(e: &anyhow::Error) -> (String, String) {
 /// automatically, the user picks in the app.
 fn notify_decide(cfg: &Config, game: &str) {
     notify::show(cfg, &t!("msg.notify_decide_title", game = game), &t!("msg.notify_decide_body"));
+}
+
+/// Like [`notify_decide`], as the result of a "restoring…" / "backing up…" notification.
+fn finish_decide(p: notify::Progress, cfg: &Config, game: &str) {
+    p.finish(cfg, &t!("msg.notify_decide_title", game = game), &t!("msg.notify_decide_body"));
 }
 
 /// What to do after the check before the game.
@@ -168,20 +180,19 @@ fn before(cfg: &Config, appid: u32) -> Start {
 
 /// `force`: the user chose the cloud save over a conflicting local one.
 fn restore(cfg: &Config, appid: u32, st: &sync::GameStatus, force: bool) {
+    let p = notify::start(cfg, "Checkpoint", &t!("msg.notify_restoring", game = st.name));
     match sync::restore(cfg, appid, None, force, st.remap.clone(), &sync::no_progress) {
         Ok(r) => {
             info!("Launch wrapper appid={appid}: restore {}", r.outcome);
-            if r.outcome == "restored" {
-                notify::show(cfg, "Checkpoint", &r.message);
-            }
+            p.finish(cfg, "Checkpoint", &r.message);
         }
         Err(e) => {
             let (shown, en) = error_text(&e);
             warn!("Launch wrapper appid={appid}: restore skipped: {en}");
             if shown.starts_with("NEEDS_CONFIRM") {
-                notify_decide(cfg, &st.name);
+                finish_decide(p, cfg, &st.name);
             } else {
-                notify::show(cfg, &t!("msg.notify_restore_failed"), &shown);
+                p.finish(cfg, &t!("msg.notify_restore_failed"), &shown);
             }
         }
     }
@@ -221,20 +232,19 @@ fn after(cfg: &Config, appid: u32, keep_local: bool) {
         }
         return;
     }
+    let p = notify::start(cfg, "Checkpoint", &t!("msg.notify_backing_up", game = st.name));
     match sync::backup(cfg, appid, force, &sync::no_progress) {
         Ok(r) => {
             info!("Launch wrapper appid={appid}: backup {}", r.outcome);
-            if r.outcome == "uploaded" {
-                notify::show(cfg, "Checkpoint", &r.message);
-            }
+            p.finish(cfg, "Checkpoint", &r.message);
         }
         Err(e) => {
             let (shown, en) = error_text(&e);
             warn!("Launch wrapper appid={appid}: backup skipped: {en}");
             if shown.starts_with("NEEDS_CONFIRM") {
-                notify_decide(cfg, &st.name);
+                finish_decide(p, cfg, &st.name);
             } else {
-                notify::show(cfg, &t!("msg.notify_backup_failed"), &shown);
+                p.finish(cfg, &t!("msg.notify_backup_failed"), &shown);
             }
         }
     }

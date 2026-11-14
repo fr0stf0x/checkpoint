@@ -6,6 +6,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 mod config;
 mod i18n;
+mod launch;
 mod link;
 mod images;
 mod logger;
@@ -446,6 +447,27 @@ async fn delete_cloud_all() -> Result<sync::DeleteResult, String> {
     .await
 }
 
+fn steam_root() -> anyhow::Result<std::path::PathBuf> {
+    let cfg = Config::load();
+    steam::find_root(cfg.steam_root_override.as_deref()).ok_or_else(|| anyhow::anyhow!("{}", crate::tr!("err.no_steam")))
+}
+
+/// The Steam launch options of these games for the account signed in on this PC (launch.rs).
+#[tauri::command]
+async fn launch_states(appids: Vec<u32>) -> Result<launch::LaunchInfo, String> {
+    blocking("launch_states", move || launch::states(&steam_root()?, &appids)).await
+}
+
+/// Turn the launch wrapper on or off in these games' Steam launch options (Steam must be closed).
+#[tauri::command]
+async fn launch_set(appids: Vec<u32>, on: bool) -> Result<launch::SetResult, String> {
+    blocking("launch_set", move || {
+        info!("Launch options: turning automatic sync {} for {} game(s)", if on { "on" } else { "off" }, appids.len());
+        launch::set(&steam_root()?, &appids, on)
+    })
+    .await
+}
+
 /// Add Checkpoint to the Steam library as a non-Steam game (Steam must be closed).
 #[tauri::command]
 async fn add_to_steam() -> Result<shortcuts::AddResult, String> {
@@ -761,6 +783,18 @@ fn main() {
                 b = b.initialization_script("window.__CHECKPOINT_PROMPT__ = true;");
             }
             b.build()?;
+            // Not in debug builds: they would point every game at target/debug
+            if !asking && !cfg!(debug_assertions) {
+                // Launch options that point to an old Checkpoint path (moved AppImage): fix them
+                // while Steam is closed, or the games would not start
+                std::thread::spawn(|| {
+                    if let Ok(root) = steam_root() {
+                        if let Err(e) = launch::repair(&root) {
+                            log::warn!("Launch options: repair failed: {}", crate::i18n::to_en(&format!("{e:#}")));
+                        }
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -781,6 +815,8 @@ fn main() {
             delete_cloud_game,
             delete_cloud_all,
             add_to_steam,
+            launch_states,
+            launch_set,
             history,
             pick_folder,
             migrate_preview,

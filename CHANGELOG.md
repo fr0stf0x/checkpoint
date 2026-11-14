@@ -8,8 +8,14 @@ Each release's section is also shown at the top of its GitHub Release notes.
 
 ### Added
 - **Linked accounts** for one player with several Steam accounts (for example a library shared through Steam Family, played as one account on this PC and another on a second PC). In **Steam accounts → Link accounts…**, pick the accounts; the dialog lists the games whose save is tied to them and how well each will work (automatic, experimental, or test in game). A save tied to an account then follows the player: each PC backs up only the account signed in there and restores into it, also through the Steam launch option, with no moving saves by hand, and both PCs show the game as in sync. Links are stored with your backups, so every PC uses them. After linking, back up each such game once.
+- **Automatic sync without copying**: **Auto sync…** on the Games page turns the Steam launch option on for every game with a save in one go (with a list of what changes), and a game's **⋯** dialog has **Turn on / Turn off automatic sync**. Checkpoint writes it into Steam's settings for the account signed in on this PC; quit Steam first (on Bazzite / SteamOS: Desktop Mode). Games show an **Auto sync** badge.
+- Launch options a game already has are kept: on Bazzite, `~/.lsfg %command%` (lsfg-vk frame generation) becomes `"<Checkpoint>" run --appid <appid> -- ~/.lsfg %command%`; `VAR=1` assignments stay first and options without `%command%` stay game arguments. The line to copy by hand in the **⋯** dialog is merged the same way, and turning automatic sync off puts the old launch options back exactly.
+- If the Checkpoint AppImage was moved, games whose launch option points to the old location are fixed when the app starts while Steam is closed; otherwise a banner offers to fix them.
+- Steam launch option: a notification also shows when a restore starts (before the game opens) and when a backup starts (after you quit), so you know why the game takes a moment to open or the wrapper is still running. On Linux the result replaces it; on Windows it shows as a second notification. A restore or backup that found nothing new now says so too, instead of showing nothing after the "restoring…" / "backing up…" notification.
 
 ### Fixed
+- Steam launch option: an unexpected error in Checkpoint before or after the game no longer stops the game from starting or the wrapper from ending.
+- Steam launch option on Linux: the conflict window no longer inherits Steam's overlay and runtime libraries, which could keep it from opening (the game still gets them).
 - Test versions: the update check picks the highest version among all releases, so a fix for the current version published after a test version no longer hides that test version.
 
 ## [0.8.1] - 2026-11-12

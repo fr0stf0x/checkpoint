@@ -34,6 +34,7 @@ Original requirements (all shipped in 0.1.0): run on Windows and Bazzite; list i
 | `migrate.rs` | Moving a save from Steam account A to B: preview, apply, undo, keep |
 | `storage.rs`, `rclone.rs`, `rcd.rs` | Folder / rclone storage backends; rclone detection, install (SHA-256 checked), Drive connect; one `rclone rcd` per process (localhost, random password, CLI fallback, stopped on exit and before reconnecting) |
 | `run.rs` | Launch wrapper `checkpoint run --appid N -- %command%`: restore if cloud newer, run the game, wait until nothing runs from its folder, back up if local newer; no window |
+| `launch.rs` | Writes the wrapper into a game's Steam launch options (`localconfig.vdf`, edited in place, Steam closed); merges with existing options (`VAR=1` first, then the wrapper, then other wrappers like `~/.lsfg`), stores the original in `launch_options.json`, repairs old Checkpoint paths on start |
 | `notify.rs`, `prompt.rs` | Launch wrapper notifications (notify-rust); the conflict question as `checkpoint prompt <file>` (small window, answer written back to the file) |
 | `link.rs` | Linked Steam accounts (one player): which files this PC syncs, normalized hash, which account a backup is restored from |
 | `updater.rs` | In-app updates (tauri-plugin-updater): check `latest.json`, signed download and install, restart |

@@ -192,7 +192,7 @@ pub fn launcher() -> Result<PathBuf> {
 }
 
 /// Steam's own process (not the web helpers, which exit with it).
-fn steam_running() -> bool {
+pub(crate) fn steam_running() -> bool {
     use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
     let mut sys = System::new();
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
