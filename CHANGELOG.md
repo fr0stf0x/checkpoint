@@ -4,6 +4,11 @@ All notable changes to Checkpoint are listed here, newest first.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 Each release's section is also shown at the top of its GitHub Release notes.
 
+## [Unreleased]
+
+### Fixed
+- Linux: the game grid could stutter on an NVIDIA + Wayland setup because WebKitGTK recomputed each card's blurred badges on every frame of the hover animation. The selection checkbox on a game card and in the games table no longer relies on the browser engine's own checkbox widget (which could render as a plain unstyled white box on some WebKitGTK builds) and is drawn consistently instead.
+
 ## [0.9.0] - 2026-11-24
 
 ### Added
@@ -147,7 +152,7 @@ First release.
 - GitHub Actions release workflow: pushing a `vX.Y.Z` tag runs the tests and publishes a Windows installer and a Linux AppImage.
 - Website (`site/`) with download buttons, live GitHub stats, a setup guide for creating a Google client ID, Privacy Policy and Terms of Service.
 
-[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/fr0stf0x/checkpoint/compare/v0.9.0...HEAD
 [0.8.1]: https://github.com/fr0stf0x/checkpoint/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.2...v0.8.0
 [0.7.2]: https://github.com/fr0stf0x/checkpoint/compare/v0.7.0...v0.7.2
