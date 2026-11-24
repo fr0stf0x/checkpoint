@@ -59,12 +59,35 @@ fn run_prompt(path: &Path, info: &ConflictInfo) -> Result<Choice> {
     }
     fs::write(path, serde_json::to_vec(&PromptFile { info: info.clone(), answer: None })?)?;
     let exe = std::env::current_exe()?;
-    let status = std::process::Command::new(exe).arg("prompt").arg(path).status().context("start the prompt window")?;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("prompt").arg(path);
+    without_steam_libs(&mut cmd);
+    let status = cmd.status().context("start the prompt window")?;
     let file: PromptFile = serde_json::from_slice(&fs::read(path)?)?;
     match file.answer {
         Some(c) => Ok(c),
         None if status.success() => Ok(Choice::Cancel),
         None => anyhow::bail!("prompt window exited with {status}"),
+    }
+}
+
+/// On Linux, Steam starts the launch options with its overlay in `LD_PRELOAD` and its runtime's
+/// libraries in `LD_LIBRARY_PATH`. The game needs them (the wrapper passes its environment on
+/// unchanged), but they can break the prompt window's own libraries (WebKitGTK in the AppImage):
+/// leave out Steam's entries for the window only.
+fn without_steam_libs(cmd: &mut std::process::Command) {
+    if !cfg!(target_os = "linux") {
+        return;
+    }
+    let steam = |p: &str| p.contains("gameoverlayrenderer") || p.contains("steam-runtime") || p.contains("ubuntu12_");
+    for (var, sep) in [("LD_PRELOAD", [' ', ':']), ("LD_LIBRARY_PATH", [':', ':'])] {
+        let Ok(v) = std::env::var(var) else { continue };
+        let kept: Vec<&str> = v.split(&sep[..]).filter(|p| !p.is_empty() && !steam(p)).collect();
+        if kept.is_empty() {
+            cmd.env_remove(var);
+        } else {
+            cmd.env(var, kept.join(&sep[1].to_string()));
+        }
     }
 }
 

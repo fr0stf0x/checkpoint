@@ -8,16 +8,10 @@ Open work, highest priority first. When an item ships, remove it here and add it
 
 ## P1
 
-### Write the Steam launch option for the user
-Today the launch option must be copied from each game's **⋯** dialog into Steam, per game, per PC, per account. Write it into `userdata/<accountid>/config/localconfig.vdf` (`UserLocalConfigStore → Software → Valve → Steam → apps → <appid> → "LaunchOptions"`, text VDF) instead:
-- [ ] Per-game switch, a "Turn on for N games" button with a preview of what changes, a "Remove all" button, and an "Auto sync" badge on game cards.
-- [ ] Steam must be closed (it rewrites the file on exit), as for "Add to Steam library". On Bazzite this means Desktop mode.
-- [ ] Edit only the `LaunchOptions` line of that game (never rewrite the whole file), escape `"` and `\`, keep `localconfig.vdf.checkpoint-bak`, write to a temp file, read it back, then rename.
-- [ ] Merge with existing options: insert the wrapper before `%command%` (`gamemoderun %command%`, `VAR=1 %command%`); without `%command%`, put the wrapper first and keep the rest as game arguments (`-dx11`). Store the original so removing restores it exactly.
-- [ ] A moved or deleted Checkpoint breaks every game that uses it: on start, repair launch options that point to an old Checkpoint path (AppImage moved to another folder).
-- [ ] The launch wrapper must never keep a game from starting: catch panics before and after the game.
+### Steam launch option: what is left
+- [ ] Test on Bazzite: turn on automatic sync for Phantom Blade Zero (`~/.lsfg %command%`), start it from Desktop Mode and Gaming Mode, check frame generation still works, the restore/backup notifications and the conflict window.
 - [ ] Measure how long the wrapper delays a game start when offline, and cap the cloud check with a timeout.
-- [ ] Default to the account signed in on this PC; let the user pick other accounts.
+- [ ] Let the user pick other Steam accounts on this PC (today: the account signed in most recently).
 
 ### Check 0.8.0 on real machines
 - [ ] Bazzite: launch wrapper notifications and the conflict window in Desktop mode and Gaming Mode (does the window show, does the controller work).
@@ -25,6 +19,7 @@ Today the launch option must be copied from each game's **⋯** dialog into Stea
 - [ ] Controller navigation on a handheld in Gaming Mode (ROG Xbox Ally X): right from the last game in a row goes to the next game, focus moves between games and not their small buttons; dialogs, the hint panel, the backup/restore progress dialog and the Quit button.
 - [ ] A forced backup over a conflicting cloud version marks that version **Kept** in History (Phantom Blade Zero is in conflict now).
 - [ ] Move Phantom Blade Zero's save to another Steam account and test it in game (encrypted save, account binding unknown).
+- [ ] One player mode on the real PCs: turn it on from Jonsbo, then open the app on a PC with an account Checkpoint has not seen; it asks once, "yes" joins, the game shows In sync after one backup, and the launch option does not sync before the answer.
 - [ ] Linked accounts on the real PCs (PC A signed in as Acc1, PC B as Acc2): link, back up each bound game once, then a full day/night cycle through the launch option; both PCs show In sync, and the game loads the save on each account (Phantom Blade Zero is encrypted: test in game).
 
 ## P2

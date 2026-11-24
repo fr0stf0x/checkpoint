@@ -265,6 +265,7 @@
     try { S.list = await call('list_games'); }
     catch (e) { S.list = null; fail(t('err.scan_failed'), e); }
     try { S.pending = await call('migrate_pending'); } catch (e) { S.pending = []; }
+    await loadLaunch();
     S.loading = false;
     $('#cGames').textContent = S.list ? S.list.games.length : '';
     render();
@@ -281,11 +282,25 @@
     try { list = await call('list_games'); pending = await call('migrate_pending'); } catch (e) { return; }
     if (!idle()) return;
     S.list = list; S.pending = pending;
+    await loadLaunch();
+    if (!idle()) return;
     $('#cGames').textContent = list.games.length;
     render();
   }
   window.addEventListener('focus', rescanOnReturn);
   document.addEventListener('visibilitychange', rescanOnReturn);
+
+  // The Steam launch options of the listed games (launch.rs): automatic sync on, off, or pointing
+  // to an old Checkpoint path
+  async function loadLaunch() {
+    if (!S.list || !S.info || !S.info.launch_prefix) { S.launch = null; return; }
+    try { S.launch = await call('launch_states', { appids: S.list.games.map((g) => g.appid) }); }
+    catch (e) { S.launch = null; }
+  }
+  const launchOf = (g) => (S.launch && S.launch.games[g.appid]) || null;
+  const launchIs = (g, st) => { const l = launchOf(g); return !!l && l.state === st; };
+  // Games with a wrapper that points to an old Checkpoint path (repaired on start while Steam is closed)
+  const launchOld = () => (S.list ? S.list.games.filter((g) => launchIs(g, 'old')) : []);
 
   async function loadAccounts() {
     try { S.accounts = await call('list_accounts'); $('#cAcc').textContent = S.accounts.length; }
@@ -329,6 +344,15 @@
       out.push(banner('warn', 'swap', h('games.pending_move', v),
         `<button class="btn" data-act="migUndo" data-mid="${esc(m.id)}">${h('move.undo_btn')}</button><button class="btn primary" data-act="migKeep" data-mid="${esc(m.id)}">${h('move.keep_btn')}</button>`));
     });
+    if (S.list && S.list.ask_player) {
+      out.push(banner('accent', 'users', h('player.ask', { account: acctName(thisAccount()), player: acctName(S.list.one_player.sid64) }),
+        `<button class="btn" data-act="playerNo">${h('player.no')}</button><button class="btn primary" data-act="playerYes">${h('player.yes')}</button>`));
+    }
+    const old = launchOld();
+    if (old.length) {
+      out.push(banner('warn', 'alert', h('auto.old_banner', { n: old.length, games: old.map((g) => g.name).join(', ') }),
+        `<button class="btn primary" data-act="launchFix">${ic('refresh')}${h('auto.fix_btn')}</button>`));
+    }
     if (S.info && !S.info.manifest_games) {
       out.push(banner('warn', 'alert', h('games.no_manifest'), `<button class="btn primary" data-act="manifest">${ic('download')}${h('games.download_manifest')}</button>`));
     }
@@ -364,8 +388,11 @@
   }
   function gameFlags(g) {
     return (g.steamid_bound ? linkedHere(g) ? `<span class="flag link">${ic('swap')}${h('games.flag_linked')}</span>` : `<span class="flag">${ic('key')}${h('games.flag_steamid')}</span>` : '')
-      + (g.running ? `<span class="flag run">${ic('play')}${h('games.flag_running')}</span>` : '');
+      + (g.running ? `<span class="flag run">${ic('play')}${h('games.flag_running')}</span>` : '')
+      + (launchIs(g, 'on') ? `<span class="flag auto" title="${h('games.flag_auto_title')}">${ic('refresh')}${h('games.flag_auto')}</span>` : '')
+      + (launchIs(g, 'old') ? `<span class="flag" title="${h('games.flag_auto_old_title')}">${ic('alert')}${h('games.flag_auto_old')}</span>` : '');
   }
+  const hasFlags = (g) => g.steamid_bound || g.running || launchIs(g, 'on') || launchIs(g, 'old');
   function gameWhere(g) {
     return g.roots.length ? g.roots.join('\n') : g.has_rules ? t('games.no_save_here') : t('games.not_in_manifest');
   }
@@ -409,7 +436,7 @@
     const cloud = g.cloud ? `${esc(ago(g.cloud.created_utc))} · ${human(g.cloud.bytes)}` : h('games.cloud_none');
     return `<article class="gcard st-${g.status} ${sel().has(g.appid) ? 'picked' : ''}" tabindex="0" data-card="${g.appid}" aria-label="${esc(g.name)}">
       <div class="cover" data-cover="${g.appid}" title="${esc(g.name + '\n' + where)}">${art('capsule', g.appid, g.name, 'cap')}
-        <div class="badges">${statusPill(g.status)}</div>${pickBox(g)}${g.steamid_bound || g.running ? `<div class="flags">${gameFlags(g)}</div>` : ''}</div>
+        <div class="badges">${statusPill(g.status)}</div>${pickBox(g)}${hasFlags(g) ? `<div class="flags">${gameFlags(g)}</div>` : ''}</div>
       <div class="gbody">
         <div class="gname" title="${esc(g.name)}">${esc(g.name)}</div>
         <div class="gmeta"><span title="${h('games.col_local')}">${ic('monitor')}${local}</span><span title="${h('games.col_cloud')}">${ic('cloud')}${cloud}</span></div>
@@ -452,6 +479,7 @@
       <div class="panehead"><div><div class="eyebrow">${h('nav.games')}</div><h2>${h('games.title', { device: S.info ? S.info.config.device_name : '' })}</h2></div>
         ${S.loading ? '<span class="spin"></span>' : ''}<span class="spacer"></span>
         <button class="btn" data-act="reload" ${S.loading ? 'disabled' : ''}>${ic('refresh')}${h('games.rescan')}</button>
+        ${S.launch ? `<button class="btn" data-act="autoOpen" title="${h('auto.btn_title')}">${ic('play')}${h('auto.btn')}</button>` : ''}
         ${bulk}</div>
       ${banners()}
       <div class="filters">${chips}<span class="spacer"></span>
@@ -500,6 +528,7 @@
         ${games.length ? `<div><button class="btn sm" data-act="migrateAcct" data-sid="${esc(a.steamid64)}">${ic('swap')}${h('accounts.move_btn')}</button></div>` : ''}</div>`;
     }).join('');
     pane.innerHTML = `<div class="panehead"><h2>${h('nav.accounts')}</h2><span class="spacer"></span>${S.list && backendReady() ? `<button class="btn" data-act="linkOpen">${ic('swap')}${h('link.open')}</button>` : ''}</div>
+      ${playerCard()}
       ${groups}
       <div class="cards">${cards || `<div class="empty">${h('accounts.none')}</div>`}</div>
       <p class="note">${h('accounts.footer')}</p>`;
@@ -590,7 +619,7 @@
   function acctName(sid) {
     const a = (S.accounts || []).find((x) => x.steamid64 === sid);
     if (a) return (a.persona_name || a.account_name) + (a.account_name && a.persona_name ? ` (${a.account_name})` : '');
-    const m = linkGroups().flat().find((x) => x.sid64 === sid);
+    const m = linkGroups().flat().concat(S.list && S.list.one_player ? [S.list.one_player] : [], (S.list && S.list.not_player) || []).find((x) => x.sid64 === sid);
     return m && m.name ? m.name : `SteamID …${String(sid).slice(-6)}`;
   }
 
@@ -681,6 +710,46 @@
       if (S.view === 'accounts') render();
     } catch (e) { fail(t('err.link_failed'), e); }
   }
+  // ---------- one player mode (link.rs) ----------
+  // Every Steam account that uses this backup location is one player; a new account is asked once.
+  function playerCard() {
+    if (!S.list || !backendReady() || S.list.cloud_error) return '';
+    const p = S.list.one_player;
+    if (!p) {
+      return `<div class="linkgroup"><div class="lghead">${ic('users')}<h3>${h('player.title')}</h3><span class="spacer"></span>
+        <button class="btn sm primary" data-act="playerOn" ${thisAccount() ? '' : 'disabled'}>${h('player.turn_on')}</button></div>
+        <span class="note">${h('player.intro')}</span></div>`;
+    }
+    const members = (linkGroups().find((g) => g.some((a) => a.sid64 === p.sid64)) || [p]).map((a) => acctName(a.sid64)).join(', ');
+    const notMe = (S.list.not_player || []).map((a) => `<li>${esc(acctName(a.sid64))} <button class="btn sm" data-act="playerForget" data-sid="${esc(a.sid64)}">${h('player.ask_again')}</button></li>`).join('');
+    return `<div class="linkgroup"><div class="lghead">${ic('users')}<h3>${h('player.title')}</h3>${statusPill('sync', t('player.on'))}<span class="spacer"></span>
+      <button class="btn sm" data-act="playerOff">${h('player.turn_off')}</button></div>
+      <span>${h('player.members', { accounts: members })}</span>
+      <span class="note">${h('player.how')}</span>
+      ${notMe ? `<span class="note">${h('player.not_me_list')}</span><ul class="chg">${notMe}</ul>` : ''}</div>`;
+  }
+
+  function confirmPlayerOn() {
+    // Same choice as link::turn_on: this account's group, else the only group (it joins), else alone
+    const me = thisAccount(), gs = linkGroups();
+    const grp = myGroup() || (gs.length === 1 ? gs[0].concat([{ sid64: me }]) : [{ sid64: me }]);
+    modal(`<h3>${h('player.title')}</h3>
+      <p>${h('player.on_body', { accounts: grp.map((a) => acctName(a.sid64)).join(', ') })}</p>
+      <ul class="chg"><li>${h('player.on_ask')}</li><li>${h('player.on_wrapper')}</li><li>${h('link.how_backup')}</li><li>${h('link.how_restore')}</li></ul>
+      <div class="alert warn"><span>${h('player.on_warn')}</span></div>
+      <div class="mfoot"><button class="btn" data-close="1" data-autofocus>${h('common.cancel')}</button><button class="btn primary" data-act="playerOnGo">${h('player.turn_on')}</button></div>`);
+  }
+
+  async function playerCall(cmd, args, done) {
+    busyModal(t('player.title'));
+    try {
+      await call(cmd, args);
+      close(); toast(done);
+      await loadGames();
+      if (S.view === 'accounts') render();
+    } catch (e) { fail(t('err.link_failed'), e); }
+  }
+
   function gamesOfAccount(sid) {
     return (S.list ? S.list.games : []).filter((g) => (g.steam_ids || []).some((x) => toSid(x) === sid));
   }
@@ -1118,15 +1187,67 @@
           ? `<span>${h('snap.count', { n: g.snapshots })}</span><button class="btn sm" data-act="snaps" data-id="${g.appid}">${ic('history')}${h('snap.view')}</button>`
           : `<span class="note">${h('snap.none')}</span>`}</div>
       </div>
-      ${g.steamid_bound || g.running ? `<div>${gameFlags(g)}</div>` : ''}
+      ${hasFlags(g) ? `<div>${gameFlags(g)}</div>` : ''}
       ${linkedHere(g) ? `<div class="alert">${h('link.game_note', { account: acctName(thisAccount()) })}</div>` : ''}
-      ${S.info && S.info.launch_prefix ? `<div class="field"><label class="l" for="launchOpt">${h('game.launch_option')}</label>
-        <div class="secret"><input type="text" id="launchOpt" readonly value="${esc(`${S.info.launch_prefix} ${g.appid} -- %command%`)}">
-        <button class="btn" data-act="copyLaunch">${ic('copy')}${h('game.copy')}</button></div>
-        <span class="note">${h('game.launch_hint')}</span></div>` : ''}
+      ${S.info && S.info.launch_prefix ? launchField(g) : ''}
       <div class="mfoot"><button class="btn" data-act="delCloud" data-id="${g.appid}" ${canDelete ? '' : 'disabled'}>${ic('trash')}${h('game.delete_cloud')}</button>
         <button class="btn" data-act="reportGame" data-id="${g.appid}">${ic('bug')}${h('game.report')}</button><span class="spacer"></span>
         <button class="btn primary" data-close="1" data-autofocus>${h('common.close')}</button></div>`);
+  }
+
+  // The game's Steam launch option: state, a button to turn automatic sync on or off (writes
+  // localconfig.vdf, Steam must be closed) and the line to copy by hand
+  function launchField(g) {
+    const l = launchOf(g);
+    const line = l ? l.merged : `${S.info.launch_prefix} ${g.appid} -- %command%`;
+    const st = l ? l.state : 'off';
+    const acct = S.launch ? S.launch.account : '';
+    const state = !l ? '' : st === 'on'
+      ? `<div class="alert ok"><span>${h('game.launch_is_on', { account: acct })}</span></div>`
+      : st === 'old' ? `<div class="alert warn"><span>${h('game.launch_is_old')}</span></div>` : '';
+    const kept = l && st === 'off' && l.current.trim() ? `<span class="note">${h('game.launch_keeps', { opts: l.current })}</span>` : '';
+    const btn = !l ? '' : st === 'on'
+      ? `<button class="btn" data-act="launchOff" data-id="${g.appid}">${ic('minus')}${h('game.launch_turn_off')}</button>`
+      : `<button class="btn primary" data-act="launchOn" data-id="${g.appid}">${ic('play')}${h(st === 'old' ? 'game.launch_fix' : 'game.launch_turn_on')}</button>`;
+    return `<div class="field"><label class="l" for="launchOpt">${h('game.launch_option')}</label>
+      ${state}${kept}
+      ${btn ? `<div class="row">${btn}</div>` : ''}
+      ${S.launch && S.launch.steam_running ? `<span class="note">${h('auto.steam_running')}</span>` : ''}
+      <div class="secret"><input type="text" id="launchOpt" readonly value="${esc(line)}">
+      <button class="btn" data-act="copyLaunch">${ic('copy')}${h('game.copy')}</button></div>
+      <span class="note">${h('game.launch_hint')}</span></div>`;
+  }
+
+  // Turn automatic sync on or off for several games at once, with what changes
+  function openAuto() {
+    const games = S.list ? S.list.games : [];
+    const toOn = games.filter((g) => (g.local_hash || g.cloud) && !launchIs(g, 'on'));
+    const toOff = games.filter((g) => launchIs(g, 'on') || launchIs(g, 'old'));
+    const nOn = games.filter((g) => launchIs(g, 'on')).length;
+    const row = (g) => {
+      const l = launchOf(g);
+      const keeps = l && l.current.trim() && !launchIs(g, 'old') ? `<span class="note">${h('auto.keeps', { opts: l.current })}</span>` : '<span></span>';
+      return `<div><span>${esc(g.name)}${launchIs(g, 'old') ? ` <span class="note">· ${h('games.flag_auto_old')}</span>` : ''}</span>${keeps}</div>`;
+    };
+    S.autoIds = { on: toOn.map((g) => g.appid), off: toOff.map((g) => g.appid) };
+    modal(`<h3>${h('auto.title')}</h3>
+      <p class="note">${h('auto.intro', { account: S.launch ? S.launch.account : '' })}</p>
+      ${S.launch && S.launch.steam_running ? `<div class="alert warn"><span>${h('auto.steam_running')}</span></div>` : ''}
+      ${toOn.length ? `<p><b>${h('auto.will_turn_on', { n: toOn.length })}</b></p><div class="list auto-list">${toOn.map(row).join('')}</div>` : `<p class="note">${h('auto.all_on')}</p>`}
+      ${nOn ? `<p class="note">${h('auto.already_on', { n: nOn })}</p>` : ''}
+      <div class="mfoot">${toOff.length ? `<button class="btn" data-act="autoOff">${ic('minus')}${h('auto.off_btn', { n: toOff.length })}</button>` : ''}<span class="spacer"></span>
+        <button class="btn" data-close="1">${h('common.close')}</button>
+        ${toOn.length ? `<button class="btn primary" data-act="autoOn">${ic('play')}${h('auto.on_btn', { n: toOn.length })}</button>` : ''}</div>`);
+  }
+
+  async function setLaunch(ids, on, done) {
+    busyModal(t('auto.title'));
+    try {
+      const r = await call('launch_set', { appids: ids, on });
+      close();
+      await loadLaunch(); render();
+      toast(done(r));
+    } catch (e) { fail(t('err.launch_failed'), e); }
   }
 
   /** A game's actions as one menu, for the controller (A on a game) and Enter on the keyboard. */
@@ -1363,6 +1484,12 @@
       else if (a === 'delAll') confirmDeleteAll();
       else if (a === 'delAllGo') deleteAll();
       else if (a === 'addSteam') addToSteam();
+      else if (a === 'launchOn') { const g = game(id); setLaunch([id], true, (r) => t('game.launch_done_on', { game: g.name, account: r.account })); }
+      else if (a === 'launchOff') { const g = game(id); setLaunch([id], false, () => t('game.launch_done_off', { game: g.name })); }
+      else if (a === 'autoOpen') openAuto();
+      else if (a === 'autoOn') setLaunch(S.autoIds.on, true, (r) => t('auto.done_on', { n: r.changed, account: r.account }));
+      else if (a === 'autoOff') setLaunch(S.autoIds.off, false, (r) => t('auto.done_off', { n: r.changed }));
+      else if (a === 'launchFix') { const ids = launchOld().map((g) => g.appid); setLaunch(ids, true, (r) => t('auto.done_fix', { n: r.changed })); }
       else if (a === 'copyLaunch') {
         const inp = $('#launchOpt');
         try { await navigator.clipboard.writeText(inp.value); toast(t('game.copied')); }
@@ -1387,6 +1514,12 @@
       else if (a === 'linkApply') applyLink();
       else if (a === 'unlink') confirmUnlink(n.dataset.sid);
       else if (a === 'unlinkYes') doUnlink(n.dataset.sid);
+      else if (a === 'playerOn') confirmPlayerOn();
+      else if (a === 'playerOnGo') playerCall('one_player_set', { on: true }, t('player.done_on'));
+      else if (a === 'playerOff') playerCall('one_player_set', { on: false }, t('player.done_off'));
+      else if (a === 'playerYes') playerCall('player_answer', { isPlayer: true }, t('player.done_yes'));
+      else if (a === 'playerNo') playerCall('player_answer', { isPlayer: false }, t('player.done_no'));
+      else if (a === 'playerForget') playerCall('not_player_forget', { sid64: n.dataset.sid }, t('player.done_forget'));
       else if (a === 'wzBack') { W.step = 1; renderWizard(); }
       else if (a === 'wzNext') wizardPrepare();
       else if (a === 'wzApply') wizardApply();

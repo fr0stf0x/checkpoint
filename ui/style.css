@@ -228,6 +228,7 @@ details.adv[open]{display:flex;flex-direction:column;gap:10px}
 .box .big{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
 .alert{border-radius:var(--radius-sm);padding:11px 13px;display:flex;flex-direction:column;gap:4px;border:1px solid var(--line-2);background:var(--info-soft)}
 .alert.warn{background:var(--warn-soft);border-color:rgba(251,191,36,.45)}
+.alert.ok{background:var(--ok-soft);border-color:rgba(52,211,153,.45)}
 .alert.bad{background:var(--bad-soft);border-color:rgba(248,113,113,.5)}
 .mfoot{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .plan{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--radius-sm);max-height:340px;overflow:auto}
@@ -361,3 +362,7 @@ ul.chg b{color:var(--fg)}
 .gtable .note{grid-column:1/-1}
 .where{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--radius-sm);padding:10px 12px;background:var(--bg-2)}
 .where .arrow{color:var(--accent-2);font-weight:800}
+.flag.auto{color:var(--ok);background:var(--ok-soft)}
+.auto-list{max-height:300px;overflow:auto}
+.auto-list > div{grid-template-columns:1fr auto}
+.auto-list > div > span:last-child{font-family:var(--f-mono);font-size:12px}

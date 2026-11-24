@@ -6,6 +6,7 @@ rust_i18n::i18n!("locales", fallback = "en");
 
 mod config;
 mod i18n;
+mod launch;
 mod link;
 mod images;
 mod logger;
@@ -313,6 +314,39 @@ async fn unlink_accounts(sid64: String) -> Result<Vec<Vec<link::LinkedAccount>>,
     .await
 }
 
+/// Turn "one player" mode on or off (link.rs).
+#[tauri::command]
+async fn one_player_set(on: bool) -> Result<(), String> {
+    blocking("one_player_set", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("One player mode {}", if on { "on" } else { "off" });
+        sync::set_one_player(&Config::load(), on)
+    })
+    .await
+}
+
+/// One player mode: whether the account signed in on this PC is the player.
+#[tauri::command]
+async fn player_answer(is_player: bool) -> Result<(), String> {
+    blocking("player_answer", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("One player mode: this PC's account is {}", if is_player { "the player" } else { "not the player" });
+        sync::answer_player(&Config::load(), is_player)
+    })
+    .await
+}
+
+/// One player mode: ask an account that answered "not me" again.
+#[tauri::command]
+async fn not_player_forget(sid64: String) -> Result<(), String> {
+    blocking("not_player_forget", move || {
+        let _g = OP.lock().unwrap_or_else(|e| e.into_inner());
+        info!("One player mode: asking an account again");
+        sync::forget_not_player(&Config::load(), &sid64)
+    })
+    .await
+}
+
 /// Games whose save is tied to these accounts, and how (for the link dialog).
 #[tauri::command]
 async fn link_preview(ids: Vec<String>) -> Result<Vec<migrate::LinkGame>, String> {
@@ -442,6 +476,27 @@ async fn delete_cloud_all() -> Result<sync::DeleteResult, String> {
         let r = sync::delete_cloud_all(&Config::load())?;
         info!("Deleted {} versions of {} games from the cloud", r.versions, r.games);
         Ok(r)
+    })
+    .await
+}
+
+fn steam_root() -> anyhow::Result<std::path::PathBuf> {
+    let cfg = Config::load();
+    steam::find_root(cfg.steam_root_override.as_deref()).ok_or_else(|| anyhow::anyhow!("{}", crate::tr!("err.no_steam")))
+}
+
+/// The Steam launch options of these games for the account signed in on this PC (launch.rs).
+#[tauri::command]
+async fn launch_states(appids: Vec<u32>) -> Result<launch::LaunchInfo, String> {
+    blocking("launch_states", move || launch::states(&steam_root()?, &appids)).await
+}
+
+/// Turn the launch wrapper on or off in these games' Steam launch options (Steam must be closed).
+#[tauri::command]
+async fn launch_set(appids: Vec<u32>, on: bool) -> Result<launch::SetResult, String> {
+    blocking("launch_set", move || {
+        info!("Launch options: turning automatic sync {} for {} game(s)", if on { "on" } else { "off" }, appids.len());
+        launch::set(&steam_root()?, &appids, on)
     })
     .await
 }
@@ -761,6 +816,18 @@ fn main() {
                 b = b.initialization_script("window.__CHECKPOINT_PROMPT__ = true;");
             }
             b.build()?;
+            // Not in debug builds: they would point every game at target/debug
+            if !asking && !cfg!(debug_assertions) {
+                // Launch options that point to an old Checkpoint path (moved AppImage): fix them
+                // while Steam is closed, or the games would not start
+                std::thread::spawn(|| {
+                    if let Ok(root) = steam_root() {
+                        if let Err(e) = launch::repair(&root) {
+                            log::warn!("Launch options: repair failed: {}", crate::i18n::to_en(&format!("{e:#}")));
+                        }
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -781,6 +848,8 @@ fn main() {
             delete_cloud_game,
             delete_cloud_all,
             add_to_steam,
+            launch_states,
+            launch_set,
             history,
             pick_folder,
             migrate_preview,
@@ -788,6 +857,9 @@ fn main() {
             link_accounts,
             unlink_accounts,
             link_preview,
+            one_player_set,
+            player_answer,
+            not_player_forget,
             migrate_undo,
             migrate_keep,
             migrate_pending,
